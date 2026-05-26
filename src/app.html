@@ -4,12 +4,20 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
-		<link rel="preload" href="/fonts/tanker-regular.otf" as="font" type="font/otf" crossorigin />
+		<link rel="preload" href="/fonts/PPFormula-Condensed-Variable.ttf" as="font" type="font/ttf" crossorigin />
+		<link rel="preload" href="/fonts/Supreme-Variable.ttf" as="font" type="font/ttf" crossorigin />
 		<style>
 			@font-face {
-				font-family: 'Tanker';
-				src: url('/fonts/tanker-regular.otf') format('opentype');
-				font-weight: normal;
+				font-family: 'PP Formula Condensed';
+				src: url('/fonts/PPFormula-Condensed-Variable.ttf') format('truetype');
+				font-weight: 100 900;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'Supreme Variable';
+				src: url('/fonts/Supreme-Variable.ttf') format('truetype');
+				font-weight: 100 900;
 				font-style: normal;
 				font-display: swap;
 			}
@@ -17,7 +25,7 @@
 				margin: 0;
 				padding: 0;
 				background: #ffffff;
-				font-family: 'Tanker', sans-serif;
+				font-family: 'PP Formula Condensed', sans-serif;
 			}
 		</style>
 		%sveltekit.head%

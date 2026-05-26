@@ -1,0 +1,84 @@
+/**
+ * Layout dock fact + opinioni — Figma sostenibilità-main (2:234), frame 1512×982
+ */
+.fact-main-stage {
+	--figma-w: 1512;
+	--figma-h: 982;
+	--dock-col-w: min(424px, calc(100vw * 424 / var(--figma-w)));
+	--dock-inset-x: max(16px, calc(100vw * 80 / var(--figma-w)));
+	--dock-top: max(120px, calc(100vh * 180 / var(--figma-h)));
+	--dock-opinions-left: calc(66.6667% - 2px);
+	--dock-opinion-gap: 20px;
+	--dock-opinion-h: 96px;
+	--dock-opinions-stack-h: calc(6 * var(--dock-opinion-h) + 5 * var(--dock-opinion-gap));
+}
+
+.fact-main-layout {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.fact-main-card {
+	position: absolute;
+	left: var(--dock-inset-x);
+	top: var(--dock-top);
+	width: var(--dock-col-w);
+	pointer-events: none;
+}
+
+.fact-main-card :global(.fact-card) {
+	width: 100%;
+	max-width: 424px;
+	pointer-events: none;
+}
+
+.fact-main-opinions {
+	position: absolute;
+	left: var(--dock-opinions-left);
+	top: var(--dock-top);
+	width: var(--dock-col-w);
+	display: flex;
+	flex-direction: column;
+	gap: var(--dock-opinion-gap);
+	pointer-events: auto;
+	box-sizing: border-box;
+	overflow: visible;
+}
+
+.fact-main-opinions .opinions-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dock-opinion-gap);
+	width: 100%;
+}
+
+/* Scala proporzionale se l’altezza non basta per 6 opinioni a 96px */
+@media (max-height: 900px) {
+	.fact-main-layout {
+		transform: scale(
+			min(
+				1,
+				calc((100vh - var(--dock-top) - 28px) / var(--dock-opinions-stack-h)),
+				calc((100vw - 32px) / 1512)
+			)
+		);
+		transform-origin: top center;
+		width: 100%;
+		height: calc(var(--dock-top) + var(--dock-opinions-stack-h));
+		left: 0;
+		right: 0;
+	}
+
+	.fact-main-card,
+	.fact-main-opinions {
+		transform: none;
+	}
+}
+
+@media (max-width: 900px) {
+	.fact-main-layout {
+		transform: scale(min(1, calc((100vw - 24px) / 1512)));
+		transform-origin: top center;
+	}
+}

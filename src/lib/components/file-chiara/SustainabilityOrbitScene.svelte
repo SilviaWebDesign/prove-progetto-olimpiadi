@@ -50,7 +50,7 @@
     reducedMotion = false
   } = $props();
 
-  const DOCK_POS = new THREE.Vector3(-3.55, 0.12, 1.15);
+  const DOCK_POS = new THREE.Vector3(-1.45, 0.12, 1.15);
   const TREE_SIZE = 2.1;
   const ORBIT_RADIUS_FALLBACK = 1.92;
   const ORBIT_RX_RATIO = 1;
@@ -59,7 +59,7 @@
   /** Rotazione albero guidata dallo scroll (niente auto-animazione a tempo). */
   const TREE_SCROLL_TURNS = 1.15;
   /** Smussamento scroll → posizione card (lambda damp) */
-  const SCROLL_SMOOTH_LAMBDA = 8;
+  const SCROLL_SMOOTH_LAMBDA = 5.6;
   /** Ritarda il docking: l'albero resta "in mezzo" alle card più a lungo */
   const DOCK_MOVE_START_T = 0.32;
   const BEHIND_HYSTERESIS_FRAMES = 3;
@@ -72,6 +72,8 @@
   let targetScrollProgress = 0;
   let smoothedScrollProgress = 0;
   let lastFrameTime = 0;
+  let lockedDockDriverIndex = -1;
+  let lockedSegmentIndex = -1;
   const treeCenter = new THREE.Vector3(0, 0, 0);
 
   let container = $state(null);
@@ -217,38 +219,84 @@
 
   function updateCardTransforms() {
     if (!camera) return;
+    const activeCamera = camera;
     syncOrbitFromTree();
     const orbitAngle = getOrbitAngle(smoothedScrollProgress);
     const n = facts.length;
+    const rx = orbitRadius * ORBIT_RX_RATIO;
+    const rz = orbitRadius * ORBIT_RZ_RATIO;
     const inOrbitPhase =
       smoothedScrollProgress >= orbitStart - 0.01 || scrollProgress >= orbitStart - 0.01;
-    const focusedCardIndex = facts.findIndex((_, i) => {
-      const dockT = getFactDockT(scrollProgress, factSegments, i);
-      return isFactSegmentActive(scrollProgress, factSegments, i) && dockT >= DOCK_UI_THRESHOLD;
-    });
+    const segmentActiveIndex = facts.findIndex((_, i) =>
+      isFactSegmentActive(scrollProgress, factSegments, i)
+    );
+    const activeDockT =
+      segmentActiveIndex >= 0 ? getFactDockT(scrollProgress, factSegments, segmentActiveIndex) : 0;
+
+    if (segmentActiveIndex < 0) {
+      lockedDockDriverIndex = -1;
+      lockedSegmentIndex = -1;
+    } else if (lockedSegmentIndex !== segmentActiveIndex || lockedDockDriverIndex < 0) {
+      let leftMostX = Number.POSITIVE_INFINITY;
+      let nextDriver = segmentActiveIndex;
+      for (let i = 0; i < n; i++) {
+        const baseAngle = (i / n) * Math.PI * 2 - Math.PI / 2 + orbitAngle;
+        const ox = treeCenter.x + Math.cos(baseAngle) * rx;
+        if (ox < leftMostX) {
+          leftMostX = ox;
+          nextDriver = i;
+        }
+      }
+      lockedDockDriverIndex = nextDriver;
+      lockedSegmentIndex = segmentActiveIndex;
+    }
+    const dockDriverIndex = lockedDockDriverIndex;
+
+    /** @param {number} segProgress */
+    const getDockBlendForSegmentProgress = (segProgress) => {
+      // Più tempo in orbita tra una card fissata e la successiva:
+      // ingresso dock ritardato, plateau centrale, rilascio prima della fine segmento.
+      if (segProgress < 0.5) return 0;
+      if (segProgress < 0.68) {
+        const t = rangeProgress(segProgress, 0.5, 0.68);
+        return t * t * (3 - 2 * t);
+      }
+      if (segProgress < 0.84) return 1;
+      const t = rangeProgress(segProgress, 0.84, 1);
+      const ease = t * t * (3 - 2 * t);
+      return 1 - ease;
+    };
+
+    const focusedCardIndex =
+      segmentActiveIndex >= 0 && activeDockT >= DOCK_UI_THRESHOLD ? dockDriverIndex : -1;
 
     cardObjects.forEach((obj, index) => {
       const baseAngle = (index / n) * Math.PI * 2 - Math.PI / 2 + orbitAngle;
-      const rx = orbitRadius * ORBIT_RX_RATIO;
-      const rz = orbitRadius * ORBIT_RZ_RATIO;
       const ox = treeCenter.x + Math.cos(baseAngle) * rx;
       const oz = treeCenter.z + Math.sin(baseAngle) * rz;
       const oy = treeCenter.y;
 
-      const dockT = getFactDockT(scrollProgress, factSegments, index);
-      const activeCard = isFactSegmentActive(scrollProgress, factSegments, index);
+      const dockT =
+        index === dockDriverIndex && segmentActiveIndex >= 0
+          ? activeDockT
+          : getFactDockT(scrollProgress, factSegments, index);
+      const activeCard = segmentActiveIndex >= 0 && index === dockDriverIndex;
       const past = isFactPast(index);
       const isDocked = activeCard && dockT > 0.35;
       const uiDocked = activeCard && dockT >= DOCK_UI_THRESHOLD;
+      const seg = activeCard ? factSegments[segmentActiveIndex] : factSegments[index];
+      const segProgress = seg ? rangeProgress(scrollProgress, seg.start, seg.end) : 0;
 
       let tx = ox;
       let ty = oy;
       let tz = oz;
       let scale = CARD_SCENE_SCALE;
       const dockMoveT = rangeProgress(dockT, DOCK_MOVE_START_T, 1);
+      const dockBlend = activeCard ? getDockBlendForSegmentProgress(segProgress) : 0;
+      const dockEaseRaw = Math.max(dockMoveT, dockBlend);
+      const dockEase = dockEaseRaw * dockEaseRaw * (3 - 2 * dockEaseRaw);
 
-      if (activeCard && dockMoveT > 0 && !uiDocked) {
-        const dockEase = dockMoveT * dockMoveT * (3 - 2 * dockMoveT);
+      if (activeCard && dockMoveT > 0) {
         tx = lerp(ox, DOCK_POS.x, dockEase);
         ty = lerp(oy, DOCK_POS.y, dockEase);
         tz = lerp(oz, DOCK_POS.z, dockEase);
@@ -260,13 +308,39 @@
       obj.updateMatrixWorld(true);
 
       const isLeftOfTree = tx <= treeCenter.x - 0.08;
+      const dockLocked = activeCard && dockBlend >= 0.98;
+      if (dockLocked) {
+        tx = DOCK_POS.x;
+        ty = DOCK_POS.y;
+        tz = DOCK_POS.z;
+        scale = CARD_SCENE_SCALE * 1.05;
+        obj.position.set(tx, ty, tz);
+        obj.scale.setScalar(scale);
+        obj.updateMatrixWorld(true);
+      }
       const frontalTurnT =
-        activeCard && isLeftOfTree ? rangeProgress(dockMoveT, 0.12, 0.92) : 0;
+        activeCard && isLeftOfTree ? rangeProgress(dockMoveT, 0.08, 0.96) : 0;
       const frontalTurnEase = frontalTurnT * frontalTurnT * (3 - 2 * frontalTurnT);
+      const dockFrontT = activeCard ? rangeProgress(dockT, 0.12, 0.98) : 0;
+      const dockFrontEase = Math.max(dockFrontT * dockFrontT * (3 - 2 * dockFrontT), dockBlend);
+      const frontalPlateau = activeCard && dockBlend >= 0.8;
+      const forceFrontal = activeCard && uiDocked;
 
-      const turnSmooth = 0.14 + frontalTurnEase * 0.18;
-      if (frontalTurnEase > 0) {
-        _lookTarget.copy(treeCenter).lerp(camera.position, frontalTurnEase);
+      const turnSmooth = 0.1 + frontalTurnEase * 0.14;
+      if (activeCard) {
+        _lookTarget.copy(treeCenter).lerp(activeCamera.position, dockFrontEase);
+        orientCardTo(obj, _lookTarget, 0.12 + dockFrontEase * 0.16);
+        if (forceFrontal) {
+          obj.quaternion.copy(activeCamera.quaternion);
+        } else if (frontalPlateau) {
+          obj.quaternion.slerp(activeCamera.quaternion, 0.24);
+        } else {
+          _targetQuat.copy(obj.quaternion);
+          _targetQuat.slerp(activeCamera.quaternion, dockFrontEase);
+          obj.quaternion.slerp(_targetQuat, 0.12 + dockFrontEase * 0.22);
+        }
+      } else if (frontalTurnEase > 0) {
+        _lookTarget.copy(treeCenter).lerp(activeCamera.position, frontalTurnEase);
         orientCardTo(obj, _lookTarget, turnSmooth);
       } else {
         orientCardTo(obj, treeCenter, turnSmooth);
@@ -278,10 +352,7 @@
       } else if (focusedCardIndex >= 0 && index !== focusedCardIndex) {
         opacity = 0;
       } else if (activeCard) {
-        const isBackOfTree = tz < treeCenter.z - 0.02;
-        const shouldHideForDock = uiDocked && isLeftOfTree && isBackOfTree;
-        const dockHideT = rangeProgress(dockT, 0.82, 1);
-        opacity = shouldHideForDock ? 1 - dockHideT : 1;
+        opacity = 1;
       } else if (past) {
         opacity = 0.35;
       } else if (inOrbitPhase) {
@@ -290,7 +361,7 @@
 
       const el = /** @type {HTMLDivElement} */ (obj.element);
       const mountEntry = cardMounts[index];
-      const behindNow = opacity > 0.01 && isCardBehindTree(obj, isDocked);
+      const behindNow = !dockLocked && opacity > 0.01 && isCardBehindTree(obj, isDocked);
       if (mountEntry) {
         mountEntry.behindFrames = behindNow ? mountEntry.behindFrames + 1 : 0;
       }

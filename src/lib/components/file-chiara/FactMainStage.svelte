@@ -90,6 +90,8 @@
     width: var(--dock-col-w);
     pointer-events: none;
     transform-origin: top left;
+    opacity: 0;
+    visibility: hidden;
   }
 
   .fact-main-card :global(.fact-card) {

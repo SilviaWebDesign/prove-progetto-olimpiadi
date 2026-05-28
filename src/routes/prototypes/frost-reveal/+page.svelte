@@ -4,85 +4,43 @@
   // IMAGE: replace with your own URL or a local path like '/my-photo.jpg'
   const IMAGE = 'https://picsum.photos/seed/frost-reveal/1200/700';
 
-  // ── Scraping brush ────────────────────────────────────────────────────────
-  const BRUSH_SIZE       = 48;   // px  — radius of the soft reveal area     (↑ = bigger swipe)
-  const BRUSH_HARDNESS   = 0.11; // 0–1 — center erase strength per pass     (↓ = softer/more gradual)
-  const EDGE_SHARD_COUNT = 22;   // int — angular fragment count at edge      (↑ = more fractured)
-  const EDGE_SOFTNESS    = 0.38; // 0–1 — where edge irregularity begins      (↓ = earlier breakup)
-
-  // ── Snow powder ───────────────────────────────────────────────────────────
-  const POWDER_DENSITY = 52;    // int — dust particles per interpolated step (↑ = more snowy)
-  const POWDER_SPREAD  = 3.1;   // ×   — how far beyond brush powder scatters (↑ = wider / more melt)
-  const POWDER_OPACITY = 0.10;  // 0–1 — max alpha per powder particle        (↑ = more visible)
-
-  // ── Snowflake crystals ────────────────────────────────────────────────────
-  const SNOWFLAKE_DENSITY  = 0.22; // 0–1 — probability of snowflake per step  (↑ = more snowy)
-  const SNOWFLAKE_MIN_SIZE = 3;    // px  — smallest snowflake radius
-  const SNOWFLAKE_MAX_SIZE = 15;   // px  — largest snowflake radius            (↑ = more crystalline)
-  const SNOWFLAKE_OPACITY  = 0.48; // 0–1 — icy-mark visibility                 (↑ = more visible)
-
-  // ── Crystal cracks ────────────────────────────────────────────────────────
-  const CRACK_DENSITY          = 2;    // int — cracks per step                  (↑ = more cracked)
-  const CRACK_OPACITY          = 0.15; // 0–1 — crack erase strength             (↓ = more subtle)
-  const CRYSTAL_BRANCH_OPACITY = 0.40; // 0–1 — branch opacity as fraction of crack opacity
-
   // ── Frost appearance ──────────────────────────────────────────────────────
-  const FROST_OPACITY  = 0.9;   // 0–1 — white/blue cloud overlay strength   (↑ = more opaque)
-  const GRAIN_OPACITY  = 0.26;  // 0–1 — noise grain tile intensity           (↑ = more gritty)
-  const SCRATCH_OPACITY = 0.14; // 0–1 — static diagonal ice-line opacity     (↑ = more scratched)
-  const BLUR_AMOUNT    = 18;    // px  — image blur on canvas                  (↑ = hazier frost)
+  const FROST_OPACITY   = 0.9;
+  const GRAIN_OPACITY   = 0.26;
+  const SCRATCH_OPACITY = 0.14;
+  const BLUR_AMOUNT     = 18;
 
-  // ── Interaction mode ──────────────────────────────────────────────────────
-  // true  → must hold mouse/pointer button to scrape (default, more intentional)
-  // false → scraping happens on hover, no click needed
-  const SCRAPE_ONLY_ON_POINTER_DOWN = false;
+  // ── Initial frost texture ─────────────────────────────────────────────────
+  const INITIAL_SNOWFLAKE_DENSITY = 40;
+  const INITIAL_SPECKLE_DENSITY   = 600;
+  const INITIAL_CRYSTAL_OPACITY   = 0.55;
 
-  // ── Brush angularity ──────────────────────────────────────────────────────
-  const BRUSH_SQUARENESS      = 0.72; // 0 = circular dist, 1 = square/diamond dist at edge
-  const ANGULAR_FRAGMENT_SIZE = 0.09; // × BRUSH_SIZE — controls edge fragment radius (↑ = bigger shards)
-
-  // ── Edge snowflakes ───────────────────────────────────────────────────────
-  const SNOWFLAKE_EDGE_AMOUNT = 0.18; // 0–1 — probability of small snowflake at brush edge per step
-
-  // ── Automatic melt spreading ──────────────────────────────────────────────
-  const MELT_SPREAD            = 4.0;  // × BRUSH_SIZE — max radius of melt fragment scatter
-  const MELT_OPACITY           = 0.05; // 0–1 — max alpha per melt fragment (↑ = more melt)
-  const MELT_FRAGMENT_COUNT    = 24;   // int — secondary dissolve fragments per step
-  const MELT_RADIUS_MULTIPLIER = 1.8;  // × BRUSH_SIZE — inner edge of the melt zone
-
-  // ── Automatic side defrost (post-cursor lateral trail dissolve) ──────────
-  const ENABLE_AUTO_SIDE_DEFROST    = true;
-  const AUTO_DEFROST_DELAY          = 100;  // ms  — pause before defrost begins after cursor passes
-  const AUTO_DEFROST_LIFETIME       = 1400; // ms  — total duration each defrost point stays active
-  const AUTO_DEFROST_STRENGTH       = 0.10; // 0–1 — erase alpha per fragment (↑ = stronger dissolve)
-  const AUTO_DEFROST_SIDE_OFFSET    = 26;   // px  — inner edge of defrost band from path center
-  const AUTO_DEFROST_SPREAD         = 34;   // px  — width of the defrost band on each side (↑ = wider)
-  const AUTO_DEFROST_FRAGMENT_COUNT = 12;   // int — eraser fragments per active point per frame (↑ = denser)
-  const AUTO_DEFROST_ALONG_SCATTER  = 1.0;  // × BRUSH_SIZE — scatter along motion axis
-  const AUTO_DEFROST_POINT_SPACING  = 10;   // px  — min gap between stored defrost points
-  const AUTO_DEFROST_MAX_POINTS     = 80;   // int — safety cap on defrost point queue
-
-  // ── Initial frost texture (before any interaction) ────────────────────────
-  const INITIAL_SNOWFLAKE_DENSITY = 40;   // int — snowflakes embedded in fresh frost (↑ = more crystals)
-  const INITIAL_SPECKLE_DENSITY   = 600;  // int — icy speckles on fresh frost surface (↑ = more snowy)
-  const INITIAL_CRYSTAL_OPACITY   = 0.55; // 0–1 — visibility of embedded frost details (↑ = more visible)
+  // ── Temporary reveal mask ─────────────────────────────────────────────────
+  // The cursor punches a temporary hole in the frost that fades out over
+  // REVEAL_LIFETIME ms. No restoration painting needed — frost recomposes
+  // automatically as the reveal mask fades.
+  const REVEAL_RADIUS           = 72;   // px  — radius of the reveal hole
+  const REVEAL_LIFETIME         = 1600; // ms  — how long each reveal point stays active
+  const REVEAL_POINT_SPACING    = 6;    // px  — min distance between stored points
+  const REVEAL_EDGE_SOFTNESS    = 0.38; // 0–1 — inner edge of the shard scatter zone
+  const REVEAL_SHARD_COUNT      = 20;   // int — pre-generated angular fragments per point
+  const REVEAL_SNOWFLAKE_CHANCE = 0.06; // 0–1 — probability of icy snowflake at edge
   // ──────────────────────────────────────────────────────────────────────────
 
   let wrapper;
   let canvas;
-  let ctx   = null;
-  let imgEl = null;
-  let cssW  = 0;
-  let cssH  = 0;
+  let ctx        = null;
+  let imgEl      = null;
+  let cssW       = 0;
+  let cssH       = 0;
 
-  let isPointerDown = false;
-  let lastX         = undefined;
-  let lastY         = undefined;
+  let frostedCanvas = null;  // offscreen permanent frost layer — drawn once, never erased
+  let frostedCtx    = null;
 
-  let trailPoints = [];      // active side-melt trail points
-  let lastTrailX  = undefined;
-  let lastTrailY  = undefined;
-  let rafId       = null;    // requestAnimationFrame handle for side melt loop
+  let revealPoints = [];     // active temporary reveal points
+  let lastRevealX  = undefined;
+  let lastRevealY  = undefined;
+  let animRafId    = null;
 
   // ─── Canvas setup on mount ────────────────────────────────────────────────
 
@@ -94,32 +52,40 @@
     cssW = rect.width;
     cssH = rect.height;
 
-    // Set internal canvas pixel resolution at device DPR
     canvas.width  = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
 
     ctx = canvas.getContext('2d');
-    // Scale once so all drawing uses CSS pixel coordinates everywhere
     ctx.scale(dpr, dpr);
 
-    // Load source image (needs crossOrigin for canvas API to read pixels)
-    const img     = new Image();
+    // Offscreen permanent frost canvas — painted once, never erased or modified
+    frostedCanvas        = document.createElement('canvas');
+    frostedCanvas.width  = Math.round(cssW * dpr);
+    frostedCanvas.height = Math.round(cssH * dpr);
+    frostedCtx           = frostedCanvas.getContext('2d');
+    frostedCtx.scale(dpr, dpr);
+
+    const img       = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload    = () => { imgEl = img; drawFrost(); };
-    img.src       = IMAGE;
+    img.onload      = () => { imgEl = img; drawFrost(); };
+    img.src         = IMAGE;
   });
 
   // ─────────────────────────────────────────────────────────────────────────
   // FROST DRAWING
-  // The canvas starts fully painted with the frosted ice surface.
-  // Scraping erases pixels from this canvas (destination-out),
-  // revealing the sharp <img> element that sits underneath it.
+  // All sub-functions draw to the permanent offscreen frostedCanvas.
+  // The main canvas is rebuilt every frame by stamping frostedCanvas then
+  // punching temporary holes with destination-out for active reveal points.
   // ─────────────────────────────────────────────────────────────────────────
 
   function drawFrost() {
-    if (!ctx || !imgEl) return;
+    if (!frostedCtx || !imgEl) return;
     const w = cssW;
     const h = cssH;
+
+    // Temporarily route all sub-function drawing to the offscreen frost canvas
+    const mainCtx = ctx;
+    ctx = frostedCtx;
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
@@ -130,6 +96,10 @@
     drawGrain(w, h);               // C: Perlin-like noise grain texture
     drawStaticScratches(w, h);     // D: thin diagonal ice-line marks
     drawInitialFrostDetails(w, h); // E: embedded snowflakes, speckles, crystal branches
+
+    ctx = mainCtx;
+
+    renderCurrentState();
   }
 
   // Sub-layer A ─────────────────────────────────────────────────────────────
@@ -342,139 +312,16 @@
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
-  function onPointerDown(e) {
-    // Ignore anything except primary button (left click / first touch)
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    isPointerDown = true;
-    const { x, y } = getCoords(e);
-    lastX = x;
-    lastY = y;
-    doScrape(x, y, x, y); // draw an immediate mark at click point
-  }
-
   function onPointerMove(e) {
     const { x, y } = getCoords(e);
-    if (SCRAPE_ONLY_ON_POINTER_DOWN && !isPointerDown) {
-      lastX = x;
-      lastY = y;
-      return;
-    }
-    if (lastX !== undefined) {
-      doScrape(x, y, lastX, lastY);
-      if (ENABLE_AUTO_SIDE_DEFROST) addAutoDefrostPoint(x, y, lastX, lastY);
-    }
-    lastX = x;
-    lastY = y;
-  }
-
-  function onPointerUp() {
-    isPointerDown = false;
+    addRevealPoint(x, y);
+    lastRevealX = x;
+    lastRevealY = y;
   }
 
   function onPointerLeave() {
-    isPointerDown = false;
-    lastX      = undefined;
-    lastY      = undefined;
-    lastTrailX = undefined; // reset so re-entry creates a clean direction vector
-    lastTrailY = undefined;
-  }
-
-  // ═════════════════════════════════════════════════════════════════════════
-  // SCRAPING — layered soft brush system
-  //
-  // Each pointer step runs four passes in order:
-  //   1. destination-out  drawSoftReveal     — soft radial gradient erase
-  //   2. destination-out  drawPowderParticles — speckled edge dust
-  //   3. destination-out  drawCrystalCrack    — thin angular fracture lines
-  //   4. source-over      drawSnowflake        — icy-blue crystal marks
-  //
-  // Snowflakes switch to source-over so they appear as visible ice-crystal
-  // decorations rather than plain holes. They paint icy blue-white strokes
-  // on top of whatever is on the canvas (frost OR already-revealed image).
-  // Subsequent destination-out passes can erase them if the user scrapes again.
-  // ═════════════════════════════════════════════════════════════════════════
-
-  function doScrape(x, y, px, py) {
-    if (!ctx) return;
-
-    const dx         = x - px;
-    const dy         = y - py;
-    const dist       = Math.sqrt(dx * dx + dy * dy);
-    const moveAngle  = Math.atan2(dy, dx); // direction of pointer travel
-
-    // Dense-enough interpolation so fast drags leave no bare gaps
-    const stepSize = Math.max(BRUSH_SIZE * 0.2, 1);
-    const steps    = Math.max(1, Math.ceil(dist / stepSize));
-
-    for (let s = 1; s <= steps; s++) {
-      const t  = s / steps;
-      const ix = px + dx * t;
-      const iy = py + dy * t;
-
-      // ── Erase passes ───────────────────────────────────────────────────
-      ctx.globalCompositeOperation = 'destination-out';
-
-      // ① Soft main reveal — low-opacity radial gradient, accumulates with drag
-      drawSoftReveal(ix, iy);
-
-      // ② Powder particles — tiny dots scattered at and beyond the brush edge
-      drawPowderParticles(ix, iy);
-
-      // ② b — Melt spread: very subtle secondary dissolve in a wider halo
-      drawMeltSpread(ix, iy);
-
-      // ③ Crystal cracks — straight angular fractures (30°/45°/60° branches)
-      for (let c = 0; c < CRACK_DENSITY; c++) {
-        // Mix: some cracks align with motion (feels like ice splitting along drag),
-        // others are fully random (crystalline chaos)
-        const crackAngle = Math.random() < 0.35
-          ? moveAngle + (Math.random() - 0.5) * 1.0
-          : Math.random() * Math.PI * 2;
-        drawCrystalCrack(
-          ix + (Math.random() - 0.5) * BRUSH_SIZE * 0.8,
-          iy + (Math.random() - 0.5) * BRUSH_SIZE * 0.8,
-          crackAngle,
-          BRUSH_SIZE * (0.35 + Math.random() * 0.8),
-          CRACK_OPACITY * (0.8 + Math.random() * 0.4)
-        );
-      }
-
-      // ── Decorative pass ────────────────────────────────────────────────
-      ctx.globalCompositeOperation = 'source-over';
-
-      // ④ Snowflake crystal marks — icy blue-white, embedded in surface
-      //    Drawn AFTER the erase so they appear on cleared AND frosted areas.
-      if (Math.random() < SNOWFLAKE_DENSITY) {
-        const sAngle  = Math.random() * Math.PI * 2;
-        const sDist   = BRUSH_SIZE * (0.15 + Math.random() * 0.85);
-        const sRadius = SNOWFLAKE_MIN_SIZE + Math.random() * (SNOWFLAKE_MAX_SIZE - SNOWFLAKE_MIN_SIZE);
-        drawSnowflake(
-          ix + Math.cos(sAngle) * sDist,
-          iy + Math.sin(sAngle) * sDist,
-          sRadius,
-          Math.random() * Math.PI,
-          SNOWFLAKE_OPACITY * (0.55 + Math.random() * 0.45)
-        );
-      }
-
-      // ④ b — Edge snowflakes: small delicate flakes at the outer brush boundary
-      if (Math.random() < SNOWFLAKE_EDGE_AMOUNT) {
-        const eAngle  = Math.random() * Math.PI * 2;
-        const eDist   = BRUSH_SIZE * (0.9 + Math.random() * 0.55);
-        const eRadius = SNOWFLAKE_MIN_SIZE * 0.5 + Math.random() * (SNOWFLAKE_MAX_SIZE * 0.45);
-        drawSnowflake(
-          ix + Math.cos(eAngle) * eDist,
-          iy + Math.sin(eAngle) * eDist,
-          eRadius,
-          Math.random() * Math.PI,
-          SNOWFLAKE_OPACITY * (0.28 + Math.random() * 0.38)
-        );
-      }
-    }
-
-    // Always end in a clean state
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
+    lastRevealX = undefined;
+    lastRevealY = undefined;
   }
 
   // ── Angular fragment helper ──────────────────────────────────────────────
@@ -538,160 +385,10 @@
     ctx.restore();
   }
 
-  // ── Pass ①: Soft radial reveal ───────────────────────────────────────────
+  // ── Snowflake crystal mark ────────────────────────────────────────────────
   //
-  // A radial gradient whose alpha drops from BRUSH_HARDNESS at the centre to
-  // zero at the edge. One drag pass removes ~22% of frost at the centre;
-  // multiple overlapping passes accumulate to full reveal.
-  // The edge-shard fragments break the circular symmetry into a fractured border.
-  function drawSoftReveal(cx, cy) {
-    const r = BRUSH_SIZE;
-
-    // Soft gradient core — outer radius extended to r * 1.2 for a faint melt/spreading tail
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.2);
-    g.addColorStop(0,    `rgba(0,0,0,${BRUSH_HARDNESS})`);
-    g.addColorStop(0.42, `rgba(0,0,0,${BRUSH_HARDNESS * 0.58})`);
-    g.addColorStop(0.72, `rgba(0,0,0,${BRUSH_HARDNESS * 0.26})`);
-    g.addColorStop(0.83, `rgba(0,0,0,${BRUSH_HARDNESS * 0.10})`);
-    g.addColorStop(1,    'rgba(0,0,0,0)');
-
-    ctx.save();
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Angular edge shards — BRUSH_SQUARENESS blends square/diamond distribution
-    // with the old circular one, making the footprint feel fractured, not round.
-    for (let i = 0; i < EDGE_SHARD_COUNT; i++) {
-      let ex, ey;
-      if (Math.random() < BRUSH_SQUARENESS) {
-        // Square/diamond distribution: uniform random in [-r*1.1, r*1.1]²
-        const sqx    = (Math.random() * 2 - 1) * r * 1.1;
-        const sqy    = (Math.random() * 2 - 1) * r * 1.1;
-        const sqDist = Math.sqrt(sqx * sqx + sqy * sqy);
-        if (sqDist < r * EDGE_SOFTNESS) continue; // skip inner zone
-        ex = cx + sqx;
-        ey = cy + sqy;
-      } else {
-        // Fallback circular ring
-        const angle = Math.random() * Math.PI * 2;
-        const dist  = r * (EDGE_SOFTNESS + Math.random() * (1.2 - EDGE_SOFTNESS));
-        ex = cx + Math.cos(angle) * dist;
-        ey = cy + Math.sin(angle) * dist;
-      }
-      const er = r * (ANGULAR_FRAGMENT_SIZE * 0.5 + Math.random() * ANGULAR_FRAGMENT_SIZE);
-      drawAngularFragment(ex, ey, er * 1.6, Math.random() * Math.PI, 0.04 + Math.random() * 0.14);
-    }
-  }
-
-  // ── Pass ②: Powder particles ─────────────────────────────────────────────
-  //
-  // Many tiny low-opacity dots spread from the brush edge outward.
-  // Their very low alpha means they erase only a whisper of frost each pass,
-  // creating the look of fine snow dust disturbed by the scraping motion.
-  // They accumulate with repeated strokes, so well-scraped paths develop
-  // a faint speckling beyond the clean reveal area.
-  function drawPowderParticles(cx, cy) {
-    for (let i = 0; i < POWDER_DENSITY; i++) {
-      const angle  = Math.random() * Math.PI * 2;
-      const dist   = BRUSH_SIZE * (0.45 + Math.random() * POWDER_SPREAD);
-      const px     = cx + Math.cos(angle) * dist;
-      const py     = cy + Math.sin(angle) * dist;
-      const radius = 0.3 + Math.random() * 1.8;
-      const alpha  = Math.random() * POWDER_OPACITY;
-
-      if (Math.random() < 0.80) {
-        // Angular fragment — fractured, not circular
-        drawAngularFragment(px, py, radius * 1.4, Math.random() * Math.PI, alpha);
-      } else {
-        // Remaining 20%: tiny round dot for variety
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle   = 'rgba(0,0,0,1)';
-        ctx.beginPath();
-        ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-    }
-  }
-
-  // ── Melt spreading (destination-out) ────────────────────────────────────
-  //
-  // A thin ring of very low-opacity angular fragments placed well beyond the
-  // main brush area. Each single pass contributes almost nothing; after the
-  // cursor lingers or crosses repeatedly the surrounding frost gradually thins.
-  // Result: the trail looks like nearby ice is sublimating, not like a glow.
-  function drawMeltSpread(cx, cy) {
-    for (let i = 0; i < MELT_FRAGMENT_COUNT; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      // Melt zone sits between MELT_RADIUS_MULTIPLIER and MELT_SPREAD × brush
-      const dist  = BRUSH_SIZE * (MELT_RADIUS_MULTIPLIER + Math.random() * (MELT_SPREAD - MELT_RADIUS_MULTIPLIER));
-      const mx    = cx + Math.cos(angle) * dist;
-      const my    = cy + Math.sin(angle) * dist;
-      const sz    = BRUSH_SIZE * (0.02 + Math.random() * 0.05);
-      drawAngularFragment(mx, my, sz, Math.random() * Math.PI, Math.random() * MELT_OPACITY);
-    }
-  }
-
-  // ── Pass ③: Crystal crack ────────────────────────────────────────────────
-  //
-  // A straight line (straight = crystalline, not organic bezier) with one
-  // optional branch at a crystallographic angle: 30°, 45°, or 60° exactly.
-  // The low CRACK_OPACITY means single cracks are barely visible; they
-  // compound visually when multiple cracks cross in well-scraped areas.
-  function drawCrystalCrack(cx, cy, angle, length, opacity) {
-    const endX = cx + Math.cos(angle) * length;
-    const endY = cy + Math.sin(angle) * length;
-
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.strokeStyle = 'rgba(0,0,0,1)';
-    ctx.lineWidth   = 0.4 + Math.random() * 0.8;
-    ctx.lineCap     = 'round';
-
-    // Main fracture line
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-
-    // Crystallographic branch (snaps to 30 / 45 / 60 degrees)
-    if (Math.random() < 0.55) {
-      const snapDeg    = [30, 45, 60][Math.floor(Math.random() * 3)];
-      const branchSign = Math.random() < 0.5 ? 1 : -1;
-      const branchAng  = angle + snapDeg * Math.PI / 180 * branchSign;
-      const bFrac      = 0.3 + Math.random() * 0.4;  // where along parent crack
-      const branchLen  = length * (0.25 + Math.random() * 0.3);
-
-      const bx = cx + Math.cos(angle) * length * bFrac;
-      const by = cy + Math.sin(angle) * length * bFrac;
-
-      ctx.lineWidth   *= 0.5;
-      ctx.globalAlpha  = opacity * CRYSTAL_BRANCH_OPACITY;
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.lineTo(bx + Math.cos(branchAng) * branchLen, by + Math.sin(branchAng) * branchLen);
-      ctx.stroke();
-    }
-
-    ctx.restore();
-  }
-
-  // ── Pass ④: Snowflake crystal mark ──────────────────────────────────────
-  //
-  // Drawn in source-over mode with an icy blue-white colour so it appears
-  // as a visible ice-crystal mark on the surface — not a hole.
-  //
-  //   • 6 radial arms from the centre
-  //   • 1–2 pairs of side branches per arm at 55°–70° (natural snowflake geometry)
-  //   • Small tip split at the end of each arm
-  //   • Line width and branch length taper toward the tips
-  //   • Arm count, branch count, size, rotation and opacity all vary per flake
-  //
-  // Calling signature: drawSnowflake(cx, cy, radius, rotation, opacity)
+  // Icy blue-white 6-arm snowflake with tip splits and side branch pairs.
+  // Used both in the initial frost texture and as edge decoration at the reveal boundary.
   function drawSnowflake(cx, cy, radius, rotation, opacity) {
     const ARMS = 6;
 
@@ -761,119 +458,180 @@
   }
 
   // ═════════════════════════════════════════════════════════════════════════
-  // AUTOMATIC SIDE DEFROST
+  // TEMPORARY REVEAL MASK
   //
-  // As the cursor moves, each position is stored as a defrost point.
-  // A requestAnimationFrame loop processes these points and, after a short
-  // delay, draws angular eraser fragments in a DEFINED BAND on BOTH SIDES
-  // of the trail — perpendicular to the direction of movement.
+  // Every pointer move stores a reveal point {x, y, timestamp, shards}.
+  // A rAF loop runs as long as points are active:
+  //   1. Clear the main canvas and stamp the permanent frostedCanvas
+  //   2. destination-out: punch holes at each point, fading with age
+  //   3. source-over: draw icy snowflake decorations at the reveal edge
   //
-  // Key difference from a larger brush:
-  //   – Fragments are placed OFFSET from the center (innerEdge…outerEdge),
-  //     so they only hit frost ADJACENT to the trail, not under the cursor.
-  //   – The band expands slightly outward over the point's lifetime.
-  //   – It continues running for ~1.4 s even after the cursor has moved away.
-  //
-  // The loop stops automatically when all defrost points have expired.
+  // When all points expire the loop stops. Frost recomposes automatically
+  // because the holes simply disappear — no restoration painting needed.
   // ═════════════════════════════════════════════════════════════════════════
 
-  function addAutoDefrostPoint(x, y, prevX, prevY) {
-    // Throttle: only store a point if cursor moved far enough from the last one
-    if (lastTrailX !== undefined) {
-      const dtx = x - lastTrailX;
-      const dty = y - lastTrailY;
-      if (dtx * dtx + dty * dty < AUTO_DEFROST_POINT_SPACING * AUTO_DEFROST_POINT_SPACING) return;
+  function addRevealPoint(x, y) {
+    if (lastRevealX !== undefined) {
+      const dx = x - lastRevealX;
+      const dy = y - lastRevealY;
+      if (dx * dx + dy * dy < REVEAL_POINT_SPACING * REVEAL_POINT_SPACING) return;
     }
 
-    const dx  = x - prevX;
-    const dy  = y - prevY;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 0.5) return;
+    // Pre-generate stable shard vertices — avoids per-frame Math.random() flicker
+    const shards = [];
+    for (let i = 0; i < REVEAL_SHARD_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist  = REVEAL_RADIUS * (REVEAL_EDGE_SOFTNESS + Math.random() * (1.25 - REVEAL_EDGE_SOFTNESS));
+      const size  = REVEAL_RADIUS * (0.04 + Math.random() * 0.09) * 1.6;
+      const rot   = Math.random() * Math.PI;
+      const alpha = 0.04 + Math.random() * 0.18;
+      const sel   = Math.random();
+      const pts   = [];
+      if (sel < 0.30) {
+        for (let j = 0; j < 4; j++) {
+          const a = (j / 4) * Math.PI * 2 + Math.PI / 4 + (Math.random() - 0.5) * 0.7;
+          const d = size * (0.4 + Math.random() * 0.6);
+          pts.push([Math.cos(a) * d, Math.sin(a) * d]);
+        }
+      } else if (sel < 0.55) {
+        for (let j = 0; j < 3; j++) {
+          const a = (j / 3) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+          const d = size * (0.45 + Math.random() * 0.55);
+          pts.push([Math.cos(a) * d, Math.sin(a) * d]);
+        }
+      } else {
+        const hw = size * (0.05 + Math.random() * 0.10);
+        const hl = size * (0.55 + Math.random() * 0.65);
+        const sk = (Math.random() - 0.5) * hw * 1.5;
+        pts.push([-hw + sk, -hl], [hw + sk, -hl], [hw - sk, hl], [-hw - sk, hl]);
+      }
+      shards.push({ angle, dist, rot, alpha, pts });
+    }
 
-    const tx = dx / len; // normalised tangent along motion
-    const ty = dy / len;
-
-    if (trailPoints.length >= AUTO_DEFROST_MAX_POINTS) trailPoints.shift();
-
-    trailPoints.push({
-      x, y,
-      tx,  ty,
-      px: -ty, py: tx,   // perpendicular = left/right of motion direction
-      timestamp: performance.now()
-    });
-
-    lastTrailX = x;
-    lastTrailY = y;
-
-    startAutoDefrostLoop();
+    revealPoints.push({ x, y, timestamp: performance.now(), shards });
+    startAnimLoop();
   }
 
-  function startAutoDefrostLoop() {
-    if (rafId !== null) return;
-    rafId = requestAnimationFrame(autoDefrostFrame);
+  function startAnimLoop() {
+    if (animRafId !== null) return;
+    animRafId = requestAnimationFrame(revealFrame);
   }
 
-  function autoDefrostFrame(timestamp) {
-    trailPoints = trailPoints.filter(p => timestamp - p.timestamp < AUTO_DEFROST_LIFETIME);
-
-    if (trailPoints.length === 0) {
-      rafId = null;
+  function revealFrame(timestamp) {
+    revealPoints = revealPoints.filter(p => timestamp - p.timestamp < REVEAL_LIFETIME);
+    renderCurrentState(timestamp);
+    if (revealPoints.length === 0) {
+      animRafId = null;
       return;
     }
-
-    if (ctx) {
-      ctx.globalCompositeOperation = 'destination-out';
-
-      for (const p of trailPoints) {
-        const age = timestamp - p.timestamp;
-        if (age < AUTO_DEFROST_DELAY) continue;
-
-        const effectAge      = age - AUTO_DEFROST_DELAY;
-        const effectDuration = AUTO_DEFROST_LIFETIME - AUTO_DEFROST_DELAY;
-        const progress       = Math.min(effectAge / effectDuration, 1);
-
-        drawAutoSideDefrost(p, progress);
-      }
-
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
-    }
-
-    rafId = requestAnimationFrame(autoDefrostFrame);
+    animRafId = requestAnimationFrame(revealFrame);
   }
 
-  // Draws one frame of defrost for one trail point.
-  //
-  // Fragments are placed in a BAND offset from the path center:
-  //   innerEdge … outerEdge on BOTH sides (left and right of motion).
-  // The band shifts outward slowly as progress increases, so the defrost
-  // starts right at the trail edge and creeps further out over time.
-  function drawAutoSideDefrost(point, progress) {
-    // Bell-curve envelope — smooth fade in and out, no hard start or stop
-    const fade = Math.sin(progress * Math.PI);
+  function renderCurrentState(timestamp = performance.now()) {
+    if (!ctx || !frostedCanvas) return;
+    const w = cssW;
+    const h = cssH;
 
-    // Band positions shift outward as the effect matures
-    const innerEdge = AUTO_DEFROST_SIDE_OFFSET * (0.7 + progress * 0.5);
-    const outerEdge = innerEdge + AUTO_DEFROST_SPREAD * (0.4 + progress * 0.6);
+    // 1. Clear and stamp the permanent frost layer
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(frostedCanvas, 0, 0, w, h);
 
-    for (let i = 0; i < AUTO_DEFROST_FRAGMENT_COUNT; i++) {
-      const side = Math.random() < 0.5 ? 1 : -1;
+    if (revealPoints.length === 0) return;
 
-      // Lateral: uniformly in [innerEdge … outerEdge] on the chosen side
-      const lateralDist = (innerEdge + Math.random() * (outerEdge - innerEdge)) * side;
-
-      // Longitudinal: scatter along the motion axis so it reads as a trail
-      const alongDist = (Math.random() - 0.5) * BRUSH_SIZE * AUTO_DEFROST_ALONG_SCATTER;
-
-      const fx = point.x + point.px * lateralDist + point.tx * alongDist;
-      const fy = point.y + point.py * lateralDist + point.ty * alongDist;
-
-      // Fragments are 3–10 px — large enough to be clearly visible
-      const sz      = BRUSH_SIZE * (0.07 + Math.random() * 0.13);
-      const opacity = fade * AUTO_DEFROST_STRENGTH * (0.35 + Math.random() * 0.65);
-
-      drawAngularFragment(fx, fy, sz, Math.random() * Math.PI, opacity);
+    // 2. Punch holes using destination-out, fading with age
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const p of revealPoints) {
+      const age         = timestamp - p.timestamp;
+      const fadeStrength = Math.max(0, 1 - age / REVEAL_LIFETIME);
+      drawRevealShape(p.x, p.y, fadeStrength, p.shards);
     }
+
+    // 3. Icy edge decorations in source-over
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    for (const p of revealPoints) {
+      const age         = timestamp - p.timestamp;
+      const fadeStrength = Math.max(0, 1 - age / REVEAL_LIFETIME);
+      drawRevealEdgeTexture(p.x, p.y, fadeStrength);
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
+
+  // Draws the reveal hole for one point.
+  // Uses a soft radial gradient (smooth inner area) + deterministic sin-jittered
+  // polygon (non-circular edge) + pre-generated shards (stable, no flicker).
+  function drawRevealShape(cx, cy, fadeStrength, shards) {
+    const r = REVEAL_RADIUS;
+
+    ctx.save();
+
+    // Soft radial gradient — smooth inner reveal
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.1);
+    g.addColorStop(0,    'rgba(0,0,0,1)');
+    g.addColorStop(0.40, 'rgba(0,0,0,0.88)');
+    g.addColorStop(0.68, 'rgba(0,0,0,0.44)');
+    g.addColorStop(0.85, 'rgba(0,0,0,0.12)');
+    g.addColorStop(1,    'rgba(0,0,0,0)');
+
+    ctx.globalAlpha = fadeStrength;
+    ctx.fillStyle   = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Deterministic irregular border — sin-jitter gives stable non-circular shape
+    const SIDES = 12;
+    ctx.beginPath();
+    for (let i = 0; i < SIDES; i++) {
+      const angle  = (i / SIDES) * Math.PI * 2;
+      const jitter = Math.sin(cx * 0.37 + cy * 0.19 + angle * 2.7) * 0.20;
+      const dist   = r * (0.82 + jitter + 0.18);
+      const px     = cx + Math.cos(angle) * dist;
+      const py     = cy + Math.sin(angle) * dist;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle   = 'rgba(0,0,0,1)';
+    ctx.globalAlpha = fadeStrength * 0.38;
+    ctx.fill();
+
+    // Pre-generated edge shards — stable, no per-frame flicker
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    for (const s of shards) {
+      const ex = cx + Math.cos(s.angle) * s.dist;
+      const ey = cy + Math.sin(s.angle) * s.dist;
+      ctx.save();
+      ctx.translate(ex, ey);
+      ctx.rotate(s.rot);
+      ctx.globalAlpha = s.alpha * fadeStrength;
+      ctx.beginPath();
+      s.pts.forEach(([px, py], idx) => {
+        idx === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  // Draws occasional icy snowflake decorations at the reveal boundary.
+  function drawRevealEdgeTexture(cx, cy, fadeStrength) {
+    if (Math.random() > REVEAL_SNOWFLAKE_CHANCE * fadeStrength * 4) return;
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = REVEAL_RADIUS * (0.75 + Math.random() * 0.55);
+    drawSnowflake(
+      cx + Math.cos(angle) * dist,
+      cy + Math.sin(angle) * dist,
+      2 + Math.random() * 8,
+      Math.random() * Math.PI,
+      0.22 * fadeStrength
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -881,12 +639,9 @@
   // ─────────────────────────────────────────────────────────────────────────
 
   function resetFrost() {
-    isPointerDown = false;
-    lastX         = undefined;
-    lastY         = undefined;
-    trailPoints   = [];
-    lastTrailX    = undefined;
-    lastTrailY    = undefined;
+    revealPoints = [];
+    lastRevealX  = undefined;
+    lastRevealY  = undefined;
     drawFrost();
   }
 </script>
@@ -916,12 +671,10 @@
       draggable="false"
     />
 
-    <!-- Layer 2: Frost canvas — scraped away by pointer interaction -->
+    <!-- Layer 2: Frost canvas — hover reveals, releases to recompose -->
     <canvas
       bind:this={canvas}
-      onpointerdown={onPointerDown}
       onpointermove={onPointerMove}
-      onpointerup={onPointerUp}
       onpointerleave={onPointerLeave}
       oncontextmenu={(e) => e.preventDefault()}
     ></canvas>

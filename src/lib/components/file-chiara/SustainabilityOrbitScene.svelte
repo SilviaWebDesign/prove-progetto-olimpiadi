@@ -5,13 +5,15 @@
   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
   import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
   import FactCard from '$lib/components/file-chiara/FactCard.svelte';
-  import { getModelRotationY, setCardRotationActive } from '$lib/components/file-chiara/cardRotation.js';
+  import { setCardRotationActive } from '$lib/components/file-chiara/cardRotation.js';
   import { rangeProgress, lerp, smoothRangeProgress, damp } from '$lib/components/file-chiara/scrollStages.js';
   import {
     fitModelToCenter,
     applyTreeMaterial,
     getOrbitRadiusFromTree,
-    isCardBehindTreeByDepth
+    isCardBehindTreeByDepth,
+    ORBIT_CARD_HALF_WIDTH,
+    ORBIT_SURFACE_MARGIN
   } from '$lib/components/file-chiara/sustainabilityOrbit3d.js';
   import {
     captureCardTexture,
@@ -22,8 +24,7 @@
   import {
     getFactDockT,
     isFactActive as isFactSegmentActive,
-    DOCK_UI_THRESHOLD,
-    orbitCardDockFade
+    DOCK_UI_THRESHOLD
   } from '$lib/components/file-chiara/sustainabilityDock.js';
 
   /**
@@ -55,12 +56,19 @@
   const ORBIT_RX_RATIO = 1;
   const ORBIT_RZ_RATIO = 1;
   const CARD_SCENE_SCALE = 0.00335;
-  /** Quanto la rotazione orbitale segue la rotazione continua dell'albero */
-  const ORBIT_TIME_BLEND = 0.18;
+  /** Rotazione albero guidata dallo scroll (niente auto-animazione a tempo). */
+  const TREE_SCROLL_TURNS = 1.15;
   /** Smussamento scroll → posizione card (lambda damp) */
   const SCROLL_SMOOTH_LAMBDA = 8;
+  /** Ritarda il docking: l'albero resta "in mezzo" alle card più a lungo */
+  const DOCK_MOVE_START_T = 0.32;
+  const BEHIND_HYSTERESIS_FRAMES = 3;
+  const OCCLUSION_OVERLAP_MIN = 0.5;
+  const OCCLUSION_DEPTH_MARGIN = 0.14;
+  const MIN_CAMERA_FACING_BLEND = 0.28;
 
   let orbitRadius = ORBIT_RADIUS_FALLBACK;
+  let treeHullRadius = Math.max(0.2, ORBIT_RADIUS_FALLBACK - ORBIT_CARD_HALF_WIDTH - ORBIT_SURFACE_MARGIN);
   let targetScrollProgress = 0;
   let smoothedScrollProgress = 0;
   let lastFrameTime = 0;
@@ -90,7 +98,8 @@
    *   expanded: boolean,
    *   mesh: THREE.Mesh | null,
    *   texture: THREE.CanvasTexture | null,
-   *   textureReady: boolean
+   *   textureReady: boolean,
+   *   behindFrames: number
    * }[]}
    */
   let cardMounts = [];
@@ -102,6 +111,10 @@
 
   const _lookTarget = new THREE.Vector3();
   const _cardWorld = new THREE.Vector3();
+  const _smoothQuat = new THREE.Quaternion();
+  const _targetQuat = new THREE.Quaternion();
+  const _cameraFacingQuat = new THREE.Quaternion();
+  const _lookMatrix = new THREE.Matrix4();
 
   $effect(() => {
     if (!active) return;
@@ -125,26 +138,45 @@
     const factT = inFacts
       ? smoothRangeProgress(progress, factSegments[0].start, factSegments[2].end)
       : 0;
-    const scrollAngle = orbitT * Math.PI * 2 + factT * Math.PI * 0.65;
-    const timeAngle = active ? getModelRotationY() * ORBIT_TIME_BLEND : 0;
-    return scrollAngle + timeAngle;
+    return orbitT * Math.PI * 2 + factT * Math.PI * 0.65;
   }
 
   /** @param {CSS3DObject} obj @param {THREE.Vector3} lookAtPoint */
-  function orientCardTo(obj, lookAtPoint) {
+  function orientCardTo(obj, lookAtPoint, smooth = 1) {
+    _smoothQuat.copy(obj.quaternion);
     obj.lookAt(lookAtPoint);
+    _targetQuat.copy(obj.quaternion);
+    if (camera) {
+      _lookMatrix.lookAt(obj.position, camera.position, obj.up);
+      _cameraFacingQuat.setFromRotationMatrix(_lookMatrix);
+      _targetQuat.slerp(_cameraFacingQuat, MIN_CAMERA_FACING_BLEND);
+    }
+    if (smooth >= 1) {
+      obj.quaternion.copy(_targetQuat);
+      return;
+    }
+    _smoothQuat.slerp(_targetQuat, smooth);
+    obj.quaternion.copy(_smoothQuat);
   }
 
   function syncOrbitFromTree() {
     if (!treeRoot || treeRoot.children.length === 0) return;
     orbitRadius = getOrbitRadiusFromTree(treeRoot, treeCenter);
+    treeHullRadius = Math.max(0.2, orbitRadius - ORBIT_CARD_HALF_WIDTH - ORBIT_SURFACE_MARGIN);
   }
 
   /** @param {CSS3DObject} obj @param {boolean} isDocked */
   function isCardBehindTree(obj, isDocked) {
     if (isDocked || !camera || !treeRoot || treeRoot.children.length === 0) return false;
     obj.getWorldPosition(_cardWorld);
-    return isCardBehindTreeByDepth(camera, _cardWorld, treeCenter);
+    const inBackHalf = _cardWorld.z < treeCenter.z - 0.02;
+    if (!inBackHalf) return false;
+    return isCardBehindTreeByDepth(camera, _cardWorld, treeCenter, {
+      treeRadiusWorld: treeHullRadius,
+      cardHalfWidthWorld: ORBIT_CARD_HALF_WIDTH,
+      overlapMin: OCCLUSION_OVERLAP_MIN,
+      depthMargin: OCCLUSION_DEPTH_MARGIN
+    });
   }
 
   /** @param {number} index */
@@ -190,6 +222,10 @@
     const n = facts.length;
     const inOrbitPhase =
       smoothedScrollProgress >= orbitStart - 0.01 || scrollProgress >= orbitStart - 0.01;
+    const focusedCardIndex = facts.findIndex((_, i) => {
+      const dockT = getFactDockT(scrollProgress, factSegments, i);
+      return isFactSegmentActive(scrollProgress, factSegments, i) && dockT >= DOCK_UI_THRESHOLD;
+    });
 
     cardObjects.forEach((obj, index) => {
       const baseAngle = (index / n) * Math.PI * 2 - Math.PI / 2 + orbitAngle;
@@ -209,9 +245,10 @@
       let ty = oy;
       let tz = oz;
       let scale = CARD_SCENE_SCALE;
+      const dockMoveT = rangeProgress(dockT, DOCK_MOVE_START_T, 1);
 
-      if (activeCard && dockT > 0 && !uiDocked) {
-        const dockEase = dockT * dockT * (3 - 2 * dockT);
+      if (activeCard && dockMoveT > 0 && !uiDocked) {
+        const dockEase = dockMoveT * dockMoveT * (3 - 2 * dockMoveT);
         tx = lerp(ox, DOCK_POS.x, dockEase);
         ty = lerp(oy, DOCK_POS.y, dockEase);
         tz = lerp(oz, DOCK_POS.z, dockEase);
@@ -222,18 +259,29 @@
       obj.scale.setScalar(scale);
       obj.updateMatrixWorld(true);
 
-      if (activeCard && dockT > 0.2) {
-        _lookTarget.copy(treeCenter).lerp(camera.position, dockT);
-        orientCardTo(obj, _lookTarget);
+      const isLeftOfTree = tx <= treeCenter.x - 0.08;
+      const frontalTurnT =
+        activeCard && isLeftOfTree ? rangeProgress(dockMoveT, 0.12, 0.92) : 0;
+      const frontalTurnEase = frontalTurnT * frontalTurnT * (3 - 2 * frontalTurnT);
+
+      const turnSmooth = 0.14 + frontalTurnEase * 0.18;
+      if (frontalTurnEase > 0) {
+        _lookTarget.copy(treeCenter).lerp(camera.position, frontalTurnEase);
+        orientCardTo(obj, _lookTarget, turnSmooth);
       } else {
-        orientCardTo(obj, treeCenter);
+        orientCardTo(obj, treeCenter, turnSmooth);
       }
 
       let opacity = 0;
       if (!inOrbitPhase && !activeCard && !past) {
         opacity = 0;
+      } else if (focusedCardIndex >= 0 && index !== focusedCardIndex) {
+        opacity = 0;
       } else if (activeCard) {
-        opacity = uiDocked ? 0 : orbitCardDockFade(dockT);
+        const isBackOfTree = tz < treeCenter.z - 0.02;
+        const shouldHideForDock = uiDocked && isLeftOfTree && isBackOfTree;
+        const dockHideT = rangeProgress(dockT, 0.82, 1);
+        opacity = shouldHideForDock ? 1 - dockHideT : 1;
       } else if (past) {
         opacity = 0.35;
       } else if (inOrbitPhase) {
@@ -241,16 +289,21 @@
       }
 
       const el = /** @type {HTMLDivElement} */ (obj.element);
-      const behind = opacity > 0.01 && isCardBehindTree(obj, isDocked);
       const mountEntry = cardMounts[index];
-      const useMesh = behind && mountEntry?.textureReady && mountEntry?.mesh;
+      const behindNow = opacity > 0.01 && isCardBehindTree(obj, isDocked);
+      if (mountEntry) {
+        mountEntry.behindFrames = behindNow ? mountEntry.behindFrames + 1 : 0;
+      }
+      const behindStable = (mountEntry?.behindFrames ?? 0) >= BEHIND_HYSTERESIS_FRAMES;
+      const useMesh = behindStable && mountEntry?.textureReady && mountEntry?.mesh;
 
       el.style.opacity = useMesh ? '0' : String(opacity);
       el.style.visibility = opacity > 0.01 ? 'visible' : 'hidden';
       el.style.pointerEvents = opacity > 0.4 && !useMesh ? 'auto' : 'none';
 
-      obj.userData.behindTree = behind;
+      obj.userData.behindTree = behindStable;
       obj.userData.hasOpacity = opacity > 0.01;
+      obj.userData.useMeshOcclusion = Boolean(useMesh);
 
       if (mountEntry?.mesh) {
         syncMeshWithCss3d(mountEntry.mesh, obj);
@@ -270,8 +323,7 @@
         return;
       }
       const idx = cardObjects.indexOf(obj);
-      const entry = cardMounts[idx];
-      const useMesh = obj.userData.behindTree && entry?.textureReady;
+      const useMesh = Boolean(obj.userData.useMeshOcclusion);
       obj.visible = !useMesh;
     });
 
@@ -280,7 +332,7 @@
     });
     cardMounts.forEach((entry, idx) => {
       if (!entry.mesh || !cardObjects[idx]?.userData.hasOpacity) return;
-      const useMesh = cardObjects[idx].userData.behindTree && entry.textureReady;
+      const useMesh = Boolean(cardObjects[idx].userData.useMeshOcclusion);
       entry.mesh.visible = Boolean(useMesh);
     });
 
@@ -389,7 +441,8 @@
         expanded: false,
         mesh,
         texture: null,
-        textureReady: false
+        textureReady: false,
+        behindFrames: 0
       });
 
       const obj = new CSS3DObject(el);
@@ -451,7 +504,12 @@
       }
 
       if (treeRoot) {
-        treeRoot.rotation.y = getModelRotationY();
+        const treeSpinT = smoothRangeProgress(
+          smoothedScrollProgress,
+          orbitStart,
+          factSegments[2]?.end ?? orbitEnd
+        );
+        treeRoot.rotation.y = treeSpinT * Math.PI * 2 * TREE_SCROLL_TURNS;
         treeRoot.updateMatrixWorld(true);
       }
       syncOrbitFromTree();
@@ -518,12 +576,25 @@
     overflow: hidden;
     pointer-events: none;
     z-index: 2;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
   }
 
   .orbit-scene :global(.orbit-card-css3d) {
     width: 424px;
     transform-style: preserve-3d;
-    backface-visibility: hidden;
+    -webkit-transform-style: preserve-3d;
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
+    will-change: transform, opacity;
+    transform: translateZ(0.01px);
+    -webkit-transform: translateZ(0.01px);
+  }
+
+  .orbit-scene :global(.orbit-card-css3d .fact-card),
+  .orbit-scene :global(.orbit-card-css3d .fact-card-inner) {
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
     will-change: transform, opacity;
   }
 

@@ -17,17 +17,61 @@ export function fitModelToCenter(object, desiredSize) {
 const _box = new THREE.Box3();
 const _cardCam = new THREE.Vector3();
 const _treeCam = new THREE.Vector3();
+const _cardNdc = new THREE.Vector3();
+const _treeNdc = new THREE.Vector3();
+const _camRight = new THREE.Vector3();
+const _treeEdgeWorld = new THREE.Vector3();
+const _cardEdgeWorld = new THREE.Vector3();
 
 /**
- * True se la card è più lontana della camera rispetto al centro albero (camera space).
+ * Classificazione conservativa "dietro albero":
+ * - overlap 2D (NDC) tra card e silhouette albero
+ * - profondità card più lontana del centro albero con margine
+ * In caso dubbio ritorna false (prefer visible).
  * @param {THREE.Camera} camera
  * @param {THREE.Vector3} cardPos
  * @param {THREE.Vector3} treeCenter
+ * @param {{
+ *   treeRadiusWorld?: number,
+ *   cardHalfWidthWorld?: number,
+ *   overlapMin?: number,
+ *   depthMargin?: number
+ * }} [opts]
  */
-export function isCardBehindTreeByDepth(camera, cardPos, treeCenter) {
+export function isCardBehindTreeByDepth(camera, cardPos, treeCenter, opts = {}) {
+  const treeRadiusWorld = opts.treeRadiusWorld ?? 1;
+  const cardHalfWidthWorld = opts.cardHalfWidthWorld ?? ORBIT_CARD_HALF_WIDTH;
+  const overlapMin = opts.overlapMin ?? 0.5;
+  const depthMargin = opts.depthMargin ?? 0.14;
+
   _cardCam.copy(cardPos).applyMatrix4(camera.matrixWorldInverse);
   _treeCam.copy(treeCenter).applyMatrix4(camera.matrixWorldInverse);
-  return _cardCam.z < _treeCam.z - 0.04;
+  const depthBehind = _cardCam.z < _treeCam.z - depthMargin;
+  if (!depthBehind) return false;
+
+  _cardNdc.copy(cardPos).project(camera);
+  _treeNdc.copy(treeCenter).project(camera);
+  if (Math.abs(_cardNdc.z) > 1.2 || Math.abs(_treeNdc.z) > 1.2) return false;
+
+  _camRight.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+  _treeEdgeWorld.copy(treeCenter).addScaledVector(_camRight, treeRadiusWorld);
+  _cardEdgeWorld.copy(cardPos).addScaledVector(_camRight, cardHalfWidthWorld);
+
+  const treeRadiusNdc = Math.abs(_treeEdgeWorld.project(camera).x - _treeNdc.x);
+  const cardRadiusNdc = Math.abs(_cardEdgeWorld.project(camera).x - _cardNdc.x);
+  const overlapRange = treeRadiusNdc + cardRadiusNdc;
+  if (overlapRange <= 0) return false;
+
+  const dx = Math.abs(_cardNdc.x - _treeNdc.x);
+  const dy = Math.abs(_cardNdc.y - _treeNdc.y);
+  const overlapsX = dx <= overlapRange * 0.58;
+  const overlapsY = dy <= Math.max(treeRadiusNdc * 0.9, cardRadiusNdc * 0.7);
+  if (!overlapsX || !overlapsY) return false;
+
+  const proximity = Math.hypot(dx, dy) / overlapRange;
+  const overlapsTreeSilhouette = proximity <= overlapMin;
+
+  return overlapsTreeSilhouette;
 }
 
 /** Mezza larghezza card in unità scena (424px × scale). */

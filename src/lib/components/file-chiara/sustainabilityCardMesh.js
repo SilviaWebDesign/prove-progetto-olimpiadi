@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-//import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas';
 
 export const CARD_PX_WIDTH = 424;
 export const CARD_PX_HEIGHT = 559;

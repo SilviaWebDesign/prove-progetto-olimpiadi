@@ -25,6 +25,15 @@
   const REVEAL_EDGE_SOFTNESS    = 0.38; // 0–1 — inner edge of the shard scatter zone
   const REVEAL_SHARD_COUNT      = 20;   // int — pre-generated angular fragments per point
   const REVEAL_SNOWFLAKE_CHANCE = 0.06; // 0–1 — probability of icy snowflake at edge
+
+  // ── Reveal strength (warm finger feel) ───────────────────────────────────
+  // MAX_REVEAL_STRENGTH caps the total frost erasure regardless of how many
+  // trail points overlap. 0 = no reveal at all, 1 = fully clear hole.
+  // 0.55 means the image shows through ~55% and frost remains ~45% at centre.
+  const MAX_REVEAL_STRENGTH      = 0.55; // 0–1 — max frost erase (warm finger cap)
+  const STATIONARY_DEFROST_DELAY = 500;  // ms  — pause before slow warmth begins
+  const STATIONARY_DEFROST_RATE  = 0.007; // per frame — how fast stationary warmth builds
+  const MAX_STATIONARY_STRENGTH  = 0.70; // 0–1 — cap on accumulated stationary defrost
   // ──────────────────────────────────────────────────────────────────────────
 
   let wrapper;
@@ -37,10 +46,19 @@
   let frostedCanvas = null;  // offscreen permanent frost layer — drawn once, never erased
   let frostedCtx    = null;
 
+  let revealCanvas  = null;  // per-frame intermediate reveal mask — built then applied at capped strength
+  let revealCtx     = null;
+
   let revealPoints = [];     // active temporary reveal points
   let lastRevealX  = undefined;
   let lastRevealY  = undefined;
   let animRafId    = null;
+
+  let stationaryAccum = 0;        // accumulated stationary warmth (0 → MAX_STATIONARY_STRENGTH)
+  let lastMoveTime    = 0;        // performance.now() of the last pointer movement
+  let cursorX         = undefined; // current cursor position (CSS px)
+  let cursorY         = undefined;
+  let cursorInside    = false;     // true while pointer is over the canvas
 
   // ─── Canvas setup on mount ────────────────────────────────────────────────
 
@@ -64,6 +82,13 @@
     frostedCanvas.height = Math.round(cssH * dpr);
     frostedCtx           = frostedCanvas.getContext('2d');
     frostedCtx.scale(dpr, dpr);
+
+    // Per-frame reveal mask — accumulated each frame, applied at MAX_REVEAL_STRENGTH
+    revealCanvas        = document.createElement('canvas');
+    revealCanvas.width  = Math.round(cssW * dpr);
+    revealCanvas.height = Math.round(cssH * dpr);
+    revealCtx           = revealCanvas.getContext('2d');
+    revealCtx.scale(dpr, dpr);
 
     const img       = new Image();
     img.crossOrigin = 'anonymous';
@@ -314,14 +339,20 @@
 
   function onPointerMove(e) {
     const { x, y } = getCoords(e);
+    cursorX      = x;
+    cursorY      = y;
+    cursorInside = true;
+    lastMoveTime = performance.now();
+    stationaryAccum = 0;  // moving resets the stationary warmth
     addRevealPoint(x, y);
     lastRevealX = x;
     lastRevealY = y;
   }
 
   function onPointerLeave() {
-    lastRevealX = undefined;
-    lastRevealY = undefined;
+    cursorInside = false;
+    lastRevealX  = undefined;
+    lastRevealY  = undefined;
   }
 
   // ── Angular fragment helper ──────────────────────────────────────────────
@@ -519,8 +550,18 @@
 
   function revealFrame(timestamp) {
     revealPoints = revealPoints.filter(p => timestamp - p.timestamp < REVEAL_LIFETIME);
+
+    // Stationary warmth: slowly build while cursor is inside and not moving
+    if (cursorInside && lastMoveTime && timestamp - lastMoveTime > STATIONARY_DEFROST_DELAY) {
+      stationaryAccum = Math.min(MAX_STATIONARY_STRENGTH, stationaryAccum + STATIONARY_DEFROST_RATE);
+    } else if (!cursorInside) {
+      stationaryAccum = Math.max(0, stationaryAccum - STATIONARY_DEFROST_RATE * 3);
+    }
+
     renderCurrentState(timestamp);
-    if (revealPoints.length === 0) {
+
+    // Keep loop alive while cursor is inside OR stationary warmth is still visible
+    if (revealPoints.length === 0 && stationaryAccum <= 0 && !cursorInside) {
       animRafId = null;
       return;
     }
@@ -528,7 +569,7 @@
   }
 
   function renderCurrentState(timestamp = performance.now()) {
-    if (!ctx || !frostedCanvas) return;
+    if (!ctx || !frostedCanvas || !revealCanvas) return;
     const w = cssW;
     const h = cssH;
 
@@ -538,17 +579,39 @@
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(frostedCanvas, 0, 0, w, h);
 
-    if (revealPoints.length === 0) return;
+    const hasReveal = revealPoints.length > 0 || stationaryAccum > 0;
+    if (!hasReveal) return;
 
-    // 2. Punch holes using destination-out, fading with age
-    ctx.globalCompositeOperation = 'destination-out';
+    // 2. Build reveal mask on revealCanvas — all shapes stack source-over,
+    //    so the centre saturates to alpha 1.0 and the total erase is capped
+    //    by MAX_REVEAL_STRENGTH when applied to the main canvas.
+    revealCtx.globalCompositeOperation = 'source-over';
+    revealCtx.globalAlpha = 1;
+    revealCtx.clearRect(0, 0, w, h);
+
+    const mainCtx = ctx;
+    ctx = revealCtx;   // temporarily route drawRevealShape to the mask canvas
+
     for (const p of revealPoints) {
       const age         = timestamp - p.timestamp;
       const fadeStrength = Math.max(0, 1 - age / REVEAL_LIFETIME);
       drawRevealShape(p.x, p.y, fadeStrength, p.shards);
     }
 
-    // 3. Icy edge decorations in source-over
+    // Stationary warmth — gradual soft defrost at the resting cursor position
+    if (stationaryAccum > 0 && cursorX !== undefined) {
+      drawRevealShape(cursorX, cursorY, stationaryAccum, []);
+    }
+
+    ctx = mainCtx;
+
+    // 3. Apply reveal mask at capped strength — MAX_REVEAL_STRENGTH is the ceiling;
+    //    the image becomes partially visible through thinned (not erased) frost.
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.globalAlpha = MAX_REVEAL_STRENGTH;
+    ctx.drawImage(revealCanvas, 0, 0, w, h);
+
+    // 4. Icy edge decorations drawn on the main canvas in source-over
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     for (const p of revealPoints) {
@@ -639,9 +702,13 @@
   // ─────────────────────────────────────────────────────────────────────────
 
   function resetFrost() {
-    revealPoints = [];
-    lastRevealX  = undefined;
-    lastRevealY  = undefined;
+    revealPoints    = [];
+    lastRevealX     = undefined;
+    lastRevealY     = undefined;
+    stationaryAccum = 0;
+    lastMoveTime    = 0;
+    cursorX         = undefined;
+    cursorY         = undefined;
     drawFrost();
   }
 </script>

@@ -58,47 +58,54 @@
         gsap.set(titleEl, { fontSize: curSize * ((vw * 0.98) / naturalW) });
       }
 
-      // ── 2. Timeline hero — AUTOMATICA, senza scrub ──────────────────────
+      // ── 2. Timeline hero — AUTOMATICA: solo l'ingresso bouncy ───────────
       const heroTl = gsap.timeline({ defaults: { transformOrigin: 'bottom center' } });
 
-      // Ingresso bouncy
       heroTl.fromTo(titleEl,
         { scaleY: 0.06, opacity: 0 },
         { scaleY: 1, opacity: 1, duration: 1.0, ease: 'elastic.out(1,0.5)' }
       );
 
-      // Stretch verso l'alto + uscita
-      heroTl.to(titleEl, {
-        scaleY: 2.2, yPercent: -120, opacity: 0,
-        duration: 0.9, ease: 'power3.in'
-      }, '+=0.6');
-
-      // Frase compare dopo che il titolo è uscito
-      heroTl.fromTo('.phrase',
-        { opacity: 0, y: 30 },
-        { opacity: 1, y: 0, duration: 1.2, ease: 'power2.out' },
-        '-=0.1'
-      );
-
-      // ── 3. Scroll timeline — frase esce, frost dissolve, 3D appare ──────
+      // ── 3. Scroll timeline — scrubbed, niente pin ────────────────────────
+      //
+      //  0.00 → 0.12 : titolo si stretcha verso l'alto e svanisce
+      //  0.00 → 0.12 : frost svanisce in parallelo con il titolo
+      //  0.10 → 0.22 : frase fa fade-in soft
+      //  0.22 → 0.36 : frase esce
+      //  0.28 → fine : scena 3D (posizioni originali invariate)
+      //
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sceneEl,
           start: 'top top',
           end: 'bottom bottom',
           scrub: 1,
-          onEnter: () => { showSectionLabel = true; },
+          onEnter:   () => { showSectionLabel = true; },
+          onComplete: () => { scene3d?.startIdleSpin(); },
         },
       });
 
-      // Fade-out morbido della frase mentre si scorre (0 → 0.14)
-      tl.to('.phrase', { opacity: 0, y: -40, duration: 0.14 }, 0);
+      // Titolo stretch + uscita (scrubbed)
+      tl.fromTo(titleEl,
+        { scaleY: 1, yPercent: 0, opacity: 1 },
+        { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.in', duration: 0.12 },
+        0
+      );
 
-      // Frost dissolve + sfondo bianco emerge (0.12 → 0.26)
-      tl.to('.layer--frost', { autoAlpha: 0, duration: 0.14 }, 0.12);
-      tl.to('.layer--bg',    { opacity: 1,   duration: 0.14 }, 0.12);
+      // Frost svanisce assieme al titolo
+      tl.to('.layer--frost', { autoAlpha: 0, duration: 0.12 }, 0);
 
-      // 3D: appare (0.28 → 0.36), ruota (0.32 → 0.62), rimpicciolisce (0.58 → 0.76)
+      // Frase compare dopo che il titolo ha cominciato a salire
+      tl.fromTo('.phrase',
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, ease: 'power2.out', duration: 0.12 },
+        0.10
+      );
+
+      // Frase esce per dare spazio alla scena 3D
+      tl.to('.phrase', { opacity: 0, y: -40, duration: 0.14 }, 0.22);
+
+      // ↓↓ Scena 3D — posizioni originali invariate ↓↓
       const proxy = { rot: 0, scale: 1, appear: 0 };
 
       tl.fromTo(proxy, { appear: 0 }, {
@@ -111,8 +118,9 @@
         onUpdate: () => scene3d?.setRotationY(proxy.rot),
       }, 0.32);
 
+      // Scala finale +1/3 rispetto all'originale (0.42 × 1.33 ≈ 0.56)
       tl.to(proxy, {
-        scale: 0.42, ease: 'power2.inOut', duration: 0.18,
+        scale: 0.56, ease: 'power2.inOut', duration: 0.18,
         onUpdate: () => scene3d?.setScale(proxy.scale),
       }, 0.58);
 
@@ -154,12 +162,12 @@
 <section class="scene" bind:this={sceneEl}>
   <div class="scene__viewport">
 
-    <!-- Layer frost: vetro smerigliato con reveal su foto B/N -->
+    <!-- Layer frost: vetro smerigliato con reveal su foto infrastrutture -->
     <div class="layer layer--frost">
-      <FrostCanvas src="/images/snow-bg.jpg" />
+      <FrostCanvas src="/images/frost-infrastrutture.jpg" />
     </div>
 
-    <!-- Layer bg bianco: opacity 0 → 1 quando frost esce -->
+    <!-- Layer bg: sfondo-infrastrutture.jpg al 28%, sempre visibile sotto il frost -->
     <div class="layer layer--bg" aria-hidden="true"></div>
 
     <!-- Titolone: fit edge-to-edge, bouncy in, stretch up e fuori -->
@@ -320,8 +328,10 @@
 
   .layer--bg {
     z-index: 1;
-    background: #FFFFFF;
-    opacity: 0;
+    background-image: url('/images/sfondo-infrastrutture.jpg');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.28;
   }
 
   /* ── Titolone edge-to-edge ───────────────────────────────────────────────── */

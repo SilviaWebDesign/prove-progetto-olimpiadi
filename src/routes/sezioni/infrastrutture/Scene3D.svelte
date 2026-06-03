@@ -8,6 +8,7 @@
     setRotationY: (rad: number) => void;
     setScale: (factor: number) => void;
     setOpacity: (val: number) => void;
+    startIdleSpin: () => void;
   }
 
   interface Props {
@@ -29,15 +30,17 @@
   let rafId: number | null = null;
   let inView = false;
   let observer: IntersectionObserver | null = null;
+  let idleSpinActive = false;
 
   onMount(() => {
     if (!canvasEl || !wrapperEl) return;
 
     // Expose API immediately — methods are safe no-ops until the model loads
     api = {
-      setRotationY: (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
-      setScale:     (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
-      setOpacity:   (val) => { materials.forEach((m) => { m.opacity = val; }); },
+      setRotationY:  (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
+      setScale:      (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
+      setOpacity:    (val) => { materials.forEach((m) => { m.opacity = val; }); },
+      startIdleSpin: ()    => { idleSpinActive = true; },
     };
 
     initThree();
@@ -184,6 +187,9 @@
 
   function tick() {
     if (!inView || !renderer || !scene || !camera) { rafId = null; return; }
+    if (idleSpinActive && modelGroup) {
+      modelGroup.rotation.y += 0.008; // ~30°/s at 60 fps
+    }
     renderer.render(scene, camera);
     rafId = requestAnimationFrame(tick);
   }

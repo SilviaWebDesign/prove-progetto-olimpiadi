@@ -11,7 +11,7 @@
   const INITIAL_SNOWFLAKE_DENSITY = 40;
   const INITIAL_SPECKLE_DENSITY   = 600;
   const INITIAL_CRYSTAL_OPACITY   = 0.55;
-  const REVEAL_RADIUS            = 72;
+  const REVEAL_RADIUS            = 120;
   const REVEAL_LIFETIME          = 1600;
   const REVEAL_POINT_SPACING     = 6;
   const REVEAL_EDGE_SOFTNESS     = 0.38;

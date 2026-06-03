@@ -48,96 +48,113 @@
 
     gsap.registerPlugin(ScrollTrigger);
 
+    const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
+
+    // ── 1. Fit edge-to-edge RESPONSIVO ───────────────────────────────────
+    // Font-size gestito solo via DOM (mai via GSAP), così transform + opacity
+    // GSAP non interferiscono col calcolo della larghezza.
+    const H_PAD = 24; // px ciascun lato
+
+    function fitTitle() {
+      titleEl.style.removeProperty('font-size');         // torna al valore CSS
+      const base = parseFloat(getComputedStyle(titleEl).fontSize);
+      const nat  = titleEl.scrollWidth;                  // larghezza naturale
+      if (!nat || !base) return;
+      const target = window.innerWidth - H_PAD * 2;
+      titleEl.style.fontSize = `${base * target / nat}px`;
+    }
+
+    fitTitle();
+    const ro = new ResizeObserver(fitTitle);
+    ro.observe(document.documentElement);               // ricalcola su resize
+
+    // ── 2. GSAP ──────────────────────────────────────────────────────────
     const ctx = gsap.context(() => {
-      // ── 1. Adatta il titolo all'intera larghezza del viewport ───────────
-      const titleEl = sceneEl!.querySelector<HTMLElement>('.hero-title')!;
-      const vw = window.innerWidth;
-      const naturalW = titleEl.offsetWidth;
-      if (naturalW > 0) {
-        const curSize = parseFloat(getComputedStyle(titleEl).fontSize);
-        gsap.set(titleEl, { fontSize: curSize * ((vw * 0.98) / naturalW) });
-      }
 
-      // ── 2. Timeline hero — AUTOMATICA: solo l'ingresso bouncy ───────────
-      const heroTl = gsap.timeline({ defaults: { transformOrigin: 'bottom center' } });
+      // Ingresso bouncy automatico (solo scaleY + opacity, mai fontSize)
+      gsap.timeline({ defaults: { transformOrigin: 'bottom center' } })
+        .fromTo(titleEl,
+          { scaleY: 0.06, opacity: 0 },
+          { scaleY: 1, opacity: 1, duration: 1.0, ease: 'elastic.out(1,0.5)' }
+        );
 
-      heroTl.fromTo(titleEl,
-        { scaleY: 0.06, opacity: 0 },
-        { scaleY: 1, opacity: 1, duration: 1.0, ease: 'elastic.out(1,0.5)' }
-      );
-
-      // ── 3. Scroll timeline — scrubbed, niente pin ────────────────────────
-      //
-      //  0.00 → 0.12 : titolo si stretcha verso l'alto e svanisce
-      //  0.00 → 0.12 : frost svanisce in parallelo con il titolo
-      //  0.10 → 0.22 : frase fa fade-in soft
-      //  0.22 → 0.36 : frase esce
-      //  0.28 → fine : scena 3D (posizioni originali invariate)
-      //
-      const tl = gsap.timeline({
+      // ── Trigger HERO: 300vh di scroll, coreografia titolo → frost → frase ─
+      //    Fine calcolata in px dinamici così è corretta anche dopo resize.
+      const heroTl = gsap.timeline({
         scrollTrigger: {
           trigger: sceneEl,
           start: 'top top',
+          end: () => `+=${window.innerHeight * 3}`,     // 300vh
+          scrub: 1.2,
+          onEnter: () => { showSectionLabel = true; },
+        },
+      });
+
+      // Titolo: stretch verso l'alto e svanisce (0 → 25 %)
+      heroTl.fromTo(titleEl,
+        { scaleY: 1, yPercent: 0, opacity: 1 },
+        { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
+        0
+      );
+      // Frost: dissolve sovrapposto al titolo, leggermente più lungo (0 → 30 %)
+      heroTl.to('.layer--frost', { autoAlpha: 0, ease: 'power2.inOut', duration: 0.30 }, 0);
+      // Frase: fade-in morbido mentre il titolo sta ancora salendo (20 → 40 %)
+      heroTl.fromTo('.phrase',
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, ease: 'power2.out', duration: 0.20 },
+        0.20
+      );
+      // Frase: esce dolcemente dopo un tratto di riposo (62 → 77 %)
+      heroTl.to('.phrase', { opacity: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
+
+      // ── Trigger 3D: trigger SEPARATO, parte solo a 360vh di scroll ────────
+      //    La scena del modello inizia davvero tardi rispetto alla hero,
+      //    così un leggero scroll non la raggiunge mai.
+      const proxy = { rot: 0, scale: 1, appear: 0 };
+
+      const threeTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sceneEl,
+          start: () => `top+=${window.innerHeight * 3.6}`, // 360vh
           end: 'bottom bottom',
-          scrub: 1,
-          onEnter:   () => { showSectionLabel = true; },
+          scrub: 1.2,
           onComplete: () => { scene3d?.startIdleSpin(); },
         },
       });
 
-      // Titolo stretch + uscita (scrubbed)
-      tl.fromTo(titleEl,
-        { scaleY: 1, yPercent: 0, opacity: 1 },
-        { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.in', duration: 0.12 },
-        0
-      );
-
-      // Frost svanisce assieme al titolo
-      tl.to('.layer--frost', { autoAlpha: 0, duration: 0.12 }, 0);
-
-      // Frase compare dopo che il titolo ha cominciato a salire
-      tl.fromTo('.phrase',
-        { opacity: 0, y: 30 },
-        { opacity: 1, y: 0, ease: 'power2.out', duration: 0.12 },
-        0.10
-      );
-
-      // Frase esce per dare spazio alla scena 3D
-      tl.to('.phrase', { opacity: 0, y: -40, duration: 0.14 }, 0.22);
-
-      // ↓↓ Scena 3D — posizioni originali invariate ↓↓
-      const proxy = { rot: 0, scale: 1, appear: 0 };
-
-      tl.fromTo(proxy, { appear: 0 }, {
-        appear: 1, duration: 0.08,
+      threeTl.fromTo(proxy, { appear: 0 }, {
+        appear: 1, duration: 0.12,
         onUpdate: () => scene3d?.setOpacity(proxy.appear),
-      }, 0.28);
+      }, 0);
 
-      tl.to(proxy, {
-        rot: Math.PI * 2, ease: 'none', duration: 0.30,
+      threeTl.to(proxy, {
+        rot: Math.PI * 2, ease: 'none', duration: 0.46,
         onUpdate: () => scene3d?.setRotationY(proxy.rot),
-      }, 0.32);
+      }, 0.06);
 
-      // Scala finale +1/3 rispetto all'originale (0.42 × 1.33 ≈ 0.56)
-      tl.to(proxy, {
-        scale: 0.56, ease: 'power2.inOut', duration: 0.18,
+      // Scala finale: 0.42 × 1.33 ≈ 0.56 (invariato dalla sessione precedente)
+      threeTl.to(proxy, {
+        scale: 0.56, ease: 'power2.inOut', duration: 0.28,
         onUpdate: () => scene3d?.setScale(proxy.scale),
-      }, 0.58);
+      }, 0.46);
 
-      tl.fromTo('.stage__text',
+      threeTl.fromTo('.stage__text',
         { opacity: 0, x: -30 },
-        { opacity: 1, x: 0, duration: 0.15, ease: 'power2.out' },
-        0.76
+        { opacity: 1, x: 0, ease: 'power2.out', duration: 0.12 },
+        0.74
       );
 
-      tl.fromTo('.stage__cards',
+      threeTl.fromTo('.stage__cards',
         { opacity: 0, x: 30 },
-        { opacity: 1, x: 0, duration: 0.15, ease: 'power2.out' },
-        0.78
+        { opacity: 1, x: 0, ease: 'power2.out', duration: 0.12 },
+        0.77
       );
     }, sceneEl);
 
-    return () => ctx.revert();
+    return () => {
+      ctx.revert();
+      ro.disconnect();
+    };
   });
 </script>
 
@@ -305,7 +322,7 @@
      ═══════════════════════════════════════════════════════════════════════ */
 
   .scene {
-    height: 400vh;
+    height: 750vh;
     position: relative;
   }
 

@@ -119,7 +119,7 @@
 
   function loadModel() {
     const draco = new DRACOLoader();
-    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+    draco.setDecoderPath('/draco/');
 
     const loader = new GLTFLoader();
     loader.setDRACOLoader(draco);

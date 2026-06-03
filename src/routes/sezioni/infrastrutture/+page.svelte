@@ -4,7 +4,7 @@
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-  import HeroFrost from '$lib/components/file-chiara/HeroFrost.svelte';
+  import FrostCanvas from '$lib/components/FrostCanvas.svelte';
   import TextBlock from './TextBlock.svelte';
   import CardStack from './CardStack.svelte';
   import Scene3D from './Scene3D.svelte';
@@ -42,17 +42,45 @@
   // ── Header label ─────────────────────────────────────────────────────────
   let showSectionLabel = $state(false);
 
-  // ── GSAP: una timeline scrubbed, niente pin ───────────────────────────────
+  // ── GSAP ─────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!browser || !sceneEl) return;
 
     gsap.registerPlugin(ScrollTrigger);
 
-    // Set the title horizontal centering via GSAP so xPercent stays correct
-    // even when other transform components are animated
-    gsap.set('.hero-title', { xPercent: -50 });
-
     const ctx = gsap.context(() => {
+      // ── 1. Adatta il titolo all'intera larghezza del viewport ───────────
+      const titleEl = sceneEl!.querySelector<HTMLElement>('.hero-title')!;
+      const vw = window.innerWidth;
+      const naturalW = titleEl.offsetWidth;
+      if (naturalW > 0) {
+        const curSize = parseFloat(getComputedStyle(titleEl).fontSize);
+        gsap.set(titleEl, { fontSize: curSize * ((vw * 0.98) / naturalW) });
+      }
+
+      // ── 2. Timeline hero — AUTOMATICA, senza scrub ──────────────────────
+      const heroTl = gsap.timeline({ defaults: { transformOrigin: 'bottom center' } });
+
+      // Ingresso bouncy
+      heroTl.fromTo(titleEl,
+        { scaleY: 0.06, opacity: 0 },
+        { scaleY: 1, opacity: 1, duration: 1.0, ease: 'elastic.out(1,0.5)' }
+      );
+
+      // Stretch verso l'alto + uscita
+      heroTl.to(titleEl, {
+        scaleY: 2.2, yPercent: -120, opacity: 0,
+        duration: 0.9, ease: 'power3.in'
+      }, '+=0.6');
+
+      // Frase compare dopo che il titolo è uscito
+      heroTl.fromTo('.phrase',
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 1.2, ease: 'power2.out' },
+        '-=0.1'
+      );
+
+      // ── 3. Scroll timeline — frase esce, frost dissolve, 3D appare ──────
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sceneEl,
@@ -63,51 +91,41 @@
         },
       });
 
-      // ── FASE A (0 → 0.20): titolo si stretcha verso l'alto ───────────────
-      tl.fromTo(
-        '.hero-title',
-        { scaleY: 1 },
-        { scaleY: 1.6, ease: 'none', duration: 0.20 },
-        0
-      );
+      // Fade-out morbido della frase mentre si scorre (0 → 0.14)
+      tl.to('.phrase', { opacity: 0, y: -40, duration: 0.14 }, 0);
 
-      // ── FASE B (0.20 → 0.42): titolo esce, frase entra (crossfade sfalsato)
-      tl.to('.hero-title', { opacity: 0, yPercent: -40, duration: 0.12 }, 0.20);
-      tl.fromTo('.phrase', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.16, ease: 'power2.out' }, 0.26);
+      // Frost dissolve + sfondo bianco emerge (0.12 → 0.26)
+      tl.to('.layer--frost', { autoAlpha: 0, duration: 0.14 }, 0.12);
+      tl.to('.layer--bg',    { opacity: 1,   duration: 0.14 }, 0.12);
 
-      // ── FASE C (0.45 → 0.57): frase esce, frost dissolve, sfondo bianco ──
-      tl.to('.phrase',      { opacity: 0, y: -40,  duration: 0.12 }, 0.45);
-      tl.to('.layer--frost', { autoAlpha: 0,        duration: 0.12 }, 0.45);
-      tl.to('.layer--bg',   { opacity: 1,           duration: 0.12 }, 0.45);
-
-      // ── FASE D (0.55 → 1.01): 3D grande → ruota → rimpicciolisce → testo/card
+      // 3D: appare (0.28 → 0.36), ruota (0.32 → 0.62), rimpicciolisce (0.58 → 0.76)
       const proxy = { rot: 0, scale: 1, appear: 0 };
 
       tl.fromTo(proxy, { appear: 0 }, {
         appear: 1, duration: 0.08,
         onUpdate: () => scene3d?.setOpacity(proxy.appear),
-      }, 0.55);
+      }, 0.28);
 
       tl.to(proxy, {
         rot: Math.PI * 2, ease: 'none', duration: 0.30,
         onUpdate: () => scene3d?.setRotationY(proxy.rot),
-      }, 0.58);
+      }, 0.32);
 
       tl.to(proxy, {
         scale: 0.42, ease: 'power2.inOut', duration: 0.18,
         onUpdate: () => scene3d?.setScale(proxy.scale),
-      }, 0.80);
+      }, 0.58);
 
       tl.fromTo('.stage__text',
         { opacity: 0, x: -30 },
         { opacity: 1, x: 0, duration: 0.15, ease: 'power2.out' },
-        0.84
+        0.76
       );
 
       tl.fromTo('.stage__cards',
         { opacity: 0, x: 30 },
         { opacity: 1, x: 0, duration: 0.15, ease: 'power2.out' },
-        0.86
+        0.78
       );
     }, sceneEl);
 
@@ -129,34 +147,33 @@
 </header>
 
 <!-- ════════════════════════════════════════════════════════════════════════════
-     SEZIONE SCROLLYTELLING
-     400 vh di altezza → 300 vh di distanza scroll per guidare la timeline.
-     Il viewport è sticky (top: 0, height: 100vh): il frost non rompe mai
-     perché non ci sono transform/pin esterni che creano stacking context.
+     SCROLLYTELLING — 400vh
+     .scene__viewport è sticky: rimane a top:0 per tutto lo scroll.
+     Niente pin GSAP = niente transform sull'antenato = frost intatto.
      ═════════════════════════════════════════════════════════════════════════ -->
 <section class="scene" bind:this={sceneEl}>
   <div class="scene__viewport">
 
-    <!-- Layer frost: sfondo interattivo, scompare in fase C (autoAlpha 0) -->
+    <!-- Layer frost: vetro smerigliato con reveal su foto B/N -->
     <div class="layer layer--frost">
-      <HeroFrost src="/images/snow-bg.jpg" refreezeMs={3500} />
+      <FrostCanvas src="/images/snow-bg.jpg" />
     </div>
 
-    <!-- Layer bg bianco: opacity 0 → 1 in fase C -->
+    <!-- Layer bg bianco: opacity 0 → 1 quando frost esce -->
     <div class="layer layer--bg" aria-hidden="true"></div>
 
-    <!-- Titolone: si stretcha in fase A, esce in fase B -->
+    <!-- Titolone: fit edge-to-edge, bouncy in, stretch up e fuori -->
     <h1 class="hero-title">INFRASTRUTTURE</h1>
 
-    <!-- Frase: entra in fase B, esce in fase C -->
+    <!-- Frase: compare automaticamente dopo il titolo, esce con lo scroll -->
     <p class="phrase">
-      Le Olimpiadi prendono forma attraverso cantieri, impianti e
-      collegamenti tra territori — opere che possono essere lette come
-      investimenti utili o come interventi costosi, il cui valore dipende da
-      cosa resterà dopo l'evento.
+      Le Olimpiadi prendono forma attraverso cantieri, impianti e collegamenti
+      tra territori. Queste opere possono essere lette come investimenti utili
+      o come interventi costosi, il cui valore dipende da cosa resterà dopo
+      l'evento.
     </p>
 
-    <!-- Stage: griglia testo | canvas 3D | card (visibile in fase D) -->
+    <!-- Stage: 3D + testo + card (visibili nella parte scrollata) -->
     <div class="stage">
 
       <div class="stage__text">
@@ -168,7 +185,6 @@
         />
       </div>
 
-      <!-- Canvas a tutto schermo: il modello scala da grande (scale=1) a piccolo (scale=0.42) -->
       <div class="stage__canvas">
         <Scene3D bind:api={scene3d} />
       </div>
@@ -277,10 +293,7 @@
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
-     ARCHITETTURA SCROLLYTELLING
-     .scene fornisce la distanza di scroll (400vh).
-     .scene__viewport è sticky: rimane a top:0 per tutto lo scroll.
-     Niente pin = niente transform sull'antenato = frost intatto.
+     SCROLLYTELLING
      ═══════════════════════════════════════════════════════════════════════ */
 
   .scene {
@@ -296,31 +309,31 @@
     background: #FFFFFF;
   }
 
-  /* Tutti i layer sono assoluti, coprono l'intero viewport sticky */
   .layer {
     position: absolute;
     inset: 0;
   }
 
-  /* Frost sopra tutto tranne hero-title e phrase */
   .layer--frost {
     z-index: 2;
   }
 
-  /* Sfondo bianco: passa da opacity 0 a 1 in fase C */
   .layer--bg {
     z-index: 1;
     background: #FFFFFF;
     opacity: 0;
   }
 
-  /* ── Titolone ─────────────────────────────────────────────────────────────── */
-  /* xPercent: -50 gestito da GSAP in onMount per mantenere la percentuale corretta */
+  /* ── Titolone edge-to-edge ───────────────────────────────────────────────── */
+  /* font-size iniziale abbondante; JS lo corregge per riempire ~98vw */
   .hero-title {
     position: absolute;
     z-index: 3;
-    left: 50%;
+    left: 0;
+    right: 0;
     bottom: 6vh;
+    width: 100%;
+    text-align: center;
     transform-origin: bottom center;
     font-family: 'PP Formula Condensed', sans-serif;
     font-size: clamp(120px, 18vw, 260px);
@@ -333,7 +346,7 @@
     will-change: transform, opacity;
   }
 
-  /* ── Frase centrata ───────────────────────────────────────────────────────── */
+  /* ── Frase ───────────────────────────────────────────────────────────────── */
   .phrase {
     position: absolute;
     z-index: 4;
@@ -352,10 +365,7 @@
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
-     STAGE — griglia finale (fase D)
-     Il canvas Three.js è position: absolute inset:0 → a tutto schermo.
-     Testo (col 1) e card (col 3) sono grid items con z-index esplicito
-     così appaiono sopra il canvas.
+     STAGE — griglia 3D (fase scroll)
      ═══════════════════════════════════════════════════════════════════════ */
 
   .stage {
@@ -368,7 +378,6 @@
     padding: 0 6vw;
   }
 
-  /* Canvas Three.js: fuori dal flusso del grid, copre l'intero stage */
   .stage__canvas {
     position: absolute;
     inset: 0;
@@ -376,7 +385,6 @@
     pointer-events: none;
   }
 
-  /* Testo sx — grid column 1, sopra il canvas */
   .stage__text {
     grid-column: 1;
     justify-self: start;
@@ -385,7 +393,6 @@
     will-change: opacity, transform;
   }
 
-  /* Card dx — grid column 3, sopra il canvas */
   .stage__cards {
     grid-column: 3;
     justify-self: end;

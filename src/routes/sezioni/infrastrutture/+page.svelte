@@ -57,33 +57,15 @@
     gsap.ticker.add(lenisRaf);
     gsap.ticker.lagSmoothing(0);
 
-    // ── 1. Titolo full-width responsivo ───────────────────────────────────
-    // Font-size impostato via DOM (mai GSAP) → GSAP anima solo transform/opacity.
-    // Base fissa a 100px per misurare; ResizeObserver ri-esegue su ogni resize.
-    const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
+    // ── 1. Titolo — viewBox dal getBBox dopo fonts.ready: scala proporzionale senza distorsione ──
+    const titleEl = sceneEl.querySelector<SVGSVGElement>('.hero-title')!;
+    const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text')!;
 
-    function fitTitle() {
-      const pad = 24;
-      const probe = titleEl.cloneNode(true) as HTMLElement;
-      Object.assign(probe.style, {
-        position: 'absolute', left: '-99999px', top: '0',
-        visibility: 'hidden', whiteSpace: 'nowrap',
-        maxWidth: 'none', transform: 'none', fontSize: '100px',
-      });
-      document.body.appendChild(probe);
-      const naturalW = probe.getBoundingClientRect().width;
-      document.body.removeChild(probe);
-      titleEl.style.fontSize = `${100 * (window.innerWidth - pad * 2) / naturalW}px`;
-    }
-
-    // Esegui dopo il caricamento del font variabile PP Formula
     document.fonts.ready.then(() => {
-      fitTitle();
+      const bb = textEl.getBBox();
+      titleEl.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${bb.height}`);
       ScrollTrigger.refresh();
     });
-
-    const ro = new ResizeObserver(fitTitle);
-    ro.observe(document.body);
 
     // ── 2. Animazioni GSAP ────────────────────────────────────────────────
     const ctx = gsap.context(() => {
@@ -175,7 +157,6 @@
 
     return () => {
       ctx.revert();
-      ro.disconnect();
       gsap.ticker.remove(lenisRaf);
       lenis.destroy();
     };
@@ -211,8 +192,12 @@
     <!-- Layer bg: sfondo-infrastrutture.jpg al 28%, sempre visibile sotto il frost -->
     <div class="layer layer--bg" aria-hidden="true"></div>
 
-    <!-- Titolone: fit edge-to-edge, bouncy in, stretch up e fuori -->
-    <h1 class="hero-title">INFRASTRUTTURE</h1>
+    <!-- Titolone: viewBox = getBBox del testo → scala proporzionale edge-to-edge, glifi intatti -->
+    <svg class="hero-title" width="100%"
+         preserveAspectRatio="xMidYMax meet" role="img" aria-label="INFRASTRUTTURE"
+         focusable="false">
+      <text class="hero-title__text" x="0" y="0">INFRASTRUTTURE</text>
+    </svg>
 
     <!-- Frase: compare automaticamente dopo il titolo, esce con lo scroll -->
     <div class="phrase-container">
@@ -378,26 +363,28 @@
   }
 
   /* ── Titolone edge-to-edge ───────────────────────────────────────────────── */
-  /* font-size iniziale abbondante; JS lo corregge per riempire ~98vw */
+  /* SVG con textLength: il testo riempie sempre l'intera larghezza, responsive nativo */
   .hero-title {
+    display: block;
     position: absolute;
     z-index: 3;
     left: 0;
     right: 0;
     bottom: 6vh;
     width: 100%;
-    text-align: center;
+    overflow: visible;
     transform-origin: bottom center;
-    font-family: 'PP Formula Condensed', sans-serif;
-    font-size: clamp(120px, 18vw, 260px);
-    font-weight: 700;
-    line-height: 1;
-    color: var(--color-text-primary, #16181D);
-    white-space: nowrap;
     pointer-events: none;
     user-select: none;
     will-change: transform, opacity;
-    opacity: 0; /* GSAP controlla sempre opacity: scrub applica stato corretto su reload */
+    opacity: 0;
+  }
+
+  .hero-title__text {
+    font-family: 'PP Formula Condensed', sans-serif;
+    font-weight: 700;
+    font-variation-settings: 'wght' 700;
+    fill: var(--color-text-primary, #16181D);
   }
 
   /* ── Frase ───────────────────────────────────────────────────────────────── */

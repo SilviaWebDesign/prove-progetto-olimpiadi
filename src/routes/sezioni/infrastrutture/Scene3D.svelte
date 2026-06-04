@@ -27,38 +27,24 @@
   let baseScale = 1;
 
   let rafId: number | null = null;
-  let inView  = false;
-  let settled = false;
-  let observer: IntersectionObserver | null = null;
+  let spinner: THREE.Group | null = null;
 
   const clock      = new THREE.Clock();
   const IDLE_RAD_S = THREE.MathUtils.degToRad(7); // 7°/s
-  let baseAngle = 0;
-  let idleAngle = 0;
 
   onMount(() => {
     if (!canvasEl || !wrapperEl) return;
 
     api = {
-      setRotationY: (rad) => { baseAngle = rad; },
+      setRotationY: (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
       setScale:     (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
       setOpacity:   (val) => { materials.forEach((m) => { m.opacity = val; }); },
-      settle:       ()    => { settled = true; },
-      unsettle:     ()    => { settled = false; idleAngle = 0; },
+      settle:       ()    => {},
+      unsettle:     ()    => {},
     };
 
     initThree();
-
-    // threshold basso: il loop rimane attivo finché anche solo 1% del canvas è visibile
-    observer = new IntersectionObserver(
-      (entries) => {
-        inView = entries[0].isIntersecting;
-        if (inView) startLoop();
-        else if (!settled) stopLoop();
-      },
-      { threshold: 0.01 }
-    );
-    observer.observe(wrapperEl);
+    startLoop();
 
     if ('requestIdleCallback' in window) {
       (window as Window & typeof globalThis & { requestIdleCallback: (cb: () => void) => void })
@@ -73,7 +59,6 @@
 
   onDestroy(() => {
     stopLoop();
-    observer?.disconnect();
     scene?.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -84,7 +69,7 @@
       mats.forEach((m) => m.dispose());
     });
     renderer?.dispose();
-    scene = null; renderer = null; camera = null; modelGroup = null; materials = [];
+    scene = null; renderer = null; camera = null; modelGroup = null; spinner = null; materials = [];
   });
 
   function initThree() {
@@ -166,7 +151,9 @@
         });
 
         modelGroup = group;
-        scene.add(group);
+        spinner = new THREE.Group();
+        spinner.add(group);
+        scene.add(spinner);
         draco.dispose();
       },
       undefined,
@@ -184,12 +171,11 @@
   }
 
   function tick() {
-    if ((!inView && !settled) || !renderer || !scene || !camera) { rafId = null; return; }
-    const dt = Math.min(clock.getDelta(), 0.1);
-    if (settled) idleAngle += IDLE_RAD_S * dt;
-    if (modelGroup) modelGroup.rotation.y = baseAngle + idleAngle;
-    renderer.render(scene, camera);
     rafId = requestAnimationFrame(tick);
+    if (!renderer || !scene || !camera) return;
+    const dt = clock.getDelta();
+    if (spinner) spinner.rotation.y += IDLE_RAD_S * dt;
+    renderer.render(scene, camera);
   }
 
   function onResize() {

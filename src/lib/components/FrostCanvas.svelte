@@ -7,7 +7,7 @@
   const FROST_OPACITY            = 0.9;
   const GRAIN_OPACITY            = 0.26;
   const SCRATCH_OPACITY          = 0.14;
-  const BLUR_AMOUNT              = 18;
+  const BLUR_AMOUNT              = 23;
   const INITIAL_SNOWFLAKE_DENSITY = 40;
   const INITIAL_SPECKLE_DENSITY   = 600;
   const INITIAL_CRYSTAL_OPACITY   = 0.55;

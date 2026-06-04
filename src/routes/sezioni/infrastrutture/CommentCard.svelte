@@ -23,40 +23,25 @@
   }: Props = $props();
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <article
   class="comment-card-glass"
   data-section={sectionId}
   data-liked={liked}
   data-size={size}
+  role="button"
+  tabindex="0"
+  aria-pressed={liked}
+  aria-label={liked ? 'Rimuovi like dal commento' : 'Metti like al commento'}
+  onclick={() => onToggleLike?.()}
+  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleLike?.(); } }}
 >
   <p class="comment-card-glass__body">{comment.body}</p>
-
-  <button
-    type="button"
-    class="comment-card-glass__like-button"
-    aria-pressed={liked}
-    aria-label={liked ? 'Rimuovi like dal commento' : 'Metti like al commento'}
-    onclick={() => onToggleLike?.()}
-  >
-    <svg
-      class="comment-card-glass__heart"
-      viewBox="0 0 44 44"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        class="comment-card-glass__heart-circle"
-        d="M21.5117 0.5C33.109 0.5 42.5244 10.0547 42.5244 21.8574C42.5243 33.66 33.1089 43.2139 21.5117 43.2139C9.91479 43.2136 0.500153 33.6599 0.5 21.8574C0.5 10.0548 9.91469 0.500262 21.5117 0.5Z"
-        stroke="currentColor"
-      />
-      <path
-        class="comment-card-glass__heart-shape"
-        d="M12.4194 15.7227C14.8602 13.2819 18.8175 13.2819 21.2583 15.7227L22.1421 16.6066L23.026 15.7227C25.4668 13.2819 29.4241 13.2819 31.8649 15.7227C34.3055 18.1634 34.3056 22.1208 31.8649 24.5615L22.1421 34.2842L12.4194 24.5615C9.97876 22.1208 9.97896 18.1635 12.4194 15.7227Z"
-        stroke="currentColor"
-      />
-    </svg>
-  </button>
+  <svg class="comment-card-glass__heart" viewBox="10 12 24 24" aria-hidden="true">
+    <path class="comment-card-glass__heart-shape"
+      d="M12.4194 15.7227C14.8602 13.2819 18.8175 13.2819 21.2583 15.7227L22.1421 16.6066L23.026 15.7227C25.4668 13.2819 29.4241 13.2819 31.8649 15.7227C34.3055 18.1634 34.3056 22.1208 31.8649 24.5615L22.1421 34.2842L12.4194 24.5615C9.97876 22.1208 9.97896 18.1635 12.4194 15.7227Z"
+      stroke="currentColor" fill="none"/>
+  </svg>
 </article>
 
 <style>
@@ -79,6 +64,7 @@
     box-shadow:
       0 6px 20px rgba(0, 0, 0, 0.08),
       inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    cursor: pointer;
     transition:
       transform 300ms cubic-bezier(0.25, 1, 0.5, 1),
       background 300ms ease,
@@ -175,31 +161,16 @@
   .comment-card-glass__body::before { content: '\201C'; }
   .comment-card-glass__body::after  { content: '\201D'; }
 
-  /* Pulsante cuore */
-  .comment-card-glass__like-button {
-    flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--color-text-primary, #16181D);
-    transition: transform 150ms ease;
-  }
-  .comment-card-glass__like-button:hover,
-  .comment-card-glass__like-button:focus-visible { transform: scale(1.08); }
-  .comment-card-glass__like-button:active { transform: scale(0.92); }
-  .comment-card-glass__like-button:focus-visible {
+  .comment-card-glass:focus-visible {
     outline: 2px solid var(--color-border, rgba(22,24,29,0.5));
-    outline-offset: 2px;
-    border-radius: 50%;
+    outline-offset: 4px;
   }
 
   .comment-card-glass__heart {
     display: block;
-    width: 100%;
-    height: 100%;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
     transition: color 200ms ease;
   }
 

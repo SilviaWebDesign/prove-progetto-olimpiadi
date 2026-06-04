@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
+  import Lenis from 'lenis';
 
   import FrostCanvas from '$lib/components/FrostCanvas.svelte';
   import TextBlock from './TextBlock.svelte';
@@ -42,83 +43,100 @@
   // ── Header label ─────────────────────────────────────────────────────────
   let showSectionLabel = $state(false);
 
-  // ── GSAP ─────────────────────────────────────────────────────────────────
+  // ── Setup ────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!browser || !sceneEl) return;
 
     gsap.registerPlugin(ScrollTrigger);
 
+    // ── A. Lenis smooth scroll ────────────────────────────────────────────
+    // lerp 0.08 = glide morbido senza distanza extra.
+    const lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
+    lenis.on('scroll', ScrollTrigger.update);
+    const lenisRaf = (t: number) => lenis.raf(t * 1000);
+    gsap.ticker.add(lenisRaf);
+    gsap.ticker.lagSmoothing(0);
+
+    // ── 1. Titolo full-width responsivo ───────────────────────────────────
+    // Font-size impostato via DOM (mai GSAP) → GSAP anima solo transform/opacity.
+    // Base fissa a 100px per misurare; ResizeObserver ri-esegue su ogni resize.
     const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
 
-    // ── 1. Fit edge-to-edge RESPONSIVO ───────────────────────────────────
-    // Font-size gestito solo via DOM (mai via GSAP), così transform + opacity
-    // GSAP non interferiscono col calcolo della larghezza.
-    const H_PAD = 24; // px ciascun lato
-
     function fitTitle() {
-      titleEl.style.removeProperty('font-size');         // torna al valore CSS
-      const base = parseFloat(getComputedStyle(titleEl).fontSize);
-      const nat  = titleEl.scrollWidth;                  // larghezza naturale
-      if (!nat || !base) return;
-      const target = window.innerWidth - H_PAD * 2;
-      titleEl.style.fontSize = `${base * target / nat}px`;
+      const pad = 24;
+      const probe = titleEl.cloneNode(true) as HTMLElement;
+      Object.assign(probe.style, {
+        position: 'absolute', left: '-99999px', top: '0',
+        visibility: 'hidden', whiteSpace: 'nowrap',
+        maxWidth: 'none', transform: 'none', fontSize: '100px',
+      });
+      document.body.appendChild(probe);
+      const naturalW = probe.getBoundingClientRect().width;
+      document.body.removeChild(probe);
+      titleEl.style.fontSize = `${100 * (window.innerWidth - pad * 2) / naturalW}px`;
     }
 
-    fitTitle();
-    const ro = new ResizeObserver(fitTitle);
-    ro.observe(document.documentElement);               // ricalcola su resize
+    // Esegui dopo il caricamento del font variabile PP Formula
+    document.fonts.ready.then(() => {
+      fitTitle();
+      ScrollTrigger.refresh();
+    });
 
-    // ── 2. GSAP ──────────────────────────────────────────────────────────
+    const ro = new ResizeObserver(fitTitle);
+    ro.observe(document.body);
+
+    // ── 2. Animazioni GSAP ────────────────────────────────────────────────
     const ctx = gsap.context(() => {
 
-      // Ingresso bouncy automatico (solo scaleY + opacity, mai fontSize)
-      gsap.timeline({ defaults: { transformOrigin: 'bottom center' } })
-        .fromTo(titleEl,
-          { scaleY: 0.06, opacity: 0 },
-          { scaleY: 1, opacity: 1, duration: 1.0, ease: 'elastic.out(1,0.5)' }
+      // Fade-in soft del titolo (solo se siamo in cima, senza bouncy/elastic).
+      // Su reload a metà/fondo pagina lo skip: lo scrub applica subito lo stato corretto.
+      if (window.scrollY < window.innerHeight * 0.15) {
+        gsap.fromTo(titleEl,
+          { opacity: 0 },
+          { opacity: 1, duration: 0.4, ease: 'power2.out', delay: 0.1 }
         );
+      }
 
-      // ── Trigger HERO: 300vh di scroll, coreografia titolo → frost → frase ─
-      //    Fine calcolata in px dinamici così è corretta anche dopo resize.
+      // ── Hero scroll trigger: ~150vh → titolo, frost e frase coreografati ─
       const heroTl = gsap.timeline({
         scrollTrigger: {
           trigger: sceneEl,
-          start: 'top top',
-          end: () => `+=${window.innerHeight * 3}`,     // 300vh
-          scrub: 1.2,
+          start:   'top top',
+          end:     () => `+=${window.innerHeight * 1.5}`, // 150vh
+          scrub:   1.2,
           onEnter: () => { showSectionLabel = true; },
         },
       });
 
-      // Titolo: stretch verso l'alto e svanisce (0 → 25 %)
+      // Titolo: stretch verso l'alto e svanisce (0–25%)
       heroTl.fromTo(titleEl,
-        { scaleY: 1, yPercent: 0, opacity: 1 },
-        { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
+        { scaleY: 1, yPercent: 0,   opacity: 1, immediateRender: false },
+        { scaleY: 2.2, yPercent: -120, opacity: 0,
+          ease: 'power3.inOut', duration: 0.25 },
         0
       );
-      // Frost: dissolve sovrapposto al titolo, leggermente più lungo (0 → 30 %)
+      // Frost: dissolve sovrapposto, leggermente più lungo (0–30%)
       heroTl.to('.layer--frost', { autoAlpha: 0, ease: 'power2.inOut', duration: 0.30 }, 0);
-      // Frase: fade-in morbido mentre il titolo sta ancora salendo (20 → 40 %)
+      // Frase: fade-in morbido mentre il titolo sale (20–40%)
       heroTl.fromTo('.phrase',
         { opacity: 0, y: 30 },
         { opacity: 1, y: 0, ease: 'power2.out', duration: 0.20 },
         0.20
       );
-      // Frase: esce dolcemente dopo un tratto di riposo (62 → 77 %)
+      // Frase: esce dopo un tratto di riposo (62–77%)
       heroTl.to('.phrase', { opacity: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
 
-      // ── Trigger 3D: trigger SEPARATO, parte solo a 360vh di scroll ────────
-      //    La scena del modello inizia davvero tardi rispetto alla hero,
-      //    così un leggero scroll non la raggiunge mai.
+      // ── Trigger 3D: SEPARATO, inizia a 185vh → nessun salto con poco scroll ─
       const proxy = { rot: 0, scale: 1, appear: 0 };
 
       const threeTl = gsap.timeline({
         scrollTrigger: {
-          trigger: sceneEl,
-          start: () => `top+=${window.innerHeight * 3.6}`, // 360vh
-          end: 'bottom bottom',
-          scrub: 1.2,
-          onComplete: () => { scene3d?.startIdleSpin(); },
+          trigger:           sceneEl,
+          start:             () => `top+=${window.innerHeight * 1.85}`, // 185vh
+          end:               'bottom bottom',
+          scrub:             1.2,
+          onComplete:        () => { scene3d?.settle(); },
+          onReverseComplete: () => { scene3d?.unsettle(); },
         },
       });
 
@@ -132,7 +150,7 @@
         onUpdate: () => scene3d?.setRotationY(proxy.rot),
       }, 0.06);
 
-      // Scala finale: 0.42 × 1.33 ≈ 0.56 (invariato dalla sessione precedente)
+      // Scala finale 0.56 (= 0.42 × 1.33)
       threeTl.to(proxy, {
         scale: 0.56, ease: 'power2.inOut', duration: 0.28,
         onUpdate: () => scene3d?.setScale(proxy.scale),
@@ -149,11 +167,17 @@
         { opacity: 1, x: 0, ease: 'power2.out', duration: 0.12 },
         0.77
       );
+
     }, sceneEl);
+
+    // Refresh iniziale + dopo fonts/immagini per stato corretto su reload
+    ScrollTrigger.refresh();
 
     return () => {
       ctx.revert();
       ro.disconnect();
+      gsap.ticker.remove(lenisRaf);
+      lenis.destroy();
     };
   });
 </script>
@@ -191,12 +215,14 @@
     <h1 class="hero-title">INFRASTRUTTURE</h1>
 
     <!-- Frase: compare automaticamente dopo il titolo, esce con lo scroll -->
-    <p class="phrase">
-      Le Olimpiadi prendono forma attraverso cantieri, impianti e collegamenti
-      tra territori. Queste opere possono essere lette come investimenti utili
-      o come interventi costosi, il cui valore dipende da cosa resterà dopo
-      l'evento.
-    </p>
+    <div class="phrase-container">
+      <p class="phrase">
+        Le Olimpiadi prendono forma attraverso cantieri, impianti e collegamenti
+        tra territori. Queste opere possono essere lette come investimenti utili
+        o come interventi costosi, il cui valore dipende da cosa resterà dopo
+        l'evento.
+      </p>
+    </div>
 
     <!-- Stage: 3D + testo + card (visibili nella parte scrollata) -->
     <div class="stage">
@@ -322,7 +348,7 @@
      ═══════════════════════════════════════════════════════════════════════ */
 
   .scene {
-    height: 750vh;
+    height: 520vh;
     position: relative;
   }
 
@@ -371,21 +397,27 @@
     pointer-events: none;
     user-select: none;
     will-change: transform, opacity;
+    opacity: 0; /* GSAP controlla sempre opacity: scrub applica stato corretto su reload */
   }
 
   /* ── Frase ───────────────────────────────────────────────────────────────── */
-  .phrase {
+  .phrase-container {
     position: absolute;
+    inset: 0;
     z-index: 4;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .phrase {
     width: min(1349px, 90vw);
     text-align: center;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
     font-size: clamp(34px, 4.5vw, 68px);
-    line-height: 1.15;
+    line-height: 1.1;
     color: var(--color-text-primary, #16181D);
     opacity: 0;
     pointer-events: none;

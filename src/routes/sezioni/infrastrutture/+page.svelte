@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { browser } from '$app/environment';
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -13,35 +13,118 @@
 
   import './tokens.css';
 
-  // ── Card state ────────────────────────────────────────────────────────────
+  // ── Interfaces ────────────────────────────────────────────────────────────
   interface CardData { id: number; body: string; liked: boolean; }
+  interface TopicData { counter: string; title: string; body: string; comments: string[]; }
 
-  let cards = $state<CardData[]>([
-    { id: 0, body: 'Lo Stadio di San Siro sarà completamente ristrutturato per ospitare le cerimonie olimpiche.', liked: false },
-    { id: 1, body: "L'Unipol Forum di Assago è già pronto e non richiede interventi strutturali rilevanti.", liked: false },
-    { id: 2, body: "Rho Fiera viene adattata come hub logistico e media center per l'intera manifestazione.", liked: false },
-    { id: 3, body: 'Circa il 90% delle sedi di gara rientra in una logica di riuso o utilizzo di strutture temporanee.', liked: false },
-    { id: 4, body: 'Il villaggio olimpico di Milano sarà poi convertito in alloggi per studenti universitari.', liked: false },
-    { id: 5, body: 'Le piste da ghiaccio temporanee verranno smontate dopo i Giochi, senza strutture inutilizzate.', liked: false },
-  ]);
+  // ── Topics ────────────────────────────────────────────────────────────────
+  const topics: TopicData[] = [
+    {
+      counter: '1 / 3',
+      title: 'Villaggio Olimpico',
+      body: "Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l'evento. Il progetto presenta tecnologie ed impianti finalizzati al risparmio energetico. Una volta adibito a studentato, la quota mensile si aggirerà intorno ai 1.000€ per posto letto.",
+      comments: [
+        "Finalmente un progetto che ha a cuore il risparmio energetico, è ammirevole.",
+        "Diventando student housing, il Villaggio può contribuire in modo utile alla città.",
+        "Ha contribuito a creare una bella atmosfera tra gli atleti, e rafforzare la sportività, che è fondamentale.",
+        "Il villaggio olimpico ha distrutto Porta Romana.",
+        "La quota di affitto non è accessibile, sarà l'ennesimo studentato soltanto per ricchi.",
+        "L'edificio non ha un aspetto gradevole, rovina il panorama urbano con la sua estetica da prefabbricato.",
+      ],
+    },
+    {
+      counter: '2 / 3',
+      title: 'Arena Santa Giulia',
+      body: "L'Arena Santa Giulia è stata progettata per ospitare l'hockey olimpico e diventare poi un'arena polifunzionale per eventi, sport e spettacoli. La costruzione dell'arena rientra nel progetto di riqualificazione del quartiere Santa Giulia, o Montecity-Rogoredo, nella periferia sudest di Milano.",
+      comments: [
+        "L'arena è completamente accessibile alle persone con disabilità, un grande passo avanti per l'Italia, finalmente.",
+        "Design estremamente moderno, un ottimo passo verso la riqualificazione di Santa Giulia.",
+        "Struttura molto adatta per i concerti, l'acustica è ottima!",
+        "È inammissibile che l'arena sia stata utilizzata prima del suo completamento.",
+        "La peggior arena di sempre, durante i Giochi si sono verificati troppi malfunzionamenti.",
+        "Uno spreco di risorse, sicuramente l'arena resterà inutilizzata.",
+      ],
+    },
+    {
+      counter: '3 / 3',
+      title: 'Sliding Centre',
+      body: "L'Eugenio Monti Sliding Centre è un tracciato per bob, skeleton e slittino situato a Cortina d'Ampezzo. La pista è stata ricostruita per ospitare le gare dei tre sport alle Olimpiadi Invernali di Milano-Cortina, ed è considerata una delle strutture più emblematiche dei Giochi.",
+      comments: [
+        "Le Olimpiadi Invernali sono state l'occasione perfetta per ristrutturare la pista, finalmente si potrà praticare di nuovo il bob a Cortina!",
+        "Gli atleti che ci hanno gareggiato l'hanno definita come la migliore di sempre, e il loro parere è sicuramente il più valido di tutti.",
+        "Non è da poco costruire una struttura così di qualità in breve tempo, l'Italia dovrebbe esserne orgogliosa.",
+        "La pista è stata costruita su un terreno franabile, è assurdo che questo progetto sia stato anche solo approvato.",
+        "L'impatto ambientale dello Sliding Centre rende impossibile apprezzarlo, indipendentemente dalla sua utilità.",
+        "Dubito che verrà utilizzata dopo il termine dei Giochi, mantenerla sarà solo un peso economico per lo Stato.",
+      ],
+    },
+  ];
+
+  // ── Topic + like state ────────────────────────────────────────────────────
+  let currentTopic = $state(0);
+  let topicLikes = $state<boolean[][]>(topics.map(t => t.comments.map(() => false)));
+  let isTransitioning = $state(false);
+
+  const cards: CardData[] = $derived(
+    topics[currentTopic].comments.map((body, i) => ({
+      id: i,
+      body,
+      liked: topicLikes[currentTopic][i],
+    }))
+  );
 
   function toggleLike(id: number) {
-    cards = cards.map((c) => (c.id === id ? { ...c, liked: !c.liked } : c));
+    topicLikes = topicLikes.map((tl, ti) =>
+      ti === currentTopic ? tl.map((l, li) => li === id ? !l : l) : tl
+    );
   }
 
-  const anyLiked = $derived(cards.some(c => c.liked));
+  const anyLiked = $derived(topicLikes[currentTopic].some(l => l));
 
-  function goToNextTopic() {
-    // stub — da collegare al prossimo argomento (2/3)
-    console.log('goToNextTopic');
+  function goToNextSection() {
+    console.log('goToNextSection — stub');
   }
 
-  // ── Text block content ────────────────────────────────────────────────────
-  const textBlockBody =
-    'Milano-Cortina 2026 è stata progettata intorno a un uso esteso di sedi già esistenti o ' +
-    'temporanee, al fine di non lasciare "cattedrali nel deserto", come spesso accade. Secondo ' +
-    'la comunicazione ufficiale, circa il 90% delle sedi di gara rientra in questa logica di ' +
-    "riuso. Alcuni degli esempi sono lo stadio di San Siro, l'Unipol Forum, e Rho Fiera.";
+  async function goNext() {
+    if (!anyLiked || isTransitioning) return;
+    if (currentTopic === 2) { goToNextSection(); return; }
+
+    isTransitioning = true;
+
+    await gsap.timeline()
+      .to('.stage__text',  { opacity: 0, y: -20, duration: 0.3, ease: 'power2.in' }, 0)
+      .to('.stage__right', { opacity: 0, x:  20, duration: 0.3, ease: 'power2.in' }, 0);
+
+    currentTopic++;
+    await tick();
+
+    gsap.set('.stage__text',  { y: 20, opacity: 0 });
+    gsap.set('.stage__right', { x: -20, opacity: 0 });
+
+    gsap.timeline({ onComplete: () => { isTransitioning = false; } })
+      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0)
+      .to('.stage__right', { opacity: 1, x: 0, duration: 0.45, ease: 'power3.out' }, 0.05);
+  }
+
+  async function goPrev() {
+    if (isTransitioning || currentTopic === 0) return;
+
+    isTransitioning = true;
+
+    await gsap.timeline()
+      .to('.stage__text',  { opacity: 0, y: 20,  duration: 0.3, ease: 'power2.in' }, 0)
+      .to('.stage__right', { opacity: 0, x: -20, duration: 0.3, ease: 'power2.in' }, 0);
+
+    currentTopic--;
+    await tick();
+
+    gsap.set('.stage__text',  { y: -20, opacity: 0 });
+    gsap.set('.stage__right', { x:  20, opacity: 0 });
+
+    gsap.timeline({ onComplete: () => { isTransitioning = false; } })
+      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0)
+      .to('.stage__right', { opacity: 1, x: 0, duration: 0.45, ease: 'power3.out' }, 0.05);
+  }
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
   let sceneEl = $state<HTMLElement | null>(null);
@@ -52,17 +135,63 @@
   // ── Header label ─────────────────────────────────────────────────────────
   let showSectionLabel = $state(false);
 
+  // ── Model loaded signal ───────────────────────────────────────────────────
+  let resolveModelLoaded: () => void = () => {};
+  const modelLoadedPromise = new Promise<void>(resolve => { resolveModelLoaded = resolve; });
+
+  // ── Topics-mode scroll interception ──────────────────────────────────────
+  let topicsMode = false;
+  let lenisRef: { stop: () => void; start: () => void } | null = null;
+
+  function enterTopicsMode() {
+    if (topicsMode) return;
+    topicsMode = true;
+    lenisRef?.stop();
+    window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
+  }
+
+  function exitTopicsMode() {
+    if (!topicsMode) return;
+    topicsMode = false;
+    window.removeEventListener('wheel', onTopicsWheel, { capture: true } as EventListenerOptions);
+    lenisRef?.start();
+  }
+
+  function onTopicsWheel(e: WheelEvent) {
+    const goingDown = e.deltaY > 0;
+
+    // Scroll up on first topic → release the pin, let Lenis scroll normally
+    if (!goingDown && currentTopic === 0) {
+      exitTopicsMode();
+      return; // no preventDefault: Lenis will handle the gesture
+    }
+
+    e.preventDefault();
+    if (isTransitioning) return;
+
+    if (goingDown) {
+      if (currentTopic === 2) {
+        exitTopicsMode();
+        goToNextSection();
+      } else if (anyLiked) {
+        goNext();
+      }
+    } else {
+      goPrev();
+    }
+  }
+
   // ── Setup ────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!browser || !sceneEl) return;
 
-    // Prevent browser scroll-restoration jank; we sync manually after init.
     history.scrollRestoration = 'manual';
 
     gsap.registerPlugin(ScrollTrigger);
 
     // ── A. Lenis smooth scroll ─────────────────────────────────────────────
     const lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
+    lenisRef = lenis;
     lenis.on('scroll', ScrollTrigger.update);
     const lenisRaf = (t: number) => lenis.raf(t * 1000);
     gsap.ticker.add(lenisRaf);
@@ -72,23 +201,16 @@
     const titleEl = sceneEl.querySelector<SVGSVGElement>('.hero-title')!;
     const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text')!;
 
-    // ── C. Explicit initial states — no flash on mid-scroll reload ─────────
-    gsap.set(titleEl,          { opacity: 0, scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
-    gsap.set('.layer--frost',  { autoAlpha: 1 });
-    gsap.set('.phrase',        { opacity: 0, y: 30 });
-    gsap.set('.stage__text',   { opacity: 0, x: -30 });
-    gsap.set('.stage__right',  { opacity: 0, x: 30 });
-    gsap.set('.stage__cta',    { opacity: 0 });
-
-    // Soft fade-in of title only when starting from top.
-    if (window.scrollY < window.innerHeight * 0.15) {
-      gsap.to(titleEl, { opacity: 1, duration: 0.4, ease: 'power2.out', delay: 0.1 });
-    }
+    // ── C. GSAP initial state (CSS handles opacity:0 for anti-flash) ───────
+    gsap.set(titleEl,         { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
+    gsap.set('.layer--frost', { autoAlpha: 1 });
+    gsap.set('.phrase',       { y: 30 });
+    gsap.set('.stage__text',  { x: -30 });
+    gsap.set('.stage__right', { x:  30 });
 
     // ── D. Animations ──────────────────────────────────────────────────────
     const ctx = gsap.context(() => {
 
-      // Hero scroll trigger: ~150vh → titolo, frost e frase coreografati.
       const heroTl = gsap.timeline({
         scrollTrigger: {
           trigger: sceneEl,
@@ -99,24 +221,19 @@
         },
       });
 
-      // Titolo: stretch verso l'alto e svanisce (0–25%)
       heroTl.fromTo(titleEl,
         { scaleY: 1, yPercent: 0, opacity: 1, immediateRender: false },
         { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
         0
       );
-      // Frost: dissolve sovrapposto, leggermente più lungo (0–30%)
       heroTl.to('.layer--frost', { autoAlpha: 0, ease: 'power2.inOut', duration: 0.30 }, 0);
-      // Frase: fade-in morbido (20–40%)
       heroTl.fromTo('.phrase',
         { opacity: 0, y: 30 },
         { opacity: 1, y: 0, ease: 'power2.out', duration: 0.20 },
         0.20
       );
-      // Frase: esce (62–77%)
       heroTl.to('.phrase', { opacity: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
 
-      // ── Trigger 3D: separato, inizia a 185vh ──────────────────────────────
       const proxy = { rot: 0, scale: 1, appear: 0 };
 
       const threeTl = gsap.timeline({
@@ -125,8 +242,8 @@
           start:             () => `top+=${window.innerHeight * 1.85}`,
           end:               'bottom bottom',
           scrub:             1.2,
-          onComplete:        () => { scene3d?.settle(); },
-          onReverseComplete: () => { scene3d?.unsettle(); },
+          onUpdate:          (self: { progress: number }) => { if (self.progress >= 0.999) { scene3d?.settle(); enterTopicsMode(); } },
+          onReverseComplete: () => { scene3d?.unsettle(); exitTopicsMode(); },
         },
       });
 
@@ -140,7 +257,6 @@
         onUpdate: () => scene3d?.setRotationY(proxy.rot),
       }, 0.06);
 
-      // Scala finale 0.56
       threeTl.to(proxy, {
         scale: 0.56, ease: 'power2.inOut', duration: 0.28,
         onUpdate: () => scene3d?.setScale(proxy.scale),
@@ -152,7 +268,6 @@
         0.74
       );
 
-      // Colonna destra (heading + card) e CTA appaiono insieme
       threeTl.fromTo('.stage__right',
         { opacity: 0, x: 30 },
         { opacity: 1, x: 0, ease: 'power2.out', duration: 0.12 },
@@ -167,22 +282,37 @@
 
     }, sceneEl);
 
-    // ── E. Dopo fonts + immagine bg: viewBox, sync Lenis, refresh ──────────
+    // ── E. fonts.ready → viewBox + titolo visibile ────────────────────────
+    document.fonts.ready.then(() => {
+      const bb   = textEl.getBBox();
+      const svgW = titleEl.getBoundingClientRect().width || window.innerWidth;
+      const svgH = svgW * bb.height / bb.width;
+      titleEl.setAttribute('height', String(Math.ceil(svgH)));
+      titleEl.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${bb.height}`);
+      if (window.scrollY < window.innerHeight * 0.15) {
+        gsap.to(titleEl, { opacity: 1, duration: 0.12, ease: 'none' });
+      }
+    });
+
+    // ── F. Tutte le risorse → sync Lenis + refresh ScrollTrigger ──────────
     const bgImg = new Image();
     bgImg.src = '/images/sfondo-infrastrutture.jpg';
     const bgLoaded = new Promise<void>(resolve => {
       bgImg.onload = bgImg.onerror = () => resolve();
     });
-
-    Promise.all([document.fonts.ready, bgLoaded]).then(() => {
-      const bb = textEl.getBBox();
-      titleEl.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${bb.height}`);
-      // Sincronizza Lenis alla posizione corrente (gestisce reload a metà pagina).
+    const windowLoaded = new Promise<void>(resolve => {
+      if (document.readyState === 'complete') resolve();
+      else window.addEventListener('load', () => resolve(), { once: true });
+    });
+    Promise.all([bgLoaded, windowLoaded, modelLoadedPromise]).then(() => {
       lenis.scrollTo(window.scrollY, { immediate: true });
-      requestAnimationFrame(() => ScrollTrigger.refresh());
+      ScrollTrigger.refresh();
+      requestAnimationFrame(() => requestAnimationFrame(() => ScrollTrigger.refresh()));
     });
 
     return () => {
+      exitTopicsMode();
+      lenisRef = null;
       ctx.revert();
       gsap.ticker.remove(lenisRaf);
       lenis.destroy();
@@ -240,15 +370,14 @@
 
       <div class="stage__text">
         <TextBlock
-          counter="1 / 3"
-          title="Riuso delle sedi"
-          body={textBlockBody}
-          source="FONTE"
+          counter={topics[currentTopic].counter}
+          title={topics[currentTopic].title}
+          body={topics[currentTopic].body}
         />
       </div>
 
       <div class="stage__canvas">
-        <Scene3D bind:api={scene3d} />
+        <Scene3D bind:api={scene3d} onModelLoaded={() => resolveModelLoaded()} />
       </div>
 
       <!-- Colonna destra: heading + card -->
@@ -263,12 +392,12 @@
     <div class="stage__cta">
       <div
         class="stage__cta-content"
-        class:active={anyLiked}
+        class:active={anyLiked && !isTransitioning}
         role="button"
-        tabindex={anyLiked ? 0 : -1}
-        aria-disabled={!anyLiked}
-        onclick={() => { if (anyLiked) goToNextTopic(); }}
-        onkeydown={(e) => { if (anyLiked && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goToNextTopic(); } }}
+        tabindex={anyLiked && !isTransitioning ? 0 : -1}
+        aria-disabled={!anyLiked || isTransitioning}
+        onclick={() => { if (anyLiked && !isTransitioning) goNext(); }}
+        onkeydown={(e) => { if (anyLiked && !isTransitioning && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goNext(); } }}
       >
         <span class="cta-label">Clicca per continuare</span>
         <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
@@ -400,6 +529,21 @@
 
   .layer--frost {
     z-index: 2;
+    overflow: hidden;
+  }
+
+  /* Placeholder sfocato renderizzato server-side: evita il flash della foto nitida
+     prima che il canvas FrostCanvas abbia dipinto il primo frame.             */
+  .layer--frost::before {
+    content: '';
+    position: absolute;
+    inset: -80px;
+    z-index: 0;
+    background-image: url('/images/frost-infrastrutture.jpg');
+    background-size: cover;
+    background-position: center;
+    filter: blur(23px) brightness(1.15) saturate(0.55) contrast(1.08);
+    pointer-events: none;
   }
 
   .layer--bg {
@@ -419,6 +563,9 @@
     right: 0;
     bottom: 0;
     width: 100%;
+    line-height: 0;
+    margin: 0;
+    padding: 0;
     overflow: visible;
     transform-origin: bottom center;
     pointer-events: none;
@@ -501,10 +648,10 @@
   .stage__right-heading {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: clamp(16px, 1.3vw, 21px);
+    font-size: 16px;
     line-height: 1.25;
     color: #161A1F;
-    max-width: 356px;
+    white-space: nowrap;
   }
 
   /* ── CTA in basso al centro ──────────────────────────────────────────────── */

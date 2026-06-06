@@ -13,8 +13,8 @@
     unsettle:     () => void;   // riprende setRotationY, ferma idle spin
   }
 
-  interface Props { api?: Scene3DApi; }
-  let { api = $bindable() }: Props = $props();
+  interface Props { api?: Scene3DApi; onModelLoaded?: () => void; }
+  let { api = $bindable(), onModelLoaded }: Props = $props();
 
   let wrapperEl = $state<HTMLDivElement | null>(null);
   let canvasEl  = $state<HTMLCanvasElement | null>(null);
@@ -155,9 +155,10 @@
         spinner.add(group);
         scene.add(spinner);
         draco.dispose();
+        onModelLoaded?.();
       },
       undefined,
-      (err) => console.error('[Scene3D] load error:', err)
+      (err) => { console.error('[Scene3D] load error:', err); onModelLoaded?.(); }
     );
   }
 

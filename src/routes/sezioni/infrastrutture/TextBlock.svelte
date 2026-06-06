@@ -3,7 +3,7 @@
     counter: string;
     title: string;
     body: string;
-    source: string;
+    source?: string;
   }
 
   let { counter, title, body, source }: Props = $props();
@@ -13,7 +13,7 @@
   <span class="counter">{counter}</span>
   <h2 class="title">{title}</h2>
   <p class="body-text">{body}</p>
-  <span class="source">— {source}</span>
+  {#if source}<span class="source">— {source}</span>{/if}
 </div>
 
 <style>

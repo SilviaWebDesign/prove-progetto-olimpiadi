@@ -90,40 +90,51 @@
     if (currentTopic === 2) { goToNextSection(); return; }
 
     isTransitioning = true;
+    const OUT = 0.50;
+    const CROSS = OUT * 0.88; // attesa all'88% del fade-out: opacity ≈ 3% (power3.inOut)
 
-    await gsap.timeline()
-      .to('.stage__text',  { opacity: 0, y: -20, duration: 0.3, ease: 'power2.in' }, 0)
-      .to('.stage__right', { opacity: 0, x:  20, duration: 0.3, ease: 'power2.in' }, 0);
+    // timeline locale: kill() non tocca i tween del threeTl ScrollTrigger
+    const outTl = gsap.timeline();
+    outTl.to('.stage__text',  { opacity: 0, y: -8, duration: OUT, ease: 'power3.inOut' }, 0);
+    outTl.to('.stage__right', { opacity: 0, x:  8, duration: OUT, ease: 'power3.inOut' }, 0);
+
+    await new Promise<void>(r => setTimeout(r, CROSS * 1000));
+    outTl.kill();
 
     currentTopic++;
     await tick();
 
-    gsap.set('.stage__text',  { y: 20, opacity: 0 });
-    gsap.set('.stage__right', { x: -20, opacity: 0 });
+    gsap.set('.stage__text',  { y: 8,  opacity: 0 });
+    gsap.set('.stage__right', { x: -8, opacity: 0 });
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
-      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0)
-      .to('.stage__right', { opacity: 1, x: 0, duration: 0.45, ease: 'power3.out' }, 0.05);
+      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0)
+      .to('.stage__right', { opacity: 1, x: 0, duration: 0.60, ease: 'power3.inOut' }, 0.04);
   }
 
   async function goPrev() {
     if (isTransitioning || currentTopic === 0) return;
 
     isTransitioning = true;
+    const OUT = 0.50;
+    const CROSS = OUT * 0.88;
 
-    await gsap.timeline()
-      .to('.stage__text',  { opacity: 0, y: 20,  duration: 0.3, ease: 'power2.in' }, 0)
-      .to('.stage__right', { opacity: 0, x: -20, duration: 0.3, ease: 'power2.in' }, 0);
+    const outTl = gsap.timeline();
+    outTl.to('.stage__text',  { opacity: 0, y:  8, duration: OUT, ease: 'power3.inOut' }, 0);
+    outTl.to('.stage__right', { opacity: 0, x: -8, duration: OUT, ease: 'power3.inOut' }, 0);
+
+    await new Promise<void>(r => setTimeout(r, CROSS * 1000));
+    outTl.kill();
 
     currentTopic--;
     await tick();
 
-    gsap.set('.stage__text',  { y: -20, opacity: 0 });
-    gsap.set('.stage__right', { x:  20, opacity: 0 });
+    gsap.set('.stage__text',  { y: -8, opacity: 0 });
+    gsap.set('.stage__right', { x:  8, opacity: 0 });
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
-      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0)
-      .to('.stage__right', { opacity: 1, x: 0, duration: 0.45, ease: 'power3.out' }, 0.05);
+      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0)
+      .to('.stage__right', { opacity: 1, x: 0, duration: 0.60, ease: 'power3.inOut' }, 0.04);
   }
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
@@ -186,11 +197,13 @@
     if (!browser || !sceneEl) return;
 
     history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
 
     gsap.registerPlugin(ScrollTrigger);
 
     // ── A. Lenis smooth scroll ─────────────────────────────────────────────
     const lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
+    lenis.scrollTo(0, { immediate: true });
     lenisRef = lenis;
     lenis.on('scroll', ScrollTrigger.update);
     const lenisRaf = (t: number) => lenis.raf(t * 1000);
@@ -202,11 +215,10 @@
     const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text')!;
 
     // ── C. GSAP initial state (CSS handles opacity:0 for anti-flash) ───────
-    gsap.set(titleEl,         { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
-    gsap.set('.layer--frost', { autoAlpha: 1 });
-    gsap.set('.phrase',       { y: 30 });
-    gsap.set('.stage__text',  { x: -30 });
-    gsap.set('.stage__right', { x:  30 });
+    gsap.set(titleEl,        { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
+    gsap.set('.phrase',      { y: 30, autoAlpha: 0 });
+    gsap.set('.stage__text', { x: -30 });
+    gsap.set('.stage__right',{ x:  30 });
 
     // ── D. Animations ──────────────────────────────────────────────────────
     const ctx = gsap.context(() => {
@@ -226,13 +238,18 @@
         { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
         0
       );
-      heroTl.to('.layer--frost', { autoAlpha: 0, ease: 'power2.inOut', duration: 0.30 }, 0);
+      // fromTo esplicito: garantisce autoAlpha:1 a scroll=0 senza gsap.set separato
+      heroTl.fromTo('.layer--frost',
+        { autoAlpha: 1 },
+        { autoAlpha: 0, ease: 'power2.inOut', duration: 0.30 },
+        0
+      );
       heroTl.fromTo('.phrase',
-        { opacity: 0, y: 30 },
-        { opacity: 1, y: 0, ease: 'power2.out', duration: 0.20 },
+        { autoAlpha: 0, y: 30 },
+        { autoAlpha: 1, y: 0, ease: 'power2.out', duration: 0.20 },
         0.20
       );
-      heroTl.to('.phrase', { opacity: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
+      heroTl.to('.phrase', { autoAlpha: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
 
       const proxy = { rot: 0, scale: 1, appear: 0 };
 
@@ -286,9 +303,13 @@
     document.fonts.ready.then(() => {
       const bb   = textEl.getBBox();
       const svgW = titleEl.getBoundingClientRect().width || window.innerWidth;
-      const svgH = svgW * bb.height / bb.width;
+      // capH = altezza dal top dei glifi alla baseline (escluso lo spazio sotto
+      // la baseline che il getBBox può includere per font con riserva discendente).
+      // Per testo tutto maiuscolo i glifi toccano la baseline → nessun gap.
+      const capH = -bb.y;
+      const svgH = svgW * capH / bb.width;
       titleEl.setAttribute('height', String(Math.ceil(svgH)));
-      titleEl.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${bb.height}`);
+      titleEl.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${capH}`);
       if (window.scrollY < window.innerHeight * 0.15) {
         gsap.to(titleEl, { opacity: 1, duration: 0.12, ease: 'none' });
       }
@@ -305,7 +326,6 @@
       else window.addEventListener('load', () => resolve(), { once: true });
     });
     Promise.all([bgLoaded, windowLoaded, modelLoadedPromise]).then(() => {
-      lenis.scrollTo(window.scrollY, { immediate: true });
       ScrollTrigger.refresh();
       requestAnimationFrame(() => requestAnimationFrame(() => ScrollTrigger.refresh()));
     });

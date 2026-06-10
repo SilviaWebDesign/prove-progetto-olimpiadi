@@ -48,8 +48,10 @@
     'davanti alle informazioni.'
   ];
   const TEXT3_LINES = [
-    'Le tue scelte plasmeranno gli eroi',
-    'e i cattivi di Milano-Cortina 2026.'
+    'Le tue scelte',
+    'plasmeranno gli eroi',
+    'e i cattivi di',
+    'Milano-Cortina 2026.'
   ];
 
   let text1Opacity = $derived(
@@ -146,12 +148,20 @@
         <div class="hero-title-stack">
           <p class="brand-tag hero-reveal" style="--reveal-delay: 0ms">Milano-Cortina 2026</p>
           <h1 class="main-title">
-            <span class="title-line hero-reveal" style="--reveal-delay: 120ms">Quante facce ha</span>
-            <span class="title-line hero-reveal" style="--reveal-delay: 260ms">una medaglia?</span>
+            <span class="title-layout title-layout--desktop">
+              <span class="title-line hero-reveal" style="--reveal-delay: 120ms">Quante facce ha</span>
+              <span class="title-line hero-reveal" style="--reveal-delay: 260ms">una medaglia?</span>
+            </span>
+            <span class="title-layout title-layout--mobile">
+              <span class="title-line hero-reveal" style="--reveal-delay: 120ms">Quante</span>
+              <span class="title-line hero-reveal" style="--reveal-delay: 180ms">facce ha</span>
+              <span class="title-line hero-reveal" style="--reveal-delay: 240ms">una</span>
+              <span class="title-line hero-reveal" style="--reveal-delay: 300ms">medaglia?</span>
+            </span>
           </h1>
         </div>
         <div class="scroll-hint hero-reveal" style="--reveal-delay: 480ms">
-          <span class="arrow">↓</span>
+          <span class="arrow" aria-hidden="true">↓</span>
           <span class="text">Scorri per continuare</span>
         </div>
       </div>
@@ -163,6 +173,7 @@
       style="opacity: {text1Opacity}; pointer-events: {text1Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text1Opacity < 0.05}
     >
+      <p class="narrative-block">{TEXT1_LINES.join(' ')}</p>
       <div class="split-lines-container">
         {#each TEXT1_LINES as line}
           <h2 class="narrative-line">{line}</h2>
@@ -176,6 +187,7 @@
       style="opacity: {text2Opacity}; pointer-events: {text2Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text2Opacity < 0.05}
     >
+      <p class="narrative-block">{TEXT2_LINES.join(' ')}</p>
       <div class="split-lines-container">
         {#each TEXT2_LINES as line}
           <h3 class="narrative-line">{line}</h3>
@@ -184,7 +196,7 @@
     </section>
 
     <section
-      class="stage center-stage"
+      class="stage center-stage center-stage--lined"
       class:stage-visible={text3Opacity > 0.02}
       style="opacity: {text3Opacity}; pointer-events: {text3Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text3Opacity < 0.05}
@@ -377,10 +389,35 @@
     color: #000000;
   }
 
+  .title-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--home-title-line-gap);
+  }
+
+  .title-layout--mobile {
+    display: none;
+  }
+
   .title-line {
     display: block;
     margin: 0;
     padding: 0;
+  }
+
+  .narrative-block {
+    display: none;
+    margin: 0;
+    padding: 0;
+    font-family: 'Supreme Variable', sans-serif;
+    font-size: var(--home-narrative-size);
+    font-weight: 700;
+    letter-spacing: var(--home-narrative-tracking);
+    line-height: var(--home-narrative-leading);
+    color: #161a1f;
+    text-align: center;
+    max-width: 278px;
   }
 
   .scroll-hint {
@@ -392,7 +429,7 @@
   }
   .scroll-hint .arrow { font-size: 1rem; color: #000000; animation: bounce 2s infinite; }
   .scroll-hint .text {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 400;
     letter-spacing: 0;
     line-height: normal;
@@ -461,41 +498,91 @@
 
   @media (max-width: 768px) {
     .organimo-wrapper {
-      --hero-pad-top: 96px;
-      --hero-pad-bottom: 40px;
-      --hero-pad-x: 16px;
-      --hero-text-lift: 4.5rem;
+      --hero-pad-top: 56px;
+      --hero-pad-bottom: 32px;
+      --hero-pad-x: 24px;
+      --hero-text-lift: 0;
       --home-title-leading: 1;
       --home-title-tracking: 0;
       --home-title-line-gap: 0;
+      --home-brand-leading: 1.3;
       --home-brand-tracking: 0;
       --home-narrative-leading: 1.2;
       --home-narrative-gap: 0;
+      --home-brand-size: 1rem;
     }
 
-    .center-stage {
-      padding-left: 16px;
-      padding-right: 16px;
+    .homepage-hero {
+      justify-content: flex-start;
     }
 
     .hero-lower {
-      gap: 1.25rem;
+      margin-top: 0;
+      flex: 1;
+      justify-content: flex-start;
+      gap: 0;
+      padding-top: 6.5rem;
     }
 
     .hero-title-stack {
-      gap: 0.85rem;
+      gap: 0.6rem;
+      max-width: 335px;
+    }
+
+    .scroll-hint {
+      margin-top: auto;
+      padding-top: 1.5rem;
+    }
+
+    .scroll-hint .arrow {
+      display: none;
+    }
+
+    .scroll-hint .text {
+      font-size: 0.875rem;
+      font-weight: 400;
     }
 
     .brand-tag {
-      font-size: 1.1rem;
+      color: #04091d;
     }
 
     .main-title {
-      --home-title-size: 3.85rem;
+      --home-title-size: 4.5rem;
+      width: 100%;
+      max-width: 335px;
+    }
+
+    .title-layout--desktop {
+      display: none;
+    }
+
+    .title-layout--mobile {
+      display: flex;
+    }
+
+    .center-stage {
+      justify-content: center;
+      padding: 56px 24px 32px;
+    }
+
+    .center-stage .split-lines-container {
+      display: none;
+    }
+
+    .center-stage--lined .split-lines-container {
+      display: flex;
+      margin: 0;
+    }
+
+    .center-stage .narrative-block {
+      display: block;
+      margin: 0;
+      --home-narrative-size: 1.5rem;
     }
 
     .narrative-line {
-      --home-narrative-size: 1.55rem;
+      --home-narrative-size: 1.5rem;
     }
   }
 </style>

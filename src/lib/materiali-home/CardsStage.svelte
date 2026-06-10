@@ -38,11 +38,15 @@
     box-sizing: border-box;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
     .cards-stage-inner {
-      grid-template-columns: 1fr;
-      padding-top: 100px;
-      padding-bottom: 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(8px, 1.8dvh, 20px);
+      padding: calc(52px + 10px) 24px clamp(10px, 2dvh, 20px);
+      overflow: hidden;
     }
   }
 </style>

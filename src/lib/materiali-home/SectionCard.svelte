@@ -146,22 +146,39 @@
     overflow: visible;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
     .section-card-link {
-      width: min(92vw, 354px);
+      flex: 1 1 0;
+      width: min(calc(100vw - 48px), 354px);
+      min-height: 0;
+      max-height: 157px;
       height: auto;
-      aspect-ratio: 354 / 380;
+    }
+
+    .section-card {
+      border-width: 1px;
+      border-radius: clamp(18px, 4.5vmin, 32px);
     }
 
     .card-object {
-      top: 7.9%;
-      width: 79%;
-      height: 57.9%;
+      inset: 0;
+      top: 0;
+      left: 0;
+      transform: none;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .theme-sport .card-object {
+      transform: scale(1.35);
+      transform-origin: center 55%;
     }
 
     .card-halo {
-      inset: -36px;
-      filter: blur(22px);
+      inset: -20px;
+      border-radius: 40px;
+      filter: blur(18px);
     }
   }
 </style>

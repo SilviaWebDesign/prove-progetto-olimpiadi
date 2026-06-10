@@ -12,7 +12,7 @@
     margin: 0;
     height: 64px;
     font-family: 'PP Formula Condensed', var(--font-title);
-    font-size: 50px;
+    font-size: 64px;
     font-weight: 900;
     font-variation-settings: 'wght' 900;
     font-stretch: condensed;
@@ -22,6 +22,10 @@
     color: #161a1f;
     word-break: break-word;
     pointer-events: none;
+    text-shadow:
+      0 0 0.35em #ffffff,
+      0 0 0.7em #ffffff,
+      0 0 1.1em rgba(255, 255, 255, 0.85);
   }
 
   .theme-sustainability {
@@ -44,11 +48,21 @@
     width: 126.8%;
   }
 
-  @media (max-width: 640px) {
-    .section-card-title {
-      font-size: clamp(1.75rem, 9vw, 50px);
+  @media (max-width: 768px) {
+    .section-card-title,
+    .section-card-title.theme-sustainability,
+    .section-card-title.theme-sport,
+    .section-card-title.theme-infrastructure {
+      top: 50%;
+      left: 16px;
+      right: 16px;
+      bottom: auto;
+      width: auto;
       height: auto;
-      min-height: 16.8%;
+      transform: translateY(-50%);
+      font-size: clamp(2.25rem, 10vmin, 64px);
+      line-height: 1.1;
+      white-space: nowrap;
     }
   }
 </style>

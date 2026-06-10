@@ -108,27 +108,35 @@
   }
 
   .navbar-inner {
+    --navbar-control-height: 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    min-height: 24px;
+    min-height: var(--navbar-control-height);
     padding: 16px 20px;
     box-sizing: border-box;
     pointer-events: auto;
+    gap: 12px;
   }
 
   .navbar-title {
     font-family: 'PP Formula Condensed', var(--font-title);
-    font-size: 20px;
+    font-size: var(--navbar-control-height);
     font-weight: 900;
     font-variation-settings: 'wght' 900;
     font-stretch: condensed;
-    line-height: normal;
+    line-height: 1;
+    height: var(--navbar-control-height);
     text-transform: uppercase;
     color: #161a1f;
     text-decoration: none;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .navbar-title:hover {
@@ -140,12 +148,19 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 24px;
-    height: 24px;
+    width: var(--navbar-control-height);
+    height: var(--navbar-control-height);
+    margin: 0;
     padding: 0;
     border: none;
     background: none;
     cursor: pointer;
+  }
+
+  .menu-button img {
+    display: block;
+    width: var(--navbar-control-height);
+    height: var(--navbar-control-height);
   }
 
   .menu-button:focus-visible {
@@ -211,16 +226,14 @@
   }
 
   @media (max-width: 768px) {
-    .navbar-title {
-      font-size: 14px;
-      white-space: normal;
-      max-width: calc(100% - 64px);
+    .navbar {
+      transform: translateY(0);
+      opacity: 1;
     }
-  }
 
-  @media (max-width: 480px) {
-    .navbar-title {
-      font-size: 12px;
+    .navbar-inner {
+      --navbar-control-height: 20px;
+      padding: 16px 24px;
     }
   }
 </style>

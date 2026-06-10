@@ -13,17 +13,31 @@
   /** @type {{ src: string, label: string, active?: boolean, hovered?: boolean, showLabel?: boolean }} */
   let { src, label, active = false, hovered = false, showLabel = true } = $props();
 
-  const METALLIC_GRAY = new THREE.Color(0x8a8d94);
+  const CARD_METALLIC_MATERIAL = new THREE.MeshStandardMaterial({
+    color: 0x8a8d94,
+    metalness: 0.92,
+    roughness: 0.28
+  });
   const TORCH_SRC = '/oggetti/torcia.glb';
   const TITLE_FONT_FAMILY = 'PP Formula Condensed';
   const LABEL_WIDTH_RATIO = 0.82;
   const LABEL_HEIGHT_RATIO = 0.22;
 
-  /** @type {Record<string, { desiredSize: number, cameraZ: number }>} */
+  const CARD_OBJECT_SIZE = 2.4;
+  const CARD_CAMERA_Z = 3.6;
+
+  /** @type {Record<string, { desiredSize: number, cameraZ: number, offsetY?: number, rotationX?: number, rotationY?: number, rotationZ?: number }>} */
   const MODEL_CONFIG = {
-    '/oggetti/albero.glb': { desiredSize: 2.1, cameraZ: 3.5 },
+    '/oggetti/albero-copia.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
+    '/oggetti/albero.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
+    '/oggetti/ice_skate.glb': {
+      desiredSize: 1.75,
+      cameraZ: CARD_CAMERA_Z
+    },
+    '/oggetti/excavator.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
     '/oggetti/pattinatrice3.glb': { desiredSize: 2.65, cameraZ: 4.5 },
-    '/oggetti/torcia.glb': { desiredSize: 2.15, cameraZ: 3.5 }
+    '/oggetti/torcia.glb': { desiredSize: 2.15, cameraZ: 3.5 },
+    '/oggetti/infrastrutture.glb': { desiredSize: 2.4, cameraZ: 4 }
   };
 
   /** @param {string} path */
@@ -51,22 +65,44 @@
     return scaleFactor;
   }
 
+  /** @param {THREE.Material | THREE.Material[]} material */
+  function disposeMaterial(material) {
+    const materials = Array.isArray(material) ? material : [material];
+    for (const mat of materials) {
+      if (!mat) continue;
+      for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
+        const tex = /** @type {Record<string, THREE.Texture | undefined>} */ (mat)[key];
+        tex?.dispose?.();
+      }
+      mat.dispose();
+    }
+  }
+
   /** @param {THREE.Object3D} object */
   function applyMetallicGrayMaterial(object) {
     object.traverse((child) => {
-      if (!child.isMesh) return;
-      const mesh = /** @type {THREE.Mesh} */ (child);
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      const metallic = materials.map(
-        () =>
-          new THREE.MeshStandardMaterial({
-            color: METALLIC_GRAY,
-            metalness: 0.92,
-            roughness: 0.28
-          })
-      );
-      mesh.material = metallic.length === 1 ? metallic[0] : metallic;
+      if (!(child instanceof THREE.Mesh)) return;
+      const mesh = child;
+      if (mesh.geometry?.attributes?.color) {
+        mesh.geometry.deleteAttribute('color');
+      }
+      disposeMaterial(mesh.material);
+      mesh.material = CARD_METALLIC_MATERIAL;
     });
+  }
+
+  /** @param {THREE.Scene} targetScene */
+  function addCardLighting(targetScene) {
+    targetScene.add(new THREE.AmbientLight(0xe8eaef, 1.4));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
+    keyLight.position.set(5, 10, 7);
+    targetScene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0xc5cad4, 1.6);
+    fillLight.position.set(-6, 4, -5);
+    targetScene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0xf5f7fa, 1.2);
+    rimLight.position.set(0, 2, -8);
+    targetScene.add(rimLight);
   }
 
   async function ensureTitleFont() {
@@ -250,16 +286,7 @@
       fillLight.position.set(0, -0.35, -lightRadius);
       torchLightOrbit.add(fillLight);
     } else {
-      scene.add(new THREE.AmbientLight(0xe8eaef, 1.4));
-      const keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
-      keyLight.position.set(5, 10, 7);
-      scene.add(keyLight);
-      const fillLight = new THREE.DirectionalLight(0xc5cad4, 1.6);
-      fillLight.position.set(-6, 4, -5);
-      scene.add(fillLight);
-      const rimLight = new THREE.DirectionalLight(0xf5f7fa, 1.2);
-      rimLight.position.set(0, 2, -8);
-      scene.add(rimLight);
+      addCardLighting(scene);
     }
 
     modelRoot = new THREE.Group();
@@ -293,6 +320,10 @@
       if (!modelRoot) return;
       const model = gltf.scene;
       fitModel(model, config.desiredSize);
+      if (config.offsetY) model.position.y += config.offsetY;
+      if (config.rotationX) model.rotation.x = config.rotationX;
+      if (config.rotationY) model.rotation.y = config.rotationY;
+      if (config.rotationZ) model.rotation.z = config.rotationZ;
       applyMetallicGrayMaterial(model);
       modelRoot.add(model);
     });

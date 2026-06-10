@@ -1,0 +1,23 @@
+:root {
+	--section-sustainability-halo: radial-gradient(
+		ellipse 72% 68% at 50% 44%,
+		rgba(71, 208, 142, 0.82) 0%,
+		rgba(71, 208, 142, 0.45) 38%,
+		rgba(71, 208, 142, 0.18) 58%,
+		rgba(71, 208, 142, 0) 78%
+	);
+	--section-sport-halo: radial-gradient(
+		ellipse 72% 68% at 50% 44%,
+		rgba(137, 186, 255, 0.85) 0%,
+		rgba(137, 186, 255, 0.48) 38%,
+		rgba(137, 186, 255, 0.2) 58%,
+		rgba(137, 186, 255, 0) 78%
+	);
+	--section-infrastructure-halo: radial-gradient(
+		ellipse 72% 68% at 50% 44%,
+		rgba(255, 131, 76, 0.82) 0%,
+		rgba(255, 131, 76, 0.45) 38%,
+		rgba(255, 131, 76, 0.18) 58%,
+		rgba(255, 131, 76, 0) 78%
+	);
+}

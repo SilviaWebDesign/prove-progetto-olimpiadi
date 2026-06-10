@@ -33,7 +33,7 @@ export const sections = {
     menuLabel: 'Sostenibilità',
     theme: 'sustainability',
     accent: '#3eaf3f',
-    modelSrc: '/oggetti/albero.glb',
+    modelSrc: '/oggetti/albero-copia.glb',
     hero: {
       background: '/sections/hero-feature.jpg'
     },
@@ -189,7 +189,7 @@ export const sections = {
     menuLabel: 'Sport',
     theme: 'sport',
     accent: '#422ccb',
-    modelSrc: '/oggetti/pattinatrice3.glb',
+    modelSrc: '/oggetti/ice_skate.glb',
     hero: HERO_ASSETS,
     intro: INTRO,
     claim: CLAIM,
@@ -212,7 +212,7 @@ export const sections = {
     menuLabel: 'Infrastrutture',
     theme: 'infrastructure',
     accent: '#ff783c',
-    modelSrc: '/oggetti/torcia.glb',
+    modelSrc: '/oggetti/excavator.glb',
     hero: HERO_ASSETS,
     intro: INTRO,
     claim: CLAIM,

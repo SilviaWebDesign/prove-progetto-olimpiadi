@@ -7,17 +7,17 @@
 
 <div class="cards-stage-inner">
   <SectionCard
-    title="SOSTENIBILITÀ"
+    title="sostenibilitÀ"
     theme="sustainability"
-    modelSrc="/oggetti/albero.glb"
+    modelSrc="/oggetti/albero-copia.glb"
     href="/sostenibilita"
     {active}
   />
-  <SectionCard title="SPORT" theme="sport" modelSrc="/oggetti/pattinatrice3.glb" href="/sport" {active} />
+  <SectionCard title="sport" theme="sport" modelSrc="/oggetti/ice_skate.glb" href="/sport" {active} />
   <SectionCard
-    title="INFRASTRUTTURE"
+    title="infrastrutture"
     theme="infrastructure"
-    modelSrc="/oggetti/torcia.glb"
+    modelSrc="/oggetti/excavator.glb"
     href="/sezioni/infrastrutture"
     {active}
   />
@@ -33,8 +33,8 @@
     max-width: 100vw;
     height: 100%;
     min-height: 0;
-    gap: clamp(12px, 2vw, 32px);
-    padding: 110px clamp(16px, 3vw, 48px) 40px;
+    gap: clamp(16px, 2.5vw, 40px);
+    padding: 110px clamp(16px, 3vw, 48px) 48px;
     box-sizing: border-box;
   }
 

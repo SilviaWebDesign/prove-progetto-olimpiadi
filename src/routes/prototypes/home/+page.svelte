@@ -1,6 +1,7 @@
 <script>
   import ThreeScene from '$lib/materiali-home/ThreeScene.svelte';
   import CardsStage from '$lib/materiali-home/CardsStage.svelte';
+  import Navbar from '$lib/materiali-home/Navbar.svelte';
   import { browser } from '$app/environment';
   import { onMount, tick } from 'svelte';
   import {
@@ -114,6 +115,8 @@
     };
   });
 </script>
+
+<Navbar />
 
 <div class="organimo-wrapper" bind:this={container}>
   <div class="webgl-bg">

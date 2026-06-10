@@ -59,8 +59,9 @@ export function fitMountainModel(model) {
   snowField.y = worldBox.min.y + worldSize.y * 0.16;
   /** Raggio minimo per orbita completa senza entrare nel mesh */
   const orbitRadius = Math.max(worldSize.x, worldSize.z) * 0.58 + 7;
+  const topDownHeight = Math.max(worldSize.x, worldSize.z) * 0.52 + 8;
 
-  return { mountainCenter, snowField, orbitRadius };
+  return { mountainCenter, snowField, orbitRadius, topDownHeight };
 }
 
 /**

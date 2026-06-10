@@ -2,16 +2,11 @@
   import { onMount } from 'svelte';
   import * as THREE from 'three';
   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-  import {
-    getModelRotationY,
-    getTorchLightRotationY,
-    setCardRotationActive,
-    setCardRotationHovered,
-    setCardRotationMotionReduced
-  } from '$lib/components/file-chiara/cardRotation.js';
-
   /** @type {{ src: string, label: string, active?: boolean, hovered?: boolean, showLabel?: boolean }} */
   let { src, label, active = false, hovered = false, showLabel = true } = $props();
+
+  const MODEL_ROTATION_SPEED = 0.35;
+  const TORCH_LIGHT_ORBIT_SPEED = 0.4;
 
   const CARD_METALLIC_MATERIAL = new THREE.MeshStandardMaterial({
     color: 0x8a8d94,
@@ -228,27 +223,24 @@
   let animationFrameId = 0;
   /** @type {ResizeObserver | undefined} */
   let resizeObserver;
-  let renderEnabled = false;
   let motionReduced = $state(false);
 
+  const animState = {
+    hovered: false,
+    active: false,
+    motionReduced: false
+  };
+
   $effect(() => {
-    renderEnabled = active;
+    animState.hovered = hovered;
   });
 
   $effect(() => {
-    if (!active) return;
-    setCardRotationActive(true);
-    return () => setCardRotationActive(false);
+    animState.active = active;
   });
 
   $effect(() => {
-    if (!hovered) return;
-    setCardRotationHovered(true);
-    return () => setCardRotationHovered(false);
-  });
-
-  $effect(() => {
-    setCardRotationMotionReduced(motionReduced);
+    animState.motionReduced = motionReduced;
   });
 
   onMount(() => {
@@ -342,18 +334,34 @@
     resizeObserver.observe(container);
     updateLayout();
 
+    let modelRotationY = 0;
+    let torchRotationY = 0;
+    let lastAnimTime = performance.now();
+
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
-      if (renderEnabled && renderer && scene && camera) {
-        if (modelRoot) {
-          modelRoot.rotation.y = getModelRotationY();
-        }
+      if (!renderer || !scene || !camera || !animState.active) return;
+
+      const now = performance.now();
+      const dt = (now - lastAnimTime) / 1000;
+      lastAnimTime = now;
+
+      if (!animState.motionReduced && !animState.hovered) {
+        modelRotationY += MODEL_ROTATION_SPEED * dt;
         if (torchLightOrbit) {
-          torchLightOrbit.rotation.y = getTorchLightRotationY();
+          torchRotationY += TORCH_LIGHT_ORBIT_SPEED * dt;
         }
-        renderer.render(scene, camera);
       }
+
+      if (modelRoot) {
+        modelRoot.rotation.y = modelRotationY;
+      }
+      if (torchLightOrbit) {
+        torchLightOrbit.rotation.y = torchRotationY;
+      }
+
+      renderer.render(scene, camera);
     };
     animate();
 

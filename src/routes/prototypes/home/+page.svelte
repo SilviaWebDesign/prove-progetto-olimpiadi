@@ -10,6 +10,8 @@
     rangeProgress,
     HOME_SNOW_DIVE_START,
     SNOW_ZONE_SCROLL,
+    HOME_CARDS_START,
+    HOME_CARDS_END,
     stageMoxyOpacity
   } from '$lib/materiali-home/scrollStages.js';
   import { homeScrollProgress } from '$lib/materiali-home/homeScrollProgress.js';
@@ -33,7 +35,7 @@
   const TEXT2 = { in: 0.28, inEnd: 0.33, out: 0.35, outEnd: 0.40 };
   /** Compare solo dopo sfondo bianco pieno (SNOW_ZONE_SCROLL ≈ 0.54) */
   const TEXT3 = { in: 0.58, inEnd: 0.68, out: 0.70, outEnd: 0.80 };
-  const CARDS = { in: 0.90, inEnd: 0.95 };
+  const CARDS = { in: HOME_CARDS_START, inEnd: HOME_CARDS_END };
 
   const TEXT1_LINES = [
     'La realtà non è unica e oggettiva,',
@@ -63,9 +65,12 @@
   let cardsOpacity = $derived(stageOpacityIn(scrollProgress, CARDS.in, CARDS.inEnd));
   let cardsInteractive = $derived(cardsOpacity > 0.05);
 
-  let snowWhiteOpacity = $derived(
-    easeOutCubic(rangeProgress(scrollProgress, HOME_SNOW_DIVE_START, SNOW_ZONE_SCROLL))
-  );
+  let snowWhiteOpacity = $derived.by(() => {
+    const diveIn = easeOutCubic(rangeProgress(scrollProgress, HOME_SNOW_DIVE_START, SNOW_ZONE_SCROLL));
+    if (scrollProgress < CARDS.in) return diveIn;
+    const cardsT = easeOutCubic(rangeProgress(scrollProgress, CARDS.in, CARDS.inEnd));
+    return diveIn * (1 - cardsT);
+  });
 
   let heroScrollFade = $derived(Math.max(0, 1 - easeOutCubic(clamp(scrollProgress * 3.8, 0, 1))));
 

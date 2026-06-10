@@ -4,6 +4,9 @@ export const HOME_ORBIT_END = 0.46;
 export const HOME_SNOW_DIVE_START = 0.46;
 /** Sfondo bianco pieno e canvas 3D spento — prima del terzo testo narrativo */
 export const SNOW_ZONE_SCROLL = 0.54;
+/** Fase cards — montagna top-down riappare insieme alle card */
+export const HOME_CARDS_START = 0.9;
+export const HOME_CARDS_END = 0.95;
 
 /** @param {number} progress @param {number} start @param {number} end */
 export function rangeProgress(progress, start, end) {

@@ -12,8 +12,13 @@ const HERO_ASSETS = {
   background: '/sections/hero-feature.jpg'
 };
 
-const SUSTAINABILITY_INTRO_CLAIM =
-  'Le Olimpiadi sono accompagnate da scelte che riguardano ambiente e risorse. Questi interventi possono essere letti come attenzione al territorio oppure come iniziative dal valore limitato, misurabile solo nel tempo.';
+const SUSTAINABILITY_INTRO_CLAIM = [
+  'Le Olimpiadi sono accompagnate da scelte che riguardano ambiente e risorse.',
+  'Questi interventi possono essere letti',
+  'come attenzione al territorio oppure',
+  'come iniziative dal valore limitato,',
+  'misurabile solo nel tempo.'
+];
 
 const SUSTAINABILITY_FACT_1_BODY =
   'Milano-Cortina 2026 è stata progettata intorno a un uso esteso di sedi già esistenti o temporanee, al fine di non lasciare “cattedrali nel deserto”, come spesso accade. Secondo la comunicazione ufficiale, circa il 90% delle sedi di gara rientra in questa logica di riuso. Alcuni degli esempi sono lo stadio di San Siro, l’Unipol Forum, e Rho Fiera.';
@@ -35,25 +40,28 @@ export const sections = {
     accent: '#3eaf3f',
     modelSrc: '/oggetti/albero-copia.glb',
     hero: {
-      background: '/sections/hero-feature.jpg'
+      background: '/images/foresta.png'
     },
     introClaim: SUSTAINABILITY_INTRO_CLAIM,
     facts: [
       {
         id: 'fact-1',
         label: 'sostenibilità · fact 1',
+        title: 'Riuso delle sedi',
         body: SUSTAINABILITY_FACT_1_BODY,
         sources: 'wikipedia, inarcassa'
       },
       {
         id: 'fact-2',
         label: 'sostenibilità · fact 2',
+        title: 'Il Villaggio Olimpico',
         body: SUSTAINABILITY_FACT_2_BODY,
         sources: 'comune di milano, ioc'
       },
       {
         id: 'fact-3',
         label: 'sostenibilità · fact 3',
+        title: 'Energia e trasporti',
         body: SUSTAINABILITY_FACT_3_BODY,
         sources: 'ministero ambiente'
       }
@@ -236,4 +244,17 @@ export const sectionList = Object.values(sections);
  */
 export function getSectionBySlug(slug) {
   return sectionList.find((section) => section.slug === slug) ?? null;
+}
+
+/**
+ * @param {typeof sections.sustainability | keyof typeof sections | string} sectionOrKey
+ */
+export function getSectionHref(sectionOrKey) {
+  const section =
+    typeof sectionOrKey === 'string'
+      ? sections[/** @type {keyof typeof sections} */ (sectionOrKey)] ??
+        sectionList.find((item) => item.id === sectionOrKey || item.slug === sectionOrKey)
+      : sectionOrKey;
+
+  return section ? `/sezioni/${section.slug}` : '/prototypes/home';
 }

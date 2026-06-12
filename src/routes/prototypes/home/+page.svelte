@@ -47,7 +47,12 @@
     'sport e infrastrutture, e prendi posizione',
     'davanti alle informazioni.'
   ];
-  const TEXT3_LINES = [
+  const TEXT3_LINES_DESKTOP = [
+    'Le tue scelte plasmeranno',
+    'gli eroi e i cattivi',
+    'di Milano-Cortina 2026.'
+  ];
+  const TEXT3_LINES_MOBILE = [
     'Le tue scelte',
     'plasmeranno gli eroi',
     'e i cattivi di',
@@ -201,8 +206,13 @@
       style="opacity: {text3Opacity}; pointer-events: {text3Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text3Opacity < 0.05}
     >
-      <div class="split-lines-container">
-        {#each TEXT3_LINES as line}
+      <div class="split-lines-container text3-lines text3-lines--desktop">
+        {#each TEXT3_LINES_DESKTOP as line}
+          <h3 class="narrative-line">{line}</h3>
+        {/each}
+      </div>
+      <div class="split-lines-container text3-lines text3-lines--mobile">
+        {#each TEXT3_LINES_MOBILE as line}
           <h3 class="narrative-line">{line}</h3>
         {/each}
       </div>
@@ -406,6 +416,10 @@
     padding: 0;
   }
 
+  .split-lines-container.text3-lines--mobile {
+    display: none;
+  }
+
   .narrative-block {
     display: none;
     margin: 0;
@@ -415,7 +429,7 @@
     font-weight: 700;
     letter-spacing: var(--home-narrative-tracking);
     line-height: var(--home-narrative-leading);
-    color: #161a1f;
+    color: #000000;
     text-align: center;
     max-width: 278px;
   }
@@ -544,7 +558,7 @@
     }
 
     .brand-tag {
-      color: #04091d;
+      color: #000000;
     }
 
     .main-title {
@@ -570,7 +584,11 @@
       display: none;
     }
 
-    .center-stage--lined .split-lines-container {
+    .center-stage--lined .split-lines-container.text3-lines--desktop {
+      display: none;
+    }
+
+    .center-stage--lined .split-lines-container.text3-lines--mobile {
       display: flex;
       margin: 0;
     }

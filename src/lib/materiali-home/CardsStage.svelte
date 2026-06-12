@@ -1,26 +1,23 @@
 <script>
   import SectionCard from './SectionCard.svelte';
+  import { sections, getSectionHref } from './sections.js';
 
   /** @type {{ active?: boolean }} */
   let { active = false } = $props();
+
+  const cardSections = [sections.sustainability, sections.sport, sections.infrastructure];
 </script>
 
 <div class="cards-stage-inner">
-  <SectionCard
-    title="sostenibilitÀ"
-    theme="sustainability"
-    modelSrc="/oggetti/albero-copia.glb"
-    href="/sostenibilita"
-    {active}
-  />
-  <SectionCard title="sport" theme="sport" modelSrc="/oggetti/ice_skate.glb" href="/sport" {active} />
-  <SectionCard
-    title="infrastrutture"
-    theme="infrastructure"
-    modelSrc="/oggetti/excavator.glb"
-    href="/sezioni/infrastrutture"
-    {active}
-  />
+  {#each cardSections as section (section.id)}
+    <SectionCard
+      title={section.heroTitle}
+      theme={section.theme}
+      modelSrc={section.modelSrc}
+      href={getSectionHref(section)}
+      {active}
+    />
+  {/each}
 </div>
 
 <style>

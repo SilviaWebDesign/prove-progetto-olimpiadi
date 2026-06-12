@@ -126,7 +126,7 @@
     font-size: 14px;
     font-weight: 800;
     text-transform: uppercase;
-    color: #161a1f;
+    color: #000000;
     background: rgba(62, 175, 63, 0.15);
     border-radius: 12px;
     border: 1px solid #3eaf3f;

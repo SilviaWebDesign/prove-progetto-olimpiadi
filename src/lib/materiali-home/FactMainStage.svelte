@@ -1,11 +1,17 @@
 <script>
-  import FactCard from './FactCard.svelte';
-  import OpinionCard from './OpinionCard.svelte';
+  import SectionFactBlock from '$lib/components/SectionFactBlock.svelte';
+  import CommentCard from '$lib/components/CommentCard.svelte';
   import { FACT_DOCK, FACT_DOCK_FRAME, OPINIONS_STACK_HEIGHT } from './factDockLayout.js';
+
+  /** @param {string} s */
+  function stripOuterQuotes(s) {
+    return s.replace(/^[""«']+|[""»']+$/g, '').trim();
+  }
 
   /**
    * @type {{
-   *   fact: { id: string, label: string, body: string, sources: string },
+   *   fact: { id: string, label: string, title?: string, body: string, sources: string },
+   *   factCount?: number,
    *   opinions: { id: string, quote: string, sentiment?: string }[],
    *   opacity?: number,
    *   likedIds?: Set<string>,
@@ -21,7 +27,8 @@
     likedIds = new Set(),
     onToggleLike,
     showGateHint = false,
-    factIndex = 0
+    factIndex = 0,
+    factCount = 3
   } = $props();
 
   const frameW = FACT_DOCK_FRAME.width;
@@ -40,21 +47,28 @@
   style:--dock-top="max(100px, calc(100vh * {FACT_DOCK.contentTop} / {frameH}))"
   style:--dock-opinion-gap="{FACT_DOCK.opinionGap}px"
   style:--dock-opinions-h="{OPINIONS_STACK_HEIGHT}px"
+  style:--dock-fact-h="{FACT_DOCK.factHeight}px"
   style:--dock-safe-x="16px"
 >
   <div class="fact-main-layout">
     <div class="fact-main-card">
-      <FactCard label={fact.label} body={fact.body} sources={fact.sources} expanded docked />
+      <SectionFactBlock
+        counter="{factIndex + 1} / {factCount}"
+        title={fact.title ?? fact.label}
+        body={fact.body}
+        source={fact.sources}
+      />
     </div>
 
     <aside class="fact-main-opinions" aria-label="Opinioni">
       <div class="opinions-list">
         {#each opinions as opinion (opinion.id)}
-          <OpinionCard
-            quote={opinion.quote}
+          <CommentCard
+            comment={{ body: stripOuterQuotes(opinion.quote) }}
+            sectionId="sustainability"
             liked={likedIds.has(opinion.id)}
-            docked
-            onToggle={() => onToggleLike?.(opinion.id)}
+            size="sm"
+            onToggleLike={() => onToggleLike?.(opinion.id)}
           />
         {/each}
       </div>
@@ -93,7 +107,7 @@
     transform-origin: top left;
   }
 
-  .fact-main-card :global(.fact-card) {
+  .fact-main-card :global(.section-fact-block) {
     width: 100%;
     max-width: 100%;
     pointer-events: none;
@@ -101,7 +115,7 @@
 
   .fact-main-opinions {
     position: absolute;
-    left: calc(66.667% - 2px);
+    left: calc(66.667% + 56px);
     top: var(--dock-top);
     width: var(--dock-col-w);
     display: flex;
@@ -127,7 +141,7 @@
     font-size: 14px;
     font-weight: 800;
     text-transform: uppercase;
-    color: #161a1f;
+    color: #000000;
     background: rgba(62, 175, 63, 0.15);
     border-radius: 12px;
     border: 1px solid #3eaf3f;
@@ -143,7 +157,7 @@
 
     .fact-main-card {
       transform: scale(
-        min(1, calc((100vh - var(--dock-top) - 40px) / 680px))
+        min(1, calc((100vh - var(--dock-top) - 40px) / var(--dock-fact-h, 520px)))
       );
     }
   }

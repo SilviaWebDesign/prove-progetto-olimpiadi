@@ -4,9 +4,10 @@
   let { src }: Props = $props();
 
   // ─── Config — identico al prototipo frost-reveal ─────────────────────────
-  const FROST_OPACITY            = 0.9;
-  const GRAIN_OPACITY            = 0.26;
-  const SCRATCH_OPACITY          = 0.14;
+  const FROST_OPACITY            = 1.0;
+  const FROST_VEIL_OPACITY       = 0.42;
+  const GRAIN_OPACITY            = 0.30;
+  const SCRATCH_OPACITY          = 0.16;
   const BLUR_AMOUNT              = 23;
   const INITIAL_SNOWFLAKE_DENSITY = 40;
   const INITIAL_SPECKLE_DENSITY   = 600;
@@ -102,15 +103,31 @@
     drawGrain(w, h);
     drawStaticScratches(w, h);
     drawInitialFrostDetails(w, h);
+    drawFrostVeil(w, h);
     ctx = mainCtx;
     renderCurrentState();
+  }
+
+  /** Allinea il disegno canvas a object-fit: cover + object-position: center dell'img .sharp */
+  function drawImageCover(img: HTMLImageElement, w: number, h: number, bleed = 0) {
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    if (!iw || !ih) return;
+
+    const scale = Math.max(w / iw, h / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    const dx = (w - dw) / 2 - bleed;
+    const dy = (h - dh) / 2 - bleed;
+
+    ctx!.drawImage(img, dx, dy, dw + bleed * 2, dh + bleed * 2);
   }
 
   function drawBlurredImage(w: number, h: number) {
     const bleed = BLUR_AMOUNT * 2;
     ctx!.save();
     ctx!.filter = `blur(${BLUR_AMOUNT}px) brightness(1.15) saturate(0.55) contrast(1.08)`;
-    ctx!.drawImage(imgEl!, -bleed, -bleed, w + bleed * 2, h + bleed * 2);
+    drawImageCover(imgEl!, w, h, bleed);
     ctx!.filter = 'none';
     ctx!.restore();
   }
@@ -119,10 +136,10 @@
     ctx!.save();
     ctx!.globalAlpha = FROST_OPACITY;
     const patches: [number,number,number,string,number,number][] = [
-      [0.12, 0.18, 0.70, '218,238,255', 0.60, 0.30],
-      [0.88, 0.82, 0.60, '205,230,255', 0.55, 0.28],
-      [0.65, 0.44, 0.42, '230,245,255', 0.40, 0.00],
-      [0.50, 0.88, 0.60, '200,225,252', 0.30, 0.00],
+      [0.12, 0.18, 0.70, '218,238,255', 0.78, 0.48],
+      [0.88, 0.82, 0.60, '205,230,255', 0.72, 0.42],
+      [0.65, 0.44, 0.42, '230,245,255', 0.58, 0.00],
+      [0.50, 0.88, 0.60, '200,225,252', 0.48, 0.00],
     ];
     for (const [cx, cy, r, rgb, a0, a1] of patches) {
       const g = ctx!.createRadialGradient(w * cx, h * cy, 0, w * cx, h * cy, w * r);
@@ -132,8 +149,16 @@
       ctx!.fillStyle = g;
       ctx!.fillRect(0, 0, w, h);
     }
-    ctx!.globalAlpha = FROST_OPACITY * 0.22;
+    ctx!.globalAlpha = FROST_VEIL_OPACITY;
     ctx!.fillStyle   = 'rgba(215,235,255,1)';
+    ctx!.fillRect(0, 0, w, h);
+    ctx!.restore();
+  }
+
+  function drawFrostVeil(w: number, h: number) {
+    ctx!.save();
+    ctx!.globalAlpha = 0.22;
+    ctx!.fillStyle   = 'rgba(248, 252, 255, 1)';
     ctx!.fillRect(0, 0, w, h);
     ctx!.restore();
   }
@@ -263,7 +288,7 @@
 
   // ─── POINTER INTERACTION ─────────────────────────────────────────────────
   function getCoords(e: PointerEvent) {
-    const rect = canvas!.getBoundingClientRect();
+    const rect = wrapper!.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 

@@ -1,6 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { sectionList } from './sections.js';
+  import { sectionList, getSectionHref } from './sections.js';
+
+  /** @type {{ alwaysVisible?: boolean }} */
+  let { alwaysVisible = false } = $props();
 
   let menuOpen = $state(false);
   let scrolled = $state(false);
@@ -41,7 +44,11 @@
   });
 </script>
 
-<header class="navbar" class:visible={scrolled || menuOpen}>
+<header
+  class="navbar"
+  class:visible={alwaysVisible || scrolled || menuOpen}
+  class:always-visible={alwaysVisible}
+>
   <div class="navbar-inner">
     <a href="/prototypes/home" class="navbar-title">Quante facce ha una medaglia?</a>
     <button
@@ -71,11 +78,7 @@
       </li>
       {#each sectionList as section (section.id)}
         <li>
-          <a
-            href={section.id === 'infrastructure' ? '/sezioni/infrastrutture' : `/${section.slug}`}
-            class="menu-link"
-            onclick={closeMenu}
-          >
+          <a href={getSectionHref(section)} class="menu-link" onclick={closeMenu}>
             {section.menuLabel}
           </a>
         </li>
@@ -107,6 +110,21 @@
     opacity: 1;
   }
 
+  .navbar.always-visible {
+    z-index: 200;
+  }
+
+  .navbar.always-visible ~ .menu-overlay {
+    z-index: 199;
+  }
+
+  @media (min-width: 769px) {
+    .navbar.always-visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
   .navbar-inner {
     --navbar-control-height: 24px;
     display: flex;
@@ -129,7 +147,7 @@
     line-height: 1;
     height: var(--navbar-control-height);
     text-transform: uppercase;
-    color: #161a1f;
+    color: #000000;
     text-decoration: none;
     white-space: nowrap;
     display: flex;

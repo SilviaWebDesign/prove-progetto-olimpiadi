@@ -60,7 +60,7 @@
     border-radius: 12px;
     cursor: pointer;
     font: inherit;
-    color: #161a1f;
+    color: #000000;
     transition:
       background 0.2s ease,
       border-color 0.2s ease,
@@ -120,7 +120,7 @@
     font-size: 18px;
     font-weight: 500;
     line-height: 1.3;
-    color: #161a1f;
+    color: #000000;
     display: flex;
     align-items: center;
     height: 56px;
@@ -151,7 +151,7 @@
     font-size: clamp(0.95rem, 1.8vw, 18px);
     font-weight: 500;
     line-height: 1.3;
-    color: #161a1f;
+    color: #000000;
   }
 
   .heart-btn {
@@ -159,7 +159,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #161a1f;
+    color: #000000;
     line-height: 0;
   }
 </style>

@@ -10,16 +10,16 @@
     position: absolute;
     z-index: 3;
     margin: 0;
-    height: 64px;
+    height: 52px;
     font-family: 'PP Formula Condensed', var(--font-title);
-    font-size: 64px;
+    font-size: 44px;
     font-weight: 900;
     font-variation-settings: 'wght' 900;
     font-stretch: condensed;
     line-height: 1.3;
     text-align: center;
     text-transform: uppercase;
-    color: #161a1f;
+    color: #000000;
     word-break: break-word;
     pointer-events: none;
     text-shadow:

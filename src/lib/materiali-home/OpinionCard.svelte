@@ -57,7 +57,7 @@
     border-radius: 12px;
     cursor: pointer;
     font: inherit;
-    color: #161a1f;
+    color: #000000;
     transition:
       background 0.25s ease,
       border-color 0.25s ease,
@@ -120,7 +120,7 @@
     font-size: 18px;
     font-weight: 500;
     line-height: 1.35;
-    color: #161a1f;
+    color: #000000;
   }
 
   .opinion-card.docked .heart-btn {
@@ -152,7 +152,7 @@
     font-size: clamp(0.95rem, 1.8vw, 18px);
     font-weight: 500;
     line-height: 1.35;
-    color: #161a1f;
+    color: #000000;
     overflow-wrap: anywhere;
   }
 
@@ -161,7 +161,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #161a1f;
+    color: #000000;
     line-height: 0;
   }
 </style>

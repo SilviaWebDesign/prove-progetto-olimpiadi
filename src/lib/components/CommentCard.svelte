@@ -1,6 +1,6 @@
 <!--
   COMMENT CARD — GLASS VARIANT
-  Self-contained: tipi definiti localmente, nessun import da $lib/types.
+  Condiviso tra sezioni (infrastrutture, sostenibilità, …)
 -->
 <script lang="ts">
   type SectionId = 'infrastructure' | 'sport' | 'sustainability';
@@ -58,7 +58,7 @@
     -webkit-backdrop-filter: blur(16px);
     border: var(--border-thin, 1px solid rgba(22, 24, 29, 0.5));
     border-radius: var(--radius-xs, 8px);
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     outline: var(--border-width-thin, 1px) solid transparent;
     outline-offset: 0;
     box-shadow:
@@ -76,7 +76,6 @@
   .comment-card-glass[data-size='sm'] { max-width: 356px; min-height: 82px; }
   .comment-card-glass[data-size='lg'] { max-width: 426px; min-height: 96px; }
 
-  /* Glow gradient dietro la card — sweepato su hover */
   .comment-card-glass::before {
     content: '';
     position: absolute;
@@ -119,7 +118,6 @@
 
   .comment-card-glass:hover { transform: translateY(-1px); }
 
-  /* Hover colorato per sezione */
   .comment-card-glass[data-section='sustainability']:hover {
     border-color: var(--color-section-sustainability, #47D08E);
     outline-color: var(--color-section-sustainability, #47D08E);
@@ -136,7 +134,6 @@
     box-shadow: 0 10px 30px rgba(0,0,0,0.10), 0 0 24px rgba(255,131,76,0.28), inset 0 1px 1px rgba(255,255,255,0.5);
   }
 
-  /* Stato liked — bordo + outline colorati per sezione */
   .comment-card-glass[data-section='sustainability'][data-liked='true'] {
     border-color: var(--color-section-sustainability, #47D08E);
     outline-color: var(--color-section-sustainability, #47D08E);
@@ -150,7 +147,6 @@
     outline-color: var(--color-section-infrastructure, #FF834C);
   }
 
-  /* Testo */
   .comment-card-glass__body { flex: 1; margin: 0; }
   .comment-card-glass[data-size='sm'] .comment-card-glass__body {
     font: var(--text-comment-body-sm-font, 600 14px/1.3 'Supreme Variable', sans-serif);
@@ -179,7 +175,6 @@
     transition: fill 200ms ease, stroke 200ms ease;
   }
 
-  /* Cuore filled al like */
   .comment-card-glass[data-section='sustainability'][data-liked='true'] .comment-card-glass__heart-shape {
     fill: var(--color-section-sustainability, #47D08E);
     stroke: var(--color-section-sustainability, #47D08E);

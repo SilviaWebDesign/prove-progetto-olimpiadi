@@ -288,7 +288,7 @@
     letter-spacing: clamp(6px, 1.2vw, 18.2px);
     text-align: center;
     text-transform: uppercase;
-    color: #161a1f;
+    color: #000000;
     white-space: nowrap;
     pointer-events: none;
   }
@@ -307,7 +307,7 @@
     font-weight: 700;
     line-height: 1.1;
     text-align: left;
-    color: #161a1f;
+    color: #000000;
   }
 
   .closure-stage {
@@ -350,7 +350,7 @@
     font-size: clamp(1.25rem, 2.5vw, 38px);
     font-weight: 700;
     line-height: 1.2;
-    color: #161a1f;
+    color: #000000;
   }
 
   .closure-hint {
@@ -360,7 +360,7 @@
     font-family: 'Supreme Variable', sans-serif;
     font-size: 0.9rem;
     font-weight: 700;
-    color: #161a1f;
+    color: #000000;
     opacity: 0.7;
   }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import CommentCard from './CommentCard.svelte';
+  import CommentCard from '$lib/components/CommentCard.svelte';
 
   interface CardData {
     id: number;

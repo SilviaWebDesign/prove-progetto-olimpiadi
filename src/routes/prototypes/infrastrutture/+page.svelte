@@ -240,7 +240,7 @@
 
   :global(body) {
     background: var(--color-bg, #F4F4F2);
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     overflow-x: hidden;
   }
 
@@ -268,7 +268,7 @@
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
   }
 
   .header-section {
@@ -308,7 +308,7 @@
     display: block;
     width: 100%;
     height: 1.5px;
-    background: var(--color-text-primary, #16181D);
+    background: var(--color-text-primary, #000000);
     border-radius: 2px;
   }
 
@@ -361,7 +361,7 @@
     font-variation-settings: 'wght' 800;
     letter-spacing: -0.02em;
     text-transform: uppercase;
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     line-height: 0.88;
     text-align: center;
     transform-origin: bottom center;
@@ -389,7 +389,7 @@
     font-size: clamp(22px, 5.04vw, 68px);
     font-weight: 700;
     line-height: 1.22;
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     text-align: center;
   }
 

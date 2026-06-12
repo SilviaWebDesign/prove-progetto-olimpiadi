@@ -5,6 +5,7 @@
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import Lenis from 'lenis';
 
+  import Navbar from '$lib/materiali-home/Navbar.svelte';
   import FrostCanvas from '$lib/components/FrostCanvas.svelte';
   import TextBlock from './TextBlock.svelte';
   import CardStack from './CardStack.svelte';
@@ -49,9 +50,6 @@
   // ── Scene3D API (bindable) ───────────────────────────────────────────────
   let scene3d = $state<Scene3DApi | undefined>(undefined);
 
-  // ── Header label ─────────────────────────────────────────────────────────
-  let showSectionLabel = $state(false);
-
   // ── Setup ────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!browser || !sceneEl) return;
@@ -95,7 +93,6 @@
           start:   'top top',
           end:     () => `+=${window.innerHeight * 1.5}`,
           scrub:   1.2,
-          onEnter: () => { showSectionLabel = true; },
         },
       });
 
@@ -169,7 +166,7 @@
 
     // ── E. Dopo fonts + immagine bg: viewBox, sync Lenis, refresh ──────────
     const bgImg = new Image();
-    bgImg.src = '/images/sfondo-infrastrutture.jpg';
+    bgImg.src = '/images/prova-frost.png';
     const bgLoaded = new Promise<void>(resolve => {
       bgImg.onload = bgImg.onerror = () => resolve();
     });
@@ -194,14 +191,7 @@
   <title>Infrastrutture — Quante facce ha una medaglia?</title>
 </svelte:head>
 
-<!-- ── Header fisso ────────────────────────────────────────────────────────── -->
-<header class="site-header">
-  <span class="header-brand">QUANTE FACCE HA UNA MEDAGLIA?</span>
-  <span class="header-section" class:visible={showSectionLabel}>INFRASTRUTTURE</span>
-  <button class="hamburger" aria-label="Menu" tabindex="-1" aria-hidden="true">
-    <span></span><span></span><span></span>
-  </button>
-</header>
+<Navbar alwaysVisible />
 
 <!-- ════════════════════════════════════════════════════════════════════════════
      SCROLLYTELLING — 520vh
@@ -212,7 +202,7 @@
 
     <!-- Layer frost -->
     <div class="layer layer--frost">
-      <FrostCanvas src="/images/frost-infrastrutture.jpg" />
+      <FrostCanvas src="/images/prova-frost.png" />
     </div>
 
     <!-- Layer bg: sfondo al 28% -->
@@ -306,74 +296,8 @@
   }
   :global(body) {
     background: var(--color-bg, #FFFFFF);
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     overflow-x: hidden;
-  }
-
-  /* ── Header ──────────────────────────────────────────────────────────────── */
-  .site-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 200;
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 clamp(16px, 2.4vw, 32px);
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid rgba(22, 24, 29, 0.1);
-  }
-
-  .header-brand {
-    font-family: 'PP Formula Condensed', sans-serif;
-    font-size: clamp(9px, 0.82vw, 11px);
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-text-primary, #16181D);
-  }
-
-  .header-section {
-    font-family: 'PP Formula Condensed', sans-serif;
-    font-size: clamp(10px, 0.89vw, 12px);
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--color-section-infrastructure, #FF834C);
-    opacity: 0;
-    transform: translateY(6px);
-    transition:
-      opacity 0.5s cubic-bezier(0.25, 1, 0.5, 1),
-      transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
-    pointer-events: none;
-  }
-  .header-section.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  .hamburger {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 4px;
-    width: 32px;
-    height: 32px;
-    background: none;
-    border: none;
-    padding: 4px;
-    cursor: pointer;
-  }
-  .hamburger span {
-    display: block;
-    width: 100%;
-    height: 1.5px;
-    background: var(--color-text-primary, #16181D);
-    border-radius: 2px;
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -402,11 +326,15 @@
     z-index: 2;
   }
 
+  .layer--frost :global(.frost-wrap) {
+    inset: 0;
+  }
+
   .layer--bg {
     z-index: 1;
-    background-image: url('/images/sfondo-infrastrutture.jpg');
+    background-image: url('/images/prova-frost.png');
     background-size: cover;
-    background-position: center;
+    background-position: center center;
     opacity: 0.28;
   }
 
@@ -431,7 +359,7 @@
     font-family: 'PP Formula Condensed', sans-serif;
     font-weight: 700;
     font-variation-settings: 'wght' 700;
-    fill: var(--color-text-primary, #16181D);
+    fill: var(--color-text-primary, #000000);
   }
 
   /* ── Frase ───────────────────────────────────────────────────────────────── */
@@ -452,7 +380,7 @@
     font-weight: 700;
     font-size: clamp(34px, 4.5vw, 68px);
     line-height: 1.1;
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     opacity: 0;
     pointer-events: none;
   }
@@ -503,7 +431,7 @@
     font-weight: 700;
     font-size: clamp(16px, 1.3vw, 21px);
     line-height: 1.25;
-    color: #161A1F;
+    color: #000000;
     max-width: 356px;
   }
 
@@ -541,7 +469,7 @@
     font-size: 13px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #161A1F;
+    color: #000000;
     white-space: nowrap;
   }
 

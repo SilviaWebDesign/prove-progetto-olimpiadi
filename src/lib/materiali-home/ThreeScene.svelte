@@ -78,7 +78,14 @@
     return t * t * (3 - 2 * t);
   }
 
-  /** Esattamente un giro completo (2π) */
+  function easeInOutQuint(t) {
+    return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+  }
+
+  /** Più alto = rotazione più lenta nelle fasi centrali dello scroll */
+  const ORBIT_EASE_POWER = 1.45;
+
+  /** Giro completo intorno alla montagna */
   const ORBIT_ARC = Math.PI * 2;
 
   function zoomAt(scroll) {
@@ -116,7 +123,8 @@
     const endAngle = cfg.startAngle + ORBIT_ARC;
 
     if (scroll <= HOME_SNOW_DIVE_START) {
-      const orbitT = clamp(scroll / orbitSpan, 0, 1);
+      const rawT = clamp(scroll / orbitSpan, 0, 1);
+      const orbitT = easeInOutQuint(Math.pow(rawT, ORBIT_EASE_POWER));
       const angle = cfg.startAngle + ORBIT_ARC * orbitT;
       positionOnOrbit(angle, cfg.radius, cfg, _camPos);
       _lookAt.copy(cfg.center).add(new THREE.Vector3(0, 2.2, 0));

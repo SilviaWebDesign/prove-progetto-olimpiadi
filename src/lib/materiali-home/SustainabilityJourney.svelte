@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import OrbitCardsLayer from './OrbitCardsLayer.svelte';
   import FactMainStage from './FactMainStage.svelte';
   import CardModel from './CardModel.svelte';
@@ -41,6 +42,11 @@
   );
 
   let heroOpacity = $derived(Math.max(0, 1 - scrollProgress / HERO_END));
+
+  /** Sfondo foresta + albero 3D solo dopo il titolo (come infrastrutture) */
+  let forestBgVisible = $derived(
+    scrollProgress >= HERO_END - 0.02 && scrollProgress < FACT_SEGMENTS[2].end + 0.02
+  );
 
   let closureOpacity = $derived(
     stageOpacity(scrollProgress, CLOSURE.in, CLOSURE.inEnd, 0.98, 1)
@@ -138,14 +144,22 @@
   }
 
   let modelActive = $derived(
-    scrollProgress >= ORBIT.start - 0.02 && scrollProgress < FACT_SEGMENTS[2].end + 0.02
+    scrollProgress >= ORBIT.start && scrollProgress < FACT_SEGMENTS[2].end + 0.02
   );
 
+  function resetScrollToTop() {
+    if (!browser) return;
+    history.scrollRestoration = 'manual';
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    scrollProgress = 0;
+  }
+
   onMount(() => {
+    resetScrollToTop();
     reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.documentElement.classList.add('section-route');
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+    requestAnimationFrame(handleScroll);
     return () => {
       window.removeEventListener('scroll', handleScroll);
       document.documentElement.classList.remove('section-route');
@@ -154,7 +168,11 @@
 </script>
 
 <div class="journey" bind:this={container}>
-  <div class="journey-bg forest-bg" aria-hidden="true"></div>
+  <div
+    class="journey-bg forest-bg"
+    style="opacity: {forestBgVisible ? 1 : 0};"
+    aria-hidden="true"
+  ></div>
 
   <section
     class="journey-stage hero-cover"
@@ -228,7 +246,7 @@
     position: relative;
     width: 100%;
     min-height: 100vh;
-    background: #000000;
+    background: #ffffff;
   }
 
   .journey-bg {
@@ -236,6 +254,7 @@
     inset: 0;
     z-index: 1;
     pointer-events: none;
+    transition: opacity 0.45s ease;
   }
 
   .forest-bg {
@@ -270,6 +289,7 @@
   .hero-cover {
     z-index: 6;
     padding: 0;
+    background: #ffffff;
   }
 
   .hero-visual {

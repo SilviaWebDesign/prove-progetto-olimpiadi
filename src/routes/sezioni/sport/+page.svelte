@@ -1,8 +1,10 @@
 <script>
   import Navbar from '$lib/materiali-home/Navbar.svelte';
-  import SectionPage from '$lib/materiali-home/SectionPage.svelte';
-  import { sections } from '$lib/materiali-home/sections.js';
+  import SectionScrollytell from '$lib/materiali-home/scrollytell/SectionScrollytell.svelte';
+  import { getScrollytellConfig } from '$lib/materiali-home/scrollytell/scrollytellConfig.js';
+
+  const config = getScrollytellConfig('sport');
 </script>
 
 <Navbar alwaysVisible />
-<SectionPage section={sections.sport} />
+<SectionScrollytell {config} />

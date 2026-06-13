@@ -33,8 +33,8 @@
    */
   const TEXT1 = { in: 0.06, inEnd: 0.11, out: 0.13, outEnd: 0.18 };
   const TEXT2 = { in: 0.28, inEnd: 0.33, out: 0.35, outEnd: 0.40 };
-  /** Compare solo dopo sfondo bianco pieno (SNOW_ZONE_SCROLL ≈ 0.54) */
-  const TEXT3 = { in: 0.58, inEnd: 0.68, out: 0.70, outEnd: 0.80 };
+  /** Compare solo dopo sfondo bianco pieno (SNOW_ZONE_SCROLL ≈ 0.62) */
+  const TEXT3 = { in: 0.66, inEnd: 0.74, out: 0.76, outEnd: 0.84 };
   const CARDS = { in: HOME_CARDS_START, inEnd: HOME_CARDS_END };
 
   const TEXT1_LINES = [

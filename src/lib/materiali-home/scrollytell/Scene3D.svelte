@@ -7,40 +7,52 @@
 
   export interface Scene3DApi {
     setRotationY: (rad: number) => void;
-    setScale:     (factor: number) => void;
-    setOpacity:   (val: number) => void;
-    settle:       () => void;   // blocca setRotationY e avvia idle spin
-    unsettle:     () => void;   // riprende setRotationY, ferma idle spin
+    setScale: (factor: number) => void;
+    setOpacity: (val: number) => void;
+    settle: () => void;
+    unsettle: () => void;
   }
 
-  interface Props { api?: Scene3DApi; }
-  let { api = $bindable() }: Props = $props();
+  interface Props {
+    api?: Scene3DApi;
+    modelSrc: string;
+  }
+
+  let { api = $bindable(), modelSrc }: Props = $props();
 
   let wrapperEl = $state<HTMLDivElement | null>(null);
-  let canvasEl  = $state<HTMLCanvasElement | null>(null);
+  let canvasEl = $state<HTMLCanvasElement | null>(null);
 
   let renderer: THREE.WebGLRenderer | null = null;
-  let scene:    THREE.Scene | null = null;
-  let camera:   THREE.PerspectiveCamera | null = null;
+  let scene: THREE.Scene | null = null;
+  let camera: THREE.PerspectiveCamera | null = null;
   let modelGroup: THREE.Group | null = null;
-  let materials:  THREE.MeshPhysicalMaterial[] = [];
+  let materials: THREE.MeshPhysicalMaterial[] = [];
   let baseScale = 1;
 
   let rafId: number | null = null;
   let spinner: THREE.Group | null = null;
 
-  const clock      = new THREE.Clock();
-  const IDLE_RAD_S = THREE.MathUtils.degToRad(7); // 7°/s
+  const clock = new THREE.Clock();
+  const IDLE_RAD_S = THREE.MathUtils.degToRad(7);
 
   onMount(() => {
     if (!canvasEl || !wrapperEl) return;
 
     api = {
-      setRotationY: (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
-      setScale:     (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
-      setOpacity:   (val) => { materials.forEach((m) => { m.opacity = val; }); },
-      settle:       ()    => {},
-      unsettle:     ()    => {},
+      setRotationY: (rad) => {
+        if (modelGroup) modelGroup.rotation.y = rad;
+      },
+      setScale: (f) => {
+        if (modelGroup) modelGroup.scale.setScalar(baseScale * f);
+      },
+      setOpacity: (val) => {
+        materials.forEach((m) => {
+          m.opacity = val;
+        });
+      },
+      settle: () => {},
+      unsettle: () => {}
     };
 
     initThree();
@@ -54,7 +66,9 @@
     }
 
     window.addEventListener('resize', onResize);
-    return () => { window.removeEventListener('resize', onResize); };
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
   });
 
   onDestroy(() => {
@@ -69,7 +83,12 @@
       mats.forEach((m) => m.dispose());
     });
     renderer?.dispose();
-    scene = null; renderer = null; camera = null; modelGroup = null; spinner = null; materials = [];
+    scene = null;
+    renderer = null;
+    camera = null;
+    modelGroup = null;
+    spinner = null;
+    materials = [];
   });
 
   function initThree() {
@@ -77,19 +96,17 @@
 
     renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.outputColorSpace    = THREE.SRGBColorSpace;
-    renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
 
     scene = new THREE.Scene();
-    // scene.background resta null → trasparente, sfondo pagina visibile sotto
 
-    // IBL tramite RoomEnvironment (necessario perché MeshPhysical/metalness rifletta)
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
 
-    const w = wrapperEl.clientWidth  || window.innerWidth;
+    const w = wrapperEl.clientWidth || window.innerWidth;
     const h = wrapperEl.clientHeight || window.innerHeight;
     camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
     camera.position.set(0, 0, 6);
@@ -111,40 +128,39 @@
     loader.setDRACOLoader(draco);
 
     loader.load(
-      '/oggetti/infrastrutture.glb',
+      modelSrc,
       (gltf) => {
         if (!scene || !camera) return;
 
-        const box    = new THREE.Box3().setFromObject(gltf.scene);
+        const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
-        const size   = box.getSize(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
         gltf.scene.position.sub(center);
 
-        const fov      = camera.fov * (Math.PI / 180);
-        const dist     = camera.position.z;
+        const fov = camera.fov * (Math.PI / 180);
+        const dist = camera.position.z;
         const visibleH = 2 * Math.tan(fov / 2) * dist;
-        const maxDim   = Math.max(size.x, size.y, size.z);
-        baseScale      = (visibleH * 0.9) / maxDim;
+        const maxDim = Math.max(size.x, size.y, size.z);
+        baseScale = (visibleH * 0.9) / maxDim;
 
         const group = new THREE.Group();
         group.add(gltf.scene);
         group.scale.setScalar(baseScale);
 
-        // Materiale cromato scuro con clearcoat
         materials = [];
         group.traverse((node) => {
           const mesh = node as THREE.Mesh;
           if (!mesh.isMesh) return;
           mesh.geometry.computeVertexNormals();
           const chrome = new THREE.MeshPhysicalMaterial({
-            color:              0x181818,
-            metalness:          1.0,
-            roughness:          0.015,
-            envMapIntensity:    5.0,
-            clearcoat:          1.0,
+            color: 0x181818,
+            metalness: 1.0,
+            roughness: 0.015,
+            envMapIntensity: 5.0,
+            clearcoat: 1.0,
             clearcoatRoughness: 0.01,
-            transparent:        true,
-            opacity:            0,
+            transparent: true,
+            opacity: 0
           });
           mesh.material = chrome;
           materials.push(chrome);
@@ -167,7 +183,10 @@
   }
 
   function stopLoop() {
-    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
   }
 
   function tick() {

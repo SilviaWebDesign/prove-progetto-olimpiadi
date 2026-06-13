@@ -164,14 +164,14 @@
     const snowT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
     const eased = easeInOutCubic(snowT);
 
-    if (eased < 0.42) {
-      const t = eased / 0.42;
+    if (eased < 0.34) {
+      const t = eased / 0.34;
       const te = easeInOutCubic(t);
       _camPos.lerpVectors(_orbitEndPos, _snowApproachPos, te);
       _lookAt.lerpVectors(_orbitEndLookAt, _snowApproachLookAt, te);
     } else {
-      const t = (eased - 0.42) / 0.58;
-      const te = easeInOutCubic(t);
+      const t = (eased - 0.34) / 0.66;
+      const te = easeInOutQuint(t);
       _camPos.lerpVectors(_snowApproachPos, _snowCamPos, te);
       _lookAt.lerpVectors(_snowApproachLookAt, _snowLookAt, te);
     }
@@ -182,7 +182,7 @@
   /** @param {number} scroll */
   function applySnowWhiteout(scroll) {
     const whiteT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
-    const insideT = smoothstep(0.38, 0.92, whiteT);
+    const insideT = smoothstep(0.30, 0.96, whiteT);
     if (!snowMountainModel) return;
 
     snowMountainModel.visible = insideT < 0.97;
@@ -355,7 +355,7 @@
     camera.updateProjectionMatrix();
 
     const whiteT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
-    const insideFog = smoothstep(0.35, 1, whiteT);
+    const insideFog = smoothstep(0.28, 1, whiteT);
     if (sceneFog) {
       sceneFog.density = lerp(0.045, 0.38, insideFog);
       sceneFog.color.setRGB(1, 1, 1);

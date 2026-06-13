@@ -9,8 +9,45 @@ const OPINION_QUOTE =
 
 /** Hero condiviso — sfondo alberi + frost interattivo */
 const HERO_ASSETS = {
-  background: '/sections/hero-feature.jpg'
+  background: '/images/hero-feature.jpg'
 };
+
+const SPORT_INTRO_PHRASE =
+  'Le Olimpiadi mettono al centro atleti, discipline e competizione. ' +
+  'Prestazioni, regolamenti e scelte organizzative possono essere letti come esaltazione ' +
+  'dello sport o come segnali di distorsione rispetto ai valori originari.';
+
+const SPORT_FACT_BODY =
+  'Milano-Cortina 2026 prevede oltre 100 medaglie in 16 discipline, con sedi che coprono ' +
+  'dalle arena milanesi alle piste dolomitiche. Il Comitato Organizzatore ha promosso programmi ' +
+  'di avvicinamento allo sport nelle scuole e campagne per tifosi e volontari.';
+
+const SPORT_OPINIONS = [
+  {
+    quote:
+      '“Le Olimpiadi aumentano la partecipazione sportiva giovanile e l’interesse verso discipline minori.”'
+  },
+  {
+    quote:
+      '“Gli atleti olimpici ispirano intere generazioni e avvicinano lo sport al grande pubblico.”'
+  },
+  {
+    quote:
+      '“Il programma di gare valorizza tradizioni locali come lo sci alpinismo e il curling.”'
+  },
+  {
+    quote:
+      '“I costi di accesso al top level escludono molti talenti prima ancora delle qualifiche.”'
+  },
+  {
+    quote:
+      '“La pressione mediatica e agonistica pesa in modo sproporzionato sui giovani atleti.”'
+  },
+  {
+    quote:
+      '“Il medagliere rispecchia più la spesa pubblica per lo sport che il merito puro.”'
+  }
+];
 
 const SUSTAINABILITY_INTRO_CLAIM = [
   'Le Olimpiadi sono accompagnate da scelte che riguardano ambiente e risorse.',
@@ -198,16 +235,19 @@ export const sections = {
     theme: 'sport',
     accent: '#422ccb',
     modelSrc: '/oggetti/ice_skate.glb',
-    hero: HERO_ASSETS,
+    hero: {
+      background: '/images/alysasfondo.png'
+    },
     intro: INTRO,
+    introPhrase: SPORT_INTRO_PHRASE,
     claim: CLAIM,
     featured: {
-      title:
-        'Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l’evento. Il progetto include edifici residenziali, spazi pubblici e una nuova piazza di quartiere.',
+      title: 'Atleti e competizione',
       cta: 'Scopri di più',
-      body: 'Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l’evento. Il progetto include edifici residenziali, spazi pubblici e una nuova piazza di quartiere.'
+      body: SPORT_FACT_BODY,
+      sources: 'ioc, coni'
     },
-    opinions: Array.from({ length: 6 }, () => ({ quote: OPINION_QUOTE })),
+    opinions: SPORT_OPINIONS,
     footerBand: false,
     footerSnowImage: null,
     footerGradientImage: null
@@ -221,7 +261,9 @@ export const sections = {
     theme: 'infrastructure',
     accent: '#ff783c',
     modelSrc: '/oggetti/excavator.glb',
-    hero: HERO_ASSETS,
+    hero: {
+      background: '/images/villaggio.png'
+    },
     intro: INTRO,
     claim: CLAIM,
     featured: {

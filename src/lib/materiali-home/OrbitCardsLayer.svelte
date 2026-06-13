@@ -26,9 +26,7 @@
   } = $props();
 
   let layerOpacity = $derived(
-    scrollProgress >= orbitStart - 0.02 && scrollProgress < (factSegments[2]?.end ?? 1) + 0.02
-      ? 1
-      : 0
+    scrollProgress >= orbitStart && scrollProgress < (factSegments[2]?.end ?? 1) + 0.02 ? 1 : 0
   );
 
   let hideGuides = $derived.by(() => {
@@ -47,7 +45,7 @@
 
 <div
   class="orbit-layer"
-  style="opacity: {layerOpacity}; pointer-events: {layerOpacity > 0.05 ? 'auto' : 'none'};"
+  style="opacity: {layerOpacity}; visibility: {layerOpacity > 0.05 ? 'visible' : 'hidden'}; pointer-events: {layerOpacity > 0.05 ? 'auto' : 'none'};"
   aria-hidden={layerOpacity < 0.05}
 >
   <div class="orbit-guides" class:hidden={hideGuides} aria-hidden="true">

@@ -3,7 +3,7 @@ export const HOME_ORBIT_END = 0.45;
 /** Inizio immersione neve + fade verso bianco (dopo la pausa post-orbita) */
 export const HOME_SNOW_DIVE_START = 0.46;
 /** Sfondo bianco pieno e canvas 3D spento — prima del terzo testo narrativo */
-export const SNOW_ZONE_SCROLL = 0.54;
+export const SNOW_ZONE_SCROLL = 0.62;
 /** Fase cards — montagna top-down riappare insieme alle card */
 export const HOME_CARDS_START = 0.9;
 export const HOME_CARDS_END = 0.95;

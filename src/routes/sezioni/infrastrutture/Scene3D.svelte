@@ -4,13 +4,16 @@
   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
   import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
   import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+  import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js';
+  import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
   export interface Scene3DApi {
     setRotationY: (rad: number) => void;
     setScale:     (factor: number) => void;
     setOpacity:   (val: number) => void;
-    settle:       () => void;   // blocca setRotationY e avvia idle spin
-    unsettle:     () => void;   // riprende setRotationY, ferma idle spin
+    settle:       () => void;
+    unsettle:     () => void;
+    pulse:        () => void;
   }
 
   interface Props { api?: Scene3DApi; onModelLoaded?: () => void; }
@@ -19,19 +22,41 @@
   let wrapperEl = $state<HTMLDivElement | null>(null);
   let canvasEl  = $state<HTMLCanvasElement | null>(null);
 
-  let renderer: THREE.WebGLRenderer | null = null;
-  let scene:    THREE.Scene | null = null;
-  let camera:   THREE.PerspectiveCamera | null = null;
+  let renderer:   THREE.WebGLRenderer | null = null;
+  let scene:      THREE.Scene | null = null;
+  let camera:     THREE.PerspectiveCamera | null = null;
   let modelGroup: THREE.Group | null = null;
   let materials:  THREE.MeshPhysicalMaterial[] = [];
   let baseScale = 1;
 
-  let rafId: number | null = null;
+  let rafId:   number | null = null;
   let spinner: THREE.Group | null = null;
 
   const clock      = new THREE.Clock();
-  const IDLE_RAD_S = THREE.MathUtils.degToRad(7); // 7°/s
+  const IDLE_RAD_S = THREE.MathUtils.degToRad(7);
 
+  // ── Particle system ────────────────────────────────────────────────────────
+  const COUNT = 20000;
+
+  let particleMesh: THREE.InstancedMesh | null = null;
+  let particleMat:  THREE.ShaderMaterial | null = null;
+  // Direct reference to instanceMatrix Float32Array for zero-overhead writes
+  let iMatBuf: Float32Array | null = null;
+
+  // Sampled target positions and lerped current positions (spinner-local space)
+  const particleTargets = new Float32Array(COUNT * 3);
+  const particleCurrent = new Float32Array(COUNT * 3);
+
+  type TState = 'none' | 'in' | 'done';
+  let transitionState: TState = 'none';
+  let transitionProgress = 0;
+  const TRANSITION_DURATION = 2.0;
+
+  let manualPulseActive  = false;
+  let manualPulseElapsed = 0;
+  const MANUAL_PULSE_DURATION = 1.5;
+
+  // ── Mount ──────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!canvasEl || !wrapperEl) return;
 
@@ -39,8 +64,13 @@
       setRotationY: (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
       setScale:     (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
       setOpacity:   (val) => { materials.forEach((m) => { m.opacity = val; }); },
-      settle:       ()    => {},
-      unsettle:     ()    => {},
+      settle:       startTransition,
+      unsettle:     () => {
+        // Only possible before transition commits
+        if (transitionState !== 'none') return;
+        materials.forEach(m => { m.opacity = 1; });
+      },
+      pulse: triggerManualPulse,
     };
 
     initThree();
@@ -57,6 +87,7 @@
     return () => { window.removeEventListener('resize', onResize); };
   });
 
+  // ── Destroy ────────────────────────────────────────────────────────────────
   onDestroy(() => {
     stopLoop();
     scene?.traverse((obj) => {
@@ -69,9 +100,12 @@
       mats.forEach((m) => m.dispose());
     });
     renderer?.dispose();
-    scene = null; renderer = null; camera = null; modelGroup = null; spinner = null; materials = [];
+    scene = null; renderer = null; camera = null;
+    modelGroup = null; spinner = null;
+    materials = []; particleMesh = null; particleMat = null; iMatBuf = null;
   });
 
+  // ── Three.js init ──────────────────────────────────────────────────────────
   function initThree() {
     if (!canvasEl || !wrapperEl) return;
 
@@ -82,9 +116,8 @@
     renderer.toneMappingExposure = 1.2;
 
     scene = new THREE.Scene();
-    // scene.background resta null → trasparente, sfondo pagina visibile sotto
+    // background = null → transparent, page background shows through
 
-    // IBL tramite RoomEnvironment (necessario perché MeshPhysical/metalness rifletta)
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
@@ -104,6 +137,7 @@
     scene.add(fill);
   }
 
+  // ── GLB load ───────────────────────────────────────────────────────────────
   function loadModel() {
     const draco = new DRACOLoader();
     draco.setDecoderPath('/draco/');
@@ -130,7 +164,6 @@
         group.add(gltf.scene);
         group.scale.setScalar(baseScale);
 
-        // Materiale cromato scuro con clearcoat
         materials = [];
         group.traverse((node) => {
           const mesh = node as THREE.Mesh;
@@ -155,6 +188,8 @@
         spinner.add(group);
         scene.add(spinner);
         draco.dispose();
+
+        buildParticles(group);
         onModelLoaded?.();
       },
       undefined,
@@ -162,6 +197,130 @@
     );
   }
 
+  // ── Build particle cloud ───────────────────────────────────────────────────
+  function buildParticles(root: THREE.Group) {
+    if (!scene || !spinner) return;
+
+    // ── 1. Merge all mesh geometries (position only, deindexed) in root-local space
+    scene.updateMatrixWorld();
+    const rootWorldInv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+
+    const geos: THREE.BufferGeometry[] = [];
+    root.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!posAttr) return;
+
+      // Keep only position to ensure mergeGeometries succeeds across heterogeneous meshes
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', posAttr.clone());
+      if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
+
+      const deindexed = g.toNonIndexed();
+      g.dispose();
+
+      // Transform positions from mesh-local to root-local space
+      const relMatrix = new THREE.Matrix4().multiplyMatrices(rootWorldInv, mesh.matrixWorld);
+      deindexed.applyMatrix4(relMatrix);
+      geos.push(deindexed);
+    });
+
+    if (geos.length === 0) return;
+
+    const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
+    geos.forEach(g => g.dispose());
+    if (!merged) return;
+
+    // ── 2. Sample surface (MeshSurfaceSampler weights by triangle area)
+    const samplerMesh = new THREE.Mesh(merged, new THREE.MeshBasicMaterial());
+    const sampler = new MeshSurfaceSampler(samplerMesh).build();
+    const p = new THREE.Vector3();
+
+    for (let i = 0; i < COUNT; i++) {
+      sampler.sample(p);
+      // Scale from root-local to spinner-local (= visual world space)
+      particleTargets[i * 3]     = p.x * baseScale;
+      particleTargets[i * 3 + 1] = p.y * baseScale;
+      particleTargets[i * 3 + 2] = p.z * baseScale;
+    }
+    merged.dispose();
+
+    // ── 3. Per-instance random directions for the pulse expansion shader
+    const directions = new Float32Array(COUNT * 3);
+    for (let i = 0; i < COUNT; i++) {
+      directions[i * 3]     = (Math.random() - 0.5) * 8;
+      directions[i * 3 + 1] = (Math.random() - 0.5) * 8;
+      directions[i * 3 + 2] = (Math.random() - 0.5) * 8;
+    }
+
+    // ── 4. Build InstancedMesh with ShaderMaterial
+    const geo = new THREE.SphereGeometry(0.08, 8, 8);
+    geo.setAttribute('aDirection', new THREE.InstancedBufferAttribute(directions, 3));
+
+    particleMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uPulse:       { value: 0.0 },
+        uBaseOpacity: { value: 0.0 },
+      },
+      vertexShader: /* glsl */`
+        attribute vec3 aDirection;
+        uniform float uPulse;
+        void main() {
+          vec3 p = position + aDirection * uPulse;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */`
+        uniform float uPulse;
+        uniform float uBaseOpacity;
+        void main() {
+          gl_FragColor = vec4(0.0, 0.0, 0.0, uBaseOpacity + uPulse * 0.5);
+        }
+      `,
+      transparent: true,
+      depthWrite:  false,
+    });
+
+    particleMesh = new THREE.InstancedMesh(geo, particleMat, COUNT);
+    particleMesh.frustumCulled = false;
+    particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    particleMesh.visible = false;
+
+    // ── 5. Pre-fill instance matrices as identity at origin
+    //    Only x/y/z (indices 12/13/14 of each 16-element column-major matrix)
+    //    will be updated during the transition; the rest stay identity.
+    iMatBuf = particleMesh.instanceMatrix.array as Float32Array;
+    for (let i = 0; i < COUNT; i++) {
+      const b = i * 16;
+      iMatBuf[b]      = 1; iMatBuf[b + 1]  = 0; iMatBuf[b + 2]  = 0; iMatBuf[b + 3]  = 0;
+      iMatBuf[b + 4]  = 0; iMatBuf[b + 5]  = 1; iMatBuf[b + 6]  = 0; iMatBuf[b + 7]  = 0;
+      iMatBuf[b + 8]  = 0; iMatBuf[b + 9]  = 0; iMatBuf[b + 10] = 1; iMatBuf[b + 11] = 0;
+      // translation [12,13,14] = 0,0,0  (starts at origin)
+      iMatBuf[b + 15] = 1;
+    }
+    particleMesh.instanceMatrix.needsUpdate = true;
+
+    spinner.add(particleMesh);
+  }
+
+  // ── Transition trigger ─────────────────────────────────────────────────────
+  function startTransition() {
+    if (transitionState !== 'none' || !particleMesh) return;
+    transitionState    = 'in';
+    transitionProgress = 0;
+    particleCurrent.fill(0); // particles start at origin and lerp outward
+    particleMesh.visible = true;
+  }
+
+  // ── Manual pulse trigger ───────────────────────────────────────────────────
+  function triggerManualPulse() {
+    if (transitionState !== 'done') return;
+    manualPulseActive  = true;
+    manualPulseElapsed = 0;
+  }
+
+  // ── Render loop ────────────────────────────────────────────────────────────
   function startLoop() {
     if (rafId !== null) return;
     rafId = requestAnimationFrame(tick);
@@ -174,8 +333,63 @@
   function tick() {
     rafId = requestAnimationFrame(tick);
     if (!renderer || !scene || !camera) return;
-    const dt = clock.getDelta();
+
+    const dt      = clock.getDelta();
+    const elapsed = clock.elapsedTime; // updated by getDelta()
+
     if (spinner) spinner.rotation.y += IDLE_RAD_S * dt;
+
+    // ── Phase A: solid → particles transition (~2s) ─────────────────────────
+    if (transitionState === 'in' && particleMesh && particleMat && iMatBuf) {
+      transitionProgress = Math.min(1, transitionProgress + dt / TRANSITION_DURATION);
+
+      // Lerp particle positions toward sampled targets; write directly to buffer
+      for (let i = 0; i < COUNT; i++) {
+        particleCurrent[i * 3]     += (particleTargets[i * 3]     - particleCurrent[i * 3])     * 0.04;
+        particleCurrent[i * 3 + 1] += (particleTargets[i * 3 + 1] - particleCurrent[i * 3 + 1]) * 0.04;
+        particleCurrent[i * 3 + 2] += (particleTargets[i * 3 + 2] - particleCurrent[i * 3 + 2]) * 0.04;
+        const b = i * 16 + 12; // translation column of the column-major 4x4
+        iMatBuf[b]     = particleCurrent[i * 3];
+        iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
+        iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
+      }
+      particleMesh.instanceMatrix.needsUpdate = true;
+
+      // Pulsing expansion arc: sin(0→π) * 3.0
+      particleMat.uniforms.uPulse.value      = Math.sin(transitionProgress * Math.PI) * 3.0;
+      // Opacity ramps to 0.85 over first half of transition
+      particleMat.uniforms.uBaseOpacity.value = Math.min(0.85, transitionProgress * 1.7 * 0.85);
+      // Solid model fades out
+      materials.forEach(m => { m.opacity = Math.max(0, 1 - transitionProgress); });
+
+      if (transitionProgress >= 1) {
+        transitionState = 'done';
+        // Snap to exact target positions
+        for (let i = 0; i < COUNT; i++) {
+          const b = i * 16 + 12;
+          iMatBuf[b]     = particleTargets[i * 3];
+          iMatBuf[b + 1] = particleTargets[i * 3 + 1];
+          iMatBuf[b + 2] = particleTargets[i * 3 + 2];
+        }
+        particleMesh.instanceMatrix.needsUpdate = true;
+        particleMat.uniforms.uBaseOpacity.value = 0.85;
+        materials.forEach(m => { m.opacity = 0; m.visible = false; });
+      }
+    }
+
+    // ── Phase B: steady state — only uniform animation, no per-particle work ─
+    if (transitionState === 'done' && particleMat) {
+      if (manualPulseActive) {
+        manualPulseElapsed += dt;
+        const t = Math.min(1, manualPulseElapsed / MANUAL_PULSE_DURATION);
+        particleMat.uniforms.uPulse.value = Math.sin(t * Math.PI) * 1.2;
+        if (t >= 1) manualPulseActive = false;
+      } else {
+        // Gentle auto-pulse: continuous blink via |sin(t·π)| * 0.4
+        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.4;
+      }
+    }
+
     renderer.render(scene, camera);
   }
 

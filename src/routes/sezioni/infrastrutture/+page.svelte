@@ -77,6 +77,7 @@
     topicLikes = topicLikes.map((tl, ti) =>
       ti === currentTopic ? tl.map((l, li) => li === id ? !l : l) : tl
     );
+    scene3d?.pulse();
   }
 
   const anyLiked = $derived(topicLikes[currentTopic].some(l => l));

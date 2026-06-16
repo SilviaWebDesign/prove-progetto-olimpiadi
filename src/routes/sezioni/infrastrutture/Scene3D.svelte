@@ -6,18 +6,24 @@
   import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
   import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js';
   import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+  import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
   export interface Scene3DApi {
-    setRotationY: (rad: number) => void;
-    setScale:     (factor: number) => void;
-    setOpacity:   (val: number) => void;
-    settle:       () => void;
-    unsettle:     () => void;
-    pulse:        () => void;
+    setRotationY:         (rad: number) => void;
+    setScale:             (factor: number) => void;
+    setOpacity:           (val: number) => void;
+    settle:               () => void;
+    unsettle:             () => void;
+    pulse:                () => void;
+    resetPulse:           () => void;
+    preloadResultModels:  () => void;
+    morphToResult:        (path: string, onDone: () => void) => void;
+    returnToParticles:    () => void;
+    returnToFeedback:     () => void;
   }
 
-  interface Props { api?: Scene3DApi; onModelLoaded?: () => void; }
-  let { api = $bindable(), onModelLoaded }: Props = $props();
+  interface Props { api?: Scene3DApi; onModelLoaded?: () => void; orbitEnabled?: boolean; }
+  let { api = $bindable(), onModelLoaded, orbitEnabled = false }: Props = $props();
 
   let wrapperEl = $state<HTMLDivElement | null>(null);
   let canvasEl  = $state<HTMLCanvasElement | null>(null);
@@ -29,8 +35,9 @@
   let materials:  THREE.MeshPhysicalMaterial[] = [];
   let baseScale = 1;
 
-  let rafId:   number | null = null;
-  let spinner: THREE.Group | null = null;
+  let rafId:    number | null = null;
+  let spinner:  THREE.Group | null = null;
+  let controls: OrbitControls | null = null;
 
   const clock      = new THREE.Clock();
   const IDLE_RAD_S = THREE.MathUtils.degToRad(7);
@@ -56,6 +63,24 @@
   let manualPulseElapsed = 0;
   const MANUAL_PULSE_DURATION = 1.5;
 
+  // ── Result model preload + morph ───────────────────────────────────────────
+  const RESULT_PATHS = [
+    '/oggetti/infrastrutture-positivo.glb',
+    '/oggetti/infrastrutture-negativo.glb',
+    '/oggetti/infrastrutture-piu-positivo.glb',
+    '/oggetti/infrastrutture-piu-negativo.glb',
+    '/oggetti/infrastrutture-neutro.glb',
+  ];
+  const resultModels = new Map<string, THREE.Group>();
+
+  const resultTargets = new Float32Array(COUNT * 3);
+  type MorphState = 'none' | 'morphing';
+  let morphState: MorphState = 'none';
+  let morphElapsed = 0;
+  const MORPH_DURATION = 1.5;
+  let morphDoneCallback: (() => void) | null = null;
+  let resultModelMaterials: THREE.MeshPhysicalMaterial[] = [];
+
   // ── Mount ──────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!canvasEl || !wrapperEl) return;
@@ -70,21 +95,60 @@
         if (transitionState !== 'none') return;
         materials.forEach(m => { m.opacity = 1; });
       },
-      pulse: triggerManualPulse,
+      pulse:       triggerManualPulse,
+      resetPulse:  () => {
+        manualPulseActive  = false;
+        manualPulseElapsed = 0;
+        if (particleMat) particleMat.uniforms.uPulse.value = 0;
+      },
+      preloadResultModels,
+      morphToResult,
+      returnToParticles: () => {
+        if (controls) controls.enabled = false;
+        if (particleMesh) particleMesh.visible = true;
+        if (particleMat) {
+          particleMat.uniforms.uBaseOpacity.value = 0.85;
+          particleMat.uniforms.uPulse.value = 0;
+        }
+        resultModelMaterials.forEach(m => { m.opacity = 0; m.visible = false; });
+      },
+      returnToFeedback: () => {
+        if (particleMesh) particleMesh.visible = false;
+        resultModelMaterials.forEach(m => { m.visible = true; m.opacity = 1; });
+      },
     };
 
     initThree();
+
+    if (renderer && camera) {
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping   = true;
+      controls.dampingFactor   = 0.05;
+      controls.enableZoom      = true;
+      controls.minDistance     = 1.5;
+      controls.maxDistance     = 8;
+      controls.enablePan       = false;
+      controls.autoRotate      = true;
+      controls.autoRotateSpeed = 1.5;
+      controls.enabled         = false;
+    }
+
     startLoop();
 
     if ('requestIdleCallback' in window) {
-      (window as Window & typeof globalThis & { requestIdleCallback: (cb: () => void) => void })
-        .requestIdleCallback(loadModel);
+      (window as Window & typeof globalThis & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
+        .requestIdleCallback(loadModel, { timeout: 300 });
     } else {
       setTimeout(loadModel, 100);
     }
 
     window.addEventListener('resize', onResize);
     return () => { window.removeEventListener('resize', onResize); };
+  });
+
+  // ── Sync OrbitControls enabled state ──────────────────────────────────────
+  $effect(() => {
+    if (controls) controls.enabled = orbitEnabled;
   });
 
   // ── Destroy ────────────────────────────────────────────────────────────────
@@ -99,9 +163,10 @@
         : [mesh.material as THREE.Material];
       mats.forEach((m) => m.dispose());
     });
+    controls?.dispose();
     renderer?.dispose();
     scene = null; renderer = null; camera = null;
-    modelGroup = null; spinner = null;
+    modelGroup = null; spinner = null; controls = null;
     materials = []; particleMesh = null; particleMat = null; iMatBuf = null;
   });
 
@@ -122,10 +187,11 @@
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
 
-    const w = wrapperEl.clientWidth  || window.innerWidth;
-    const h = wrapperEl.clientHeight || window.innerHeight;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
     camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
     camera.position.set(0, 0, 6);
+    camera.lookAt(0, 0, 0);
     renderer.setSize(w, h);
 
     const key = new THREE.DirectionalLight(0xffffff, 3.5);
@@ -239,10 +305,11 @@
 
     for (let i = 0; i < COUNT; i++) {
       sampler.sample(p);
-      // Scale from root-local to spinner-local (= visual world space)
-      particleTargets[i * 3]     = p.x * baseScale;
-      particleTargets[i * 3 + 1] = p.y * baseScale;
-      particleTargets[i * 3 + 2] = p.z * baseScale;
+      // Positions are in root (modelGroup) local space — no extra scale needed
+      // because particleMesh is a child of root and scales with it automatically
+      particleTargets[i * 3]     = p.x;
+      particleTargets[i * 3 + 1] = p.y;
+      particleTargets[i * 3 + 2] = p.z;
     }
     merged.dispose();
 
@@ -255,7 +322,7 @@
     }
 
     // ── 4. Build InstancedMesh with ShaderMaterial
-    const geo = new THREE.SphereGeometry(0.08, 8, 8);
+    const geo = new THREE.SphereGeometry(0.008, 4, 4);
     geo.setAttribute('aDirection', new THREE.InstancedBufferAttribute(directions, 3));
 
     particleMat = new THREE.ShaderMaterial({
@@ -301,7 +368,129 @@
     }
     particleMesh.instanceMatrix.needsUpdate = true;
 
-    spinner.add(particleMesh);
+    // Add to root (modelGroup) so particles scale and rotate with the model
+    root.add(particleMesh);
+  }
+
+  // ── Preload result GLBs in background ─────────────────────────────────────
+  function preloadResultModels() {
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('/draco/');
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(draco);
+    let remaining = RESULT_PATHS.length;
+    RESULT_PATHS.forEach(path => {
+      loader.load(path, (gltf) => {
+        resultModels.set(path, gltf.scene);
+        remaining--;
+        if (remaining === 0) draco.dispose();
+      }, undefined, (err) => {
+        console.warn('[Scene3D] preload error:', path, err);
+        remaining--;
+        if (remaining === 0) draco.dispose();
+      });
+    });
+  }
+
+  // ── Morph particles → result model ────────────────────────────────────────
+  function doMorph(source: THREE.Group, onDone: () => void) {
+    if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) return;
+
+    const resultGroup = source.clone();
+
+    // Center in local space before adding to scene
+    resultGroup.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(resultGroup);
+    const center = box.getCenter(new THREE.Vector3());
+    const size   = box.getSize(new THREE.Vector3());
+    resultGroup.position.sub(center);
+
+    // Scale to match settled excavator visual size
+    const fov        = camera.fov * (Math.PI / 180);
+    const visibleH   = 2 * Math.tan(fov / 2) * camera.position.z;
+    const maxDim     = Math.max(size.x, size.y, size.z);
+    const resultBase = (visibleH * 0.9) / maxDim;
+    const settled    = modelGroup.scale.x / baseScale; // e.g. 0.56
+    resultGroup.scale.setScalar(resultBase * settled * 1.33);
+
+    // Chrome material, starts invisible
+    resultModelMaterials = [];
+    resultGroup.traverse(node => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.computeVertexNormals();
+      const chrome = new THREE.MeshPhysicalMaterial({
+        color: 0x181818, metalness: 1.0, roughness: 0.015,
+        envMapIntensity: 5.0, clearcoat: 1.0, clearcoatRoughness: 0.01,
+        transparent: true, opacity: 0,
+      });
+      mesh.material = chrome;
+      resultModelMaterials.push(chrome);
+    });
+
+    spinner.add(resultGroup);
+    scene.updateMatrixWorld();
+
+    // Sample result model surface in modelGroup local space
+    const modelGroupWorldInv = new THREE.Matrix4().copy(modelGroup.matrixWorld).invert();
+    const geos: THREE.BufferGeometry[] = [];
+    resultGroup.traverse(node => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!posAttr) return;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', posAttr.clone());
+      if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
+      const deindexed = g.toNonIndexed();
+      g.dispose();
+      const relMatrix = new THREE.Matrix4().multiplyMatrices(modelGroupWorldInv, mesh.matrixWorld);
+      deindexed.applyMatrix4(relMatrix);
+      geos.push(deindexed);
+    });
+
+    if (geos.length === 0) { spinner.remove(resultGroup); return; }
+    const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
+    geos.forEach(g => g.dispose());
+    if (!merged) { spinner.remove(resultGroup); return; }
+
+    const samplerMesh = new THREE.Mesh(merged, new THREE.MeshBasicMaterial());
+    const sampler = new MeshSurfaceSampler(samplerMesh).build();
+    const p = new THREE.Vector3();
+    for (let i = 0; i < COUNT; i++) {
+      sampler.sample(p);
+      resultTargets[i * 3]     = p.x;
+      resultTargets[i * 3 + 1] = p.y;
+      resultTargets[i * 3 + 2] = p.z;
+    }
+    merged.dispose();
+
+    // Start from current settled particle positions
+    particleCurrent.set(particleTargets);
+    particleMesh.visible = true;
+
+    morphState        = 'morphing';
+    morphElapsed      = 0;
+    morphDoneCallback = onDone;
+  }
+
+  function morphToResult(path: string, onDone: () => void) {
+    const cached = resultModels.get(path);
+    if (cached) { doMorph(cached, onDone); return; }
+
+    // Not preloaded yet — load on demand
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('/draco/');
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(draco);
+    loader.load(path, (gltf) => {
+      draco.dispose();
+      resultModels.set(path, gltf.scene);
+      doMorph(gltf.scene, onDone);
+    }, undefined, (err) => {
+      console.error('[Scene3D] on-demand load error:', path, err);
+      draco.dispose();
+    });
   }
 
   // ── Transition trigger ─────────────────────────────────────────────────────
@@ -337,7 +526,8 @@
     const dt      = clock.getDelta();
     const elapsed = clock.elapsedTime; // updated by getDelta()
 
-    if (spinner) spinner.rotation.y += IDLE_RAD_S * dt;
+    if (spinner && !orbitEnabled) spinner.rotation.y += IDLE_RAD_S * dt;
+    if (controls?.enabled) controls.update(dt);
 
     // ── Phase A: solid → particles transition (~2s) ─────────────────────────
     if (transitionState === 'in' && particleMesh && particleMat && iMatBuf) {
@@ -378,7 +568,7 @@
     }
 
     // ── Phase B: steady state — only uniform animation, no per-particle work ─
-    if (transitionState === 'done' && particleMat) {
+    if (transitionState === 'done' && morphState === 'none' && particleMat) {
       if (manualPulseActive) {
         manualPulseElapsed += dt;
         const t = Math.min(1, manualPulseElapsed / MANUAL_PULSE_DURATION);
@@ -390,21 +580,52 @@
       }
     }
 
+    // ── Phase C: morph particles toward result model ──────────────────────────
+    if (morphState === 'morphing' && particleMesh && particleMat && iMatBuf) {
+      morphElapsed += dt;
+      const t = Math.min(1, morphElapsed / MORPH_DURATION);
+
+      for (let i = 0; i < COUNT; i++) {
+        particleCurrent[i * 3]     += (resultTargets[i * 3]     - particleCurrent[i * 3])     * 0.06;
+        particleCurrent[i * 3 + 1] += (resultTargets[i * 3 + 1] - particleCurrent[i * 3 + 1]) * 0.06;
+        particleCurrent[i * 3 + 2] += (resultTargets[i * 3 + 2] - particleCurrent[i * 3 + 2]) * 0.06;
+        const b = i * 16 + 12;
+        iMatBuf[b]     = particleCurrent[i * 3];
+        iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
+        iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
+      }
+      particleMesh.instanceMatrix.needsUpdate = true;
+
+      // Result model fades in from 80% of morph (1.2s / 1.5s)
+      if (t >= 0.8) {
+        const fadeT = (t - 0.8) / 0.2;
+        resultModelMaterials.forEach(m => { m.opacity = fadeT; });
+      }
+
+      if (t >= 1) {
+        morphState = 'none';
+        particleMesh.visible = false;
+        resultModelMaterials.forEach(m => { m.opacity = 1; });
+        const cb = morphDoneCallback;
+        morphDoneCallback = null;
+        cb?.();
+      }
+    }
+
     renderer.render(scene, camera);
   }
 
   function onResize() {
-    if (!renderer || !camera || !wrapperEl) return;
-    const w = wrapperEl.clientWidth;
-    const h = wrapperEl.clientHeight;
-    if (!w || !h) return;
+    if (!renderer || !camera) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
 </script>
 
-<div class="scene-wrapper" bind:this={wrapperEl}>
+<div class="scene-wrapper" bind:this={wrapperEl} style:pointer-events={orbitEnabled ? 'auto' : 'none'}>
   <canvas bind:this={canvasEl}></canvas>
 </div>
 
@@ -412,7 +633,10 @@
   .scene-wrapper {
     position: absolute;
     inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
+    z-index: 0;
   }
 
   canvas {

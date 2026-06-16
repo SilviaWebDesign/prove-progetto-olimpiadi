@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -65,6 +66,12 @@
   let topicLikes = $state<boolean[][]>(topics.map(t => t.comments.map(() => false)));
   let isTransitioning = $state(false);
 
+  // ── Phase management ──────────────────────────────────────────────────────
+  type PagePhase = 'intro' | 'topics' | 'feedback';
+  let phase = $state<PagePhase>('intro');
+  let resultModelPath = '';
+  let hasMorphedToResult = false;
+
   const cards: CardData[] = $derived(
     topics[currentTopic].comments.map((body, i) => ({
       id: i,
@@ -82,14 +89,106 @@
 
   const anyLiked = $derived(topicLikes[currentTopic].some(l => l));
 
+  const ctaLabel = $derived(
+    currentTopic === 2 && anyLiked
+      ? 'Scopri il tuo risultato'
+      : 'Clicca per continuare'
+  );
+
   function goToNextSection() {
     console.log('goToNextSection — stub');
   }
 
+  function computeResult(): string {
+    let totalPositive = 0, totalNegative = 0;
+    for (const tl of topicLikes) {
+      totalPositive += tl.slice(0, 3).filter(Boolean).length;
+      totalNegative += tl.slice(3, 6).filter(Boolean).length;
+    }
+    if (totalPositive > 0 && totalNegative === 0) return '/oggetti/infrastrutture-positivo.glb';
+    if (totalNegative > 0 && totalPositive === 0) return '/oggetti/infrastrutture-negativo.glb';
+    if (totalPositive > totalNegative)            return '/oggetti/infrastrutture-piu-positivo.glb';
+    if (totalNegative > totalPositive)            return '/oggetti/infrastrutture-piu-negativo.glb';
+    return '/oggetti/infrastrutture-neutro.glb';
+  }
+
+  async function enterFeedbackPhase() {
+    if (phase !== 'topics' || isTransitioning || !anyLiked) return;
+    isTransitioning = true;
+
+    const OUT = 0.50;
+    const outTl = gsap.timeline();
+    outTl.to('.stage__text',  { opacity: 0, y: -8, duration: OUT, ease: 'power3.inOut' }, 0);
+    outTl.to('.stage__right', { opacity: 0, x:  8, duration: OUT, ease: 'power3.inOut' }, 0);
+    outTl.to('.stage__cta',   { opacity: 0, duration: OUT * 0.6, ease: 'power2.inOut' }, 0);
+
+    await new Promise<void>(r => setTimeout(r, OUT * 1000));
+    outTl.kill();
+
+    resultModelPath = computeResult();
+    gsap.to('.layer--bg', { filter: 'blur(12px)', duration: 0.8, ease: 'power2.inOut' });
+
+    if (!hasMorphedToResult) {
+      hasMorphedToResult = true;
+      scene3d?.morphToResult(resultModelPath, () => {
+        phase = 'feedback';
+        isTransitioning = false;
+        tick().then(() => {
+          gsap.fromTo('.feedback-text',       { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+          gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
+        });
+      });
+    } else {
+      scene3d?.returnToFeedback();
+      phase = 'feedback';
+      isTransitioning = false;
+      await tick();
+      gsap.fromTo('.feedback-text',       { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+      gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
+    }
+  }
+
+  function returnToTopics() {
+    if (phase !== 'feedback' || isTransitioning) return;
+    isTransitioning = true;
+
+    // Immediately: hide result model, show particles, disable orbit (synchronous, outside timeline)
+    scene3d?.returnToParticles();
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        phase = 'topics';
+        isTransitioning = false;
+      },
+    });
+
+    // 1. Snap feedback overlays to invisible
+    tl.set('.feedback-text',       { opacity: 0 });
+    tl.set('.feedback-bottom-cta', { opacity: 0 });
+
+    // 2. Remove blur
+    tl.to('.layer--bg', { filter: 'blur(0px)', duration: 0.4, ease: 'power2.out' });
+
+    // 3. Reveal topics UI
+    tl.fromTo('.stage__text',
+      { opacity: 0, x: -20 },
+      { opacity: 1, x: 0, duration: 0.5, ease: 'power2.out' }
+    );
+    tl.fromTo('.stage__right',
+      { opacity: 0, x: 20 },
+      { opacity: 1, x: 0, duration: 0.5, ease: 'power2.out' }, '<'
+    );
+    tl.fromTo('.stage__cta',
+      { opacity: 0 },
+      { opacity: 1, duration: 0.3, ease: 'power2.out' }, '<'
+    );
+  }
+
   async function goNext() {
     if (!anyLiked || isTransitioning) return;
-    if (currentTopic === 2) { goToNextSection(); return; }
+    if (currentTopic === 2) { enterFeedbackPhase(); return; }
 
+    scene3d?.resetPulse();
     isTransitioning = true;
     const OUT = 0.50;
     const CROSS = OUT * 0.88; // attesa all'88% del fade-out: opacity ≈ 3% (power3.inOut)
@@ -116,6 +215,7 @@
   async function goPrev() {
     if (isTransitioning || currentTopic === 0) return;
 
+    scene3d?.resetPulse();
     isTransitioning = true;
     const OUT = 0.50;
     const CROSS = OUT * 0.88;
@@ -158,6 +258,7 @@
   function enterTopicsMode() {
     if (topicsMode) return;
     topicsMode = true;
+    phase = 'topics';
     lenisRef?.stop();
     window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
   }
@@ -170,6 +271,15 @@
   }
 
   function onTopicsWheel(e: WheelEvent) {
+    if (phase === 'feedback') {
+      e.preventDefault();
+      if (e.deltaY < 0 && !isTransitioning) {
+        e.stopPropagation();
+        returnToTopics();
+      }
+      return;
+    }
+
     const goingDown = e.deltaY > 0;
 
     // Scroll up on first topic → release the pin, let Lenis scroll normally
@@ -183,8 +293,7 @@
 
     if (goingDown) {
       if (currentTopic === 2) {
-        exitTopicsMode();
-        goToNextSection();
+        if (anyLiked) enterFeedbackPhase();
       } else if (anyLiked) {
         goNext();
       }
@@ -329,6 +438,13 @@
     Promise.all([bgLoaded, windowLoaded, modelLoadedPromise]).then(() => {
       ScrollTrigger.refresh();
       requestAnimationFrame(() => requestAnimationFrame(() => ScrollTrigger.refresh()));
+      // Preload result GLBs once the initial model + page are ready
+      if ('requestIdleCallback' in window) {
+        (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
+          .requestIdleCallback(() => scene3d?.preloadResultModels(), { timeout: 1000 });
+      } else {
+        setTimeout(() => scene3d?.preloadResultModels(), 2000);
+      }
     });
 
     return () => {
@@ -386,7 +502,10 @@
       </p>
     </div>
 
-    <!-- Stage: 3D + testo + colonna destra -->
+    <!-- Layer 3D: canvas full-viewport, dietro la griglia -->
+    <Scene3D bind:api={scene3d} onModelLoaded={() => resolveModelLoaded()} orbitEnabled={phase === 'feedback'} />
+
+    <!-- Stage: testo a sx + card a dx, sopra il canvas 3D -->
     <div class="stage">
 
       <div class="stage__text">
@@ -397,9 +516,8 @@
         />
       </div>
 
-      <div class="stage__canvas">
-        <Scene3D bind:api={scene3d} onModelLoaded={() => resolveModelLoaded()} />
-      </div>
+      <!-- colonna centrale vuota: spazio visivo per il modello 3D -->
+      <div aria-hidden="true"></div>
 
       <!-- Colonna destra: heading + card -->
       <div class="stage__right">
@@ -420,13 +538,40 @@
         onclick={() => { if (anyLiked && !isTransitioning) goNext(); }}
         onkeydown={(e) => { if (anyLiked && !isTransitioning && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goNext(); } }}
       >
-        <span class="cta-label">Clicca per continuare</span>
+        {#key ctaLabel}
+          <span class="cta-label"
+            in:fade={{ duration: 150, delay: 150 }}
+            out:fade={{ duration: 150 }}>
+            {ctaLabel}
+          </span>
+        {/key}
         <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
           <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
     </div>
+
+    <!-- Overlay fase B: testo feedback + CTA continua -->
+    {#if phase === 'feedback'}
+      <p class="feedback-text" style="opacity: 0">
+        Questa è la realtà, plasmata dalla tua opinione
+      </p>
+      <div
+        class="feedback-bottom-cta"
+        style="opacity: 0"
+        role="button"
+        tabindex="0"
+        onclick={goToNextSection}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToNextSection(); } }}
+      >
+        <span class="cta-label">Passa al prossimo argomento</span>
+        <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+          <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    {/if}
 
   </div>
 </section>
@@ -635,14 +780,9 @@
     z-index: 1;
     display: grid;
     grid-template-columns: 1fr 1.2fr 1fr;
+    grid-template-rows: 1fr;
     align-items: center;
     padding: 0 6vw;
-  }
-
-  .stage__canvas {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
     pointer-events: none;
   }
 
@@ -664,6 +804,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+    pointer-events: auto;
   }
 
   .stage__right-heading {
@@ -726,5 +867,41 @@
   @keyframes chevron-bounce {
     0%, 100% { transform: translateY(0); }
     50%       { transform: translateY(5px); }
+  }
+
+  /* ── Overlay fase B: testo feedback in alto ──────────────────────────────── */
+  .feedback-text {
+    position: absolute;
+    top: 140px;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    text-align: center;
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 400;
+    font-size: 24px;
+    color: #16181D;
+    pointer-events: none;
+    padding: 0 clamp(16px, 4vw, 48px);
+  }
+
+  /* ── Overlay fase B: CTA continua in basso ───────────────────────────────── */
+  .feedback-bottom-cta {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    pointer-events: auto;
+    white-space: nowrap;
+  }
+
+  .feedback-bottom-cta .cta-chevron {
+    animation: chevron-bounce 1.4s ease-in-out infinite;
   }
 </style>

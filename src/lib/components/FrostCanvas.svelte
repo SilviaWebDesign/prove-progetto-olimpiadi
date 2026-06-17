@@ -26,6 +26,7 @@
   // ─── DOM refs ($state → tracciati da $effect) ────────────────────────────
   let wrapper = $state<HTMLDivElement | null>(null);
   let canvas  = $state<HTMLCanvasElement | null>(null);
+  let ready   = $state(false);
 
   // ─── Variabili interne (non reattive) ────────────────────────────────────
   let ctx: CanvasRenderingContext2D | null        = null;
@@ -78,7 +79,7 @@
 
     const img       = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload      = () => { imgEl = img; drawFrost(); };
+    img.onload      = () => { imgEl = img; drawFrost(); ready = true; };
     img.src         = src;
 
     return () => {
@@ -523,7 +524,7 @@
     1. .sharp  — foto nitida B/N, sempre visibile sotto
     2. canvas  — frost dipinto sopra; destination-out rivela la foto
 -->
-<div class="frost-wrap" bind:this={wrapper} aria-hidden="true">
+<div class="frost-wrap" class:ready bind:this={wrapper} aria-hidden="true">
   <img class="sharp" {src} alt="" draggable="false" />
   <canvas
     bind:this={canvas}
@@ -538,6 +539,11 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .frost-wrap.ready {
+    opacity: 1;
   }
 
   .sharp {

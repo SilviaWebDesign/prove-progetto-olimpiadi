@@ -69,8 +69,6 @@
   // ── Phase management ──────────────────────────────────────────────────────
   type PagePhase = 'intro' | 'topics' | 'feedback';
   let phase = $state<PagePhase>('intro');
-  let resultModelPath = '';
-  let hasMorphedToResult = false;
 
   const cards: CardData[] = $derived(
     topics[currentTopic].comments.map((body, i) => ({
@@ -112,6 +110,26 @@
     return '/oggetti/infrastrutture-neutro.glb';
   }
 
+  async function exitFeedbackPhase() {
+    if (phase !== 'feedback' || isTransitioning) return;
+    isTransitioning = true;
+
+    const OUT = 0.35;
+    gsap.to('.feedback-text',       { opacity: 0, duration: OUT });
+    gsap.to('.feedback-bottom-cta', { opacity: 0, duration: OUT });
+    await new Promise<void>(r => setTimeout(r, OUT * 1000));
+
+    gsap.to('.layer--bg', { filter: 'none', duration: 0.6, ease: 'power2.inOut' });
+    scene3d?.returnToParticles();
+    phase = 'topics';
+    await tick();
+
+    gsap.fromTo('.stage__text',  { opacity: 0, y:  8 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.inOut' });
+    gsap.fromTo('.stage__right', { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.5, ease: 'power3.inOut', delay: 0.04 });
+    gsap.to('.stage__cta', { opacity: 1, duration: 0.3, delay: 0.1 });
+    isTransitioning = false;
+  }
+
   async function enterFeedbackPhase() {
     if (phase !== 'topics' || isTransitioning || !anyLiked) return;
     isTransitioning = true;
@@ -125,63 +143,17 @@
     await new Promise<void>(r => setTimeout(r, OUT * 1000));
     outTl.kill();
 
-    resultModelPath = computeResult();
+    const resultModelPath = computeResult();
     gsap.to('.layer--bg', { filter: 'blur(12px)', duration: 0.8, ease: 'power2.inOut' });
 
-    if (!hasMorphedToResult) {
-      hasMorphedToResult = true;
-      scene3d?.morphToResult(resultModelPath, () => {
-        phase = 'feedback';
-        isTransitioning = false;
-        tick().then(() => {
-          gsap.fromTo('.feedback-text',       { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
-          gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
-        });
-      });
-    } else {
-      scene3d?.returnToFeedback();
+    scene3d?.morphToResult(resultModelPath, () => {
       phase = 'feedback';
       isTransitioning = false;
-      await tick();
-      gsap.fromTo('.feedback-text',       { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
-      gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
-    }
-  }
-
-  function returnToTopics() {
-    if (phase !== 'feedback' || isTransitioning) return;
-    isTransitioning = true;
-
-    // Immediately: hide result model, show particles, disable orbit (synchronous, outside timeline)
-    scene3d?.returnToParticles();
-
-    const tl = gsap.timeline({
-      onComplete: () => {
-        phase = 'topics';
-        isTransitioning = false;
-      },
+      tick().then(() => {
+        gsap.fromTo('.feedback-text',       { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+        gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
+      });
     });
-
-    // 1. Snap feedback overlays to invisible
-    tl.set('.feedback-text',       { opacity: 0 });
-    tl.set('.feedback-bottom-cta', { opacity: 0 });
-
-    // 2. Remove blur
-    tl.to('.layer--bg', { filter: 'blur(0px)', duration: 0.4, ease: 'power2.out' });
-
-    // 3. Reveal topics UI
-    tl.fromTo('.stage__text',
-      { opacity: 0, x: -20 },
-      { opacity: 1, x: 0, duration: 0.5, ease: 'power2.out' }
-    );
-    tl.fromTo('.stage__right',
-      { opacity: 0, x: 20 },
-      { opacity: 1, x: 0, duration: 0.5, ease: 'power2.out' }, '<'
-    );
-    tl.fromTo('.stage__cta',
-      { opacity: 0 },
-      { opacity: 1, duration: 0.3, ease: 'power2.out' }, '<'
-    );
   }
 
   async function goNext() {
@@ -273,10 +245,7 @@
   function onTopicsWheel(e: WheelEvent) {
     if (phase === 'feedback') {
       e.preventDefault();
-      if (e.deltaY < 0 && !isTransitioning) {
-        e.stopPropagation();
-        returnToTopics();
-      }
+      if (e.deltaY < 0 && !isTransitioning) exitFeedbackPhase();
       return;
     }
 
@@ -520,7 +489,7 @@
       <div aria-hidden="true"></div>
 
       <!-- Colonna destra: heading + card -->
-      <div class="stage__right">
+      <div class="stage__right" class:no-pointer={phase === 'feedback'}>
         <p class="stage__right-heading">Metti like alle opinioni con cui sei d'accordo</p>
         <CardStack {cards} onToggleLike={toggleLike} />
       </div>
@@ -617,10 +586,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 clamp(16px, 2.4vw, 32px);
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid rgba(22, 24, 29, 0.1);
+    background: transparent;
   }
 
   .header-brand {
@@ -633,6 +599,8 @@
   }
 
   .header-section {
+    position: absolute;
+    left: 50%;
     font-family: 'PP Formula Condensed', sans-serif;
     font-size: clamp(10px, 0.89vw, 12px);
     font-weight: 700;
@@ -640,7 +608,7 @@
     text-transform: uppercase;
     color: var(--color-section-infrastructure, #FF834C);
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateX(-50%) translateY(6px);
     transition:
       opacity 0.5s cubic-bezier(0.25, 1, 0.5, 1),
       transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
@@ -648,7 +616,7 @@
   }
   .header-section.visible {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
 
   .hamburger {
@@ -718,6 +686,7 @@
     background-size: cover;
     background-position: center;
     opacity: 0.28;
+    pointer-events: none;
   }
 
   /* ── Titolone a filo col fondo ───────────────────────────────────────────── */
@@ -807,6 +776,10 @@
     pointer-events: auto;
   }
 
+  .stage__right.no-pointer {
+    pointer-events: none;
+  }
+
   .stage__right-heading {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
@@ -869,17 +842,17 @@
     50%       { transform: translateY(5px); }
   }
 
-  /* ── Overlay fase B: testo feedback in alto ──────────────────────────────── */
+  /* ── Overlay fase B: testo feedback sopra il modello ────────────────────── */
   .feedback-text {
     position: absolute;
-    top: 140px;
+    top: 84px;
     left: 0;
     right: 0;
     z-index: 10;
     text-align: center;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 400;
-    font-size: 24px;
+    font-size: 28px;
     color: #16181D;
     pointer-events: none;
     padding: 0 clamp(16px, 4vw, 48px);

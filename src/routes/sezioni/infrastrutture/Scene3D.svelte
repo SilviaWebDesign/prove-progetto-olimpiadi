@@ -19,7 +19,6 @@
     preloadResultModels:  () => void;
     morphToResult:        (path: string, onDone: () => void) => void;
     returnToParticles:    () => void;
-    returnToFeedback:     () => void;
   }
 
   interface Props { api?: Scene3DApi; onModelLoaded?: () => void; orbitEnabled?: boolean; }
@@ -112,10 +111,6 @@
         }
         resultModelMaterials.forEach(m => { m.opacity = 0; m.visible = false; });
       },
-      returnToFeedback: () => {
-        if (particleMesh) particleMesh.visible = false;
-        resultModelMaterials.forEach(m => { m.visible = true; m.opacity = 1; });
-      },
     };
 
     initThree();
@@ -124,13 +119,14 @@
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping   = true;
       controls.dampingFactor   = 0.05;
-      controls.enableZoom      = true;
+      controls.enableZoom      = false;
       controls.minDistance     = 1.5;
       controls.maxDistance     = 8;
       controls.enablePan       = false;
       controls.autoRotate      = true;
       controls.autoRotateSpeed = 1.5;
       controls.enabled         = false;
+      controls.target.set(0, 0.3, 0);
     }
 
     startLoop();
@@ -191,7 +187,7 @@
     const h = window.innerHeight;
     camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
     camera.position.set(0, 0, 6);
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(0, 0.3, 0);
     renderer.setSize(w, h);
 
     const key = new THREE.DirectionalLight(0xffffff, 3.5);
@@ -575,8 +571,8 @@
         particleMat.uniforms.uPulse.value = Math.sin(t * Math.PI) * 1.2;
         if (t >= 1) manualPulseActive = false;
       } else {
-        // Gentle auto-pulse: continuous blink via |sin(t·π)| * 0.4
-        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.4;
+        // Gentle auto-pulse: barely perceptible blink at rest
+        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.08;
       }
     }
 

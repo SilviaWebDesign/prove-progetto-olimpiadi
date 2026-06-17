@@ -83,7 +83,7 @@
     font-size: clamp(13px, 1.04vw, 14px);
     font-weight: 500;
     line-height: 1.45;
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     margin: 0;
   }
 
@@ -98,7 +98,7 @@
     border: none;
     padding: 0;
     cursor: pointer;
-    color: var(--color-text-primary, #16181D);
+    color: var(--color-text-primary, #000000);
     transition: transform 0.15s ease, color 0.2s ease;
   }
 

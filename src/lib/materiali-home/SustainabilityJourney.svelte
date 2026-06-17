@@ -1,13 +1,13 @@
 <script>
   import { onMount } from 'svelte';
-  import SectionMountainScene from './SectionMountainScene.svelte';
+  import { browser } from '$app/environment';
   import OrbitCardsLayer from './OrbitCardsLayer.svelte';
   import FactMainStage from './FactMainStage.svelte';
   import CardModel from './CardModel.svelte';
   import SectionHeroTitle from './SectionHeroTitle.svelte';
-  import HeroFrost from './HeroFrost.svelte';
+  import FrostCanvas from '$lib/components/FrostCanvas.svelte';
   import { sections } from './sections.js';
-  import { stageOpacity, clamp, remap } from './scrollStages.js';
+  import { stageOpacity } from './scrollStages.js';
   import {
     getFactDockT,
     isFactActive as isFactSegmentActive,
@@ -41,11 +41,12 @@
     stageOpacity(scrollProgress, INTRO.in, INTRO.inEnd, INTRO.out, INTRO.outEnd)
   );
 
-  let mountainProgress = $derived(clamp(remap(scrollProgress, HERO_END, 0.88), 0, 1));
-
-  let mountainsVisible = $derived(scrollProgress >= HERO_END - 0.02 && scrollProgress < 0.9);
-
   let heroOpacity = $derived(Math.max(0, 1 - scrollProgress / HERO_END));
+
+  /** Sfondo foresta + albero 3D solo dopo il titolo (come infrastrutture) */
+  let forestBgVisible = $derived(
+    scrollProgress >= HERO_END - 0.02 && scrollProgress < FACT_SEGMENTS[2].end + 0.02
+  );
 
   let closureOpacity = $derived(
     stageOpacity(scrollProgress, CLOSURE.in, CLOSURE.inEnd, 0.98, 1)
@@ -143,14 +144,22 @@
   }
 
   let modelActive = $derived(
-    scrollProgress >= ORBIT.start - 0.02 && scrollProgress < FACT_SEGMENTS[2].end + 0.02
+    scrollProgress >= ORBIT.start && scrollProgress < FACT_SEGMENTS[2].end + 0.02
   );
 
+  function resetScrollToTop() {
+    if (!browser) return;
+    history.scrollRestoration = 'manual';
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    scrollProgress = 0;
+  }
+
   onMount(() => {
+    resetScrollToTop();
     reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.documentElement.classList.add('section-route');
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+    requestAnimationFrame(handleScroll);
     return () => {
       window.removeEventListener('scroll', handleScroll);
       document.documentElement.classList.remove('section-route');
@@ -159,9 +168,11 @@
 </script>
 
 <div class="journey" bind:this={container}>
-  <div class="journey-bg mountains-bg" style="opacity: {mountainsVisible ? 1 : 0};">
-    <SectionMountainScene progress={mountainProgress} visible={mountainsVisible} />
-  </div>
+  <div
+    class="journey-bg forest-bg"
+    style="opacity: {forestBgVisible ? 1 : 0};"
+    aria-hidden="true"
+  ></div>
 
   <section
     class="journey-stage hero-cover"
@@ -169,7 +180,9 @@
     aria-hidden={heroOpacity < 0.1}
   >
     <div class="hero-visual">
-      <HeroFrost src={section.hero.background} />
+      <div class="hero-frost-layer">
+        <FrostCanvas src={section.hero.background} />
+      </div>
       <SectionHeroTitle title={section.heroTitle} />
     </div>
   </section>
@@ -179,7 +192,11 @@
     style="opacity: {introOpacity}; pointer-events: {introOpacity > 0.1 ? 'auto' : 'none'};"
     aria-hidden={introOpacity < 0.1}
   >
-    <p class="intro-claim">{section.introClaim}</p>
+    <div class="intro-claim">
+      {#each section.introClaim as line}
+        <p class="intro-claim-line">{line}</p>
+      {/each}
+    </div>
   </section>
 
   <OrbitCardsLayer
@@ -204,6 +221,7 @@
       onToggleLike={(id) => toggleLike(fact.id, id)}
       showGateHint={scrollGateMessage && likedCount(fact.id) === 0}
       factIndex={activeFactIndex}
+      factCount={section.facts.length}
     />
   {/if}
 
@@ -228,7 +246,7 @@
     position: relative;
     width: 100%;
     min-height: 100vh;
-    background: #f9f9fa;
+    background: #ffffff;
   }
 
   .journey-bg {
@@ -237,6 +255,22 @@
     z-index: 1;
     pointer-events: none;
     transition: opacity 0.45s ease;
+  }
+
+  .forest-bg {
+    background-image: url('/images/foresta.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: brightness(1.18) saturate(0.92);
+  }
+
+  .forest-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.38);
+    pointer-events: none;
   }
 
   .journey-stage {
@@ -255,6 +289,7 @@
   .hero-cover {
     z-index: 6;
     padding: 0;
+    background: #ffffff;
   }
 
   .hero-visual {
@@ -268,6 +303,21 @@
     align-items: center;
   }
 
+  .hero-frost-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .hero-frost-layer :global(.frost-wrap) {
+    position: absolute;
+    inset: 0;
+  }
+
+  .hero-frost-layer :global(.sharp) {
+    filter: grayscale(1) brightness(1.18) saturate(0.92);
+  }
+
   .intro-stage {
     z-index: 7;
     padding: clamp(100px, 12vh, 140px) clamp(24px, 5vw, 80px);
@@ -277,12 +327,20 @@
   .intro-claim {
     max-width: min(1349px, 100%);
     margin: 0;
+    text-align: left;
+  }
+
+  .intro-claim-line {
+    margin: 0;
     font-family: 'Supreme Variable', sans-serif;
     font-size: clamp(1.75rem, 5vw, 68px);
     font-weight: 700;
     line-height: 1.1;
-    text-align: left;
-    color: #161a1f;
+    color: #000000;
+    text-shadow:
+      0 0 0.35em #ffffff,
+      0 0 0.7em #ffffff,
+      0 0 1.1em rgba(255, 255, 255, 0.85);
   }
 
   .closure-stage {
@@ -298,9 +356,9 @@
     top: 87px;
     background: linear-gradient(
       180deg,
-      rgba(249, 249, 250, 0.92) 0%,
-      rgba(255, 255, 255, 0.96) 45%,
-      #ffffff 100%
+      rgba(255, 255, 255, 0.35) 0%,
+      rgba(255, 255, 255, 0.55) 45%,
+      rgba(255, 255, 255, 0.72) 100%
     );
   }
 
@@ -325,7 +383,7 @@
     font-size: clamp(1.25rem, 2.5vw, 38px);
     font-weight: 700;
     line-height: 1.2;
-    color: #161a1f;
+    color: #000000;
   }
 
   .closure-hint {
@@ -335,7 +393,7 @@
     font-family: 'Supreme Variable', sans-serif;
     font-size: 0.9rem;
     font-weight: 700;
-    color: #161a1f;
+    color: #000000;
     opacity: 0.7;
   }
 

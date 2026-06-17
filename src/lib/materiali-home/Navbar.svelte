@@ -1,6 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { sectionList } from './sections.js';
+  import { sectionList, getSectionHref } from './sections.js';
+
+  /** @type {{ alwaysVisible?: boolean }} */
+  let { alwaysVisible = false } = $props();
 
   let menuOpen = $state(false);
   let scrolled = $state(false);
@@ -41,9 +44,13 @@
   });
 </script>
 
-<header class="navbar" class:visible={scrolled || menuOpen}>
+<header
+  class="navbar"
+  class:visible={alwaysVisible || scrolled || menuOpen}
+  class:always-visible={alwaysVisible}
+>
   <div class="navbar-inner">
-    <a href="/" class="navbar-title">Quante facce ha una medaglia?</a>
+    <a href="/prototypes/home" class="navbar-title">Quante facce ha una medaglia?</a>
     <button
       type="button"
       class="menu-button"
@@ -67,11 +74,13 @@
   <nav id="site-menu" class="menu-panel" aria-hidden={!menuOpen}>
     <ul class="menu-list">
       <li>
-        <a href="/" class="menu-link" onclick={closeMenu}>Home</a>
+        <a href="/prototypes/home" class="menu-link" onclick={closeMenu}>Home</a>
       </li>
       {#each sectionList as section (section.id)}
         <li>
-          <a href="/{section.slug}" class="menu-link" onclick={closeMenu}>{section.menuLabel}</a>
+          <a href={getSectionHref(section)} class="menu-link" onclick={closeMenu}>
+            {section.menuLabel}
+          </a>
         </li>
       {/each}
     </ul>
@@ -101,30 +110,51 @@
     opacity: 1;
   }
 
-  :global(html.section-route) .navbar-title {
-    color: #000000;
+  .navbar.always-visible {
+    z-index: 200;
+  }
+
+  .navbar.always-visible ~ .menu-overlay {
+    z-index: 199;
+  }
+
+  @media (min-width: 769px) {
+    .navbar.always-visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
 
   .navbar-inner {
+    --navbar-control-height: 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    min-height: 24px;
-    padding: 16px 24px;
+    min-height: var(--navbar-control-height);
+    padding: 16px 20px;
     box-sizing: border-box;
     pointer-events: auto;
+    gap: 12px;
   }
 
   .navbar-title {
-    font-family: var(--font-title);
-    font-size: 20px;
-    font-weight: var(--font-title-weight);
-    line-height: normal;
+    font-family: 'PP Formula Condensed', var(--font-title);
+    font-size: var(--navbar-control-height);
+    font-weight: 900;
+    font-variation-settings: 'wght' 900;
+    font-stretch: condensed;
+    line-height: 1;
+    height: var(--navbar-control-height);
     text-transform: uppercase;
     color: #000000;
     text-decoration: none;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .navbar-title:hover {
@@ -135,30 +165,40 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    flex-shrink: 0;
+    width: var(--navbar-control-height);
+    height: var(--navbar-control-height);
+    margin: 0;
     padding: 0;
     border: none;
     background: none;
     cursor: pointer;
   }
 
+  .menu-button img {
+    display: block;
+    width: var(--navbar-control-height);
+    height: var(--navbar-control-height);
+  }
+
   .menu-button:focus-visible {
-    outline: 2px solid #000000;
+    outline: 2px solid #161a1f;
     outline-offset: 4px;
   }
 
   .menu-overlay {
     position: fixed;
     inset: 0;
-    z-index: 8;
+    z-index: 9;
     display: flex;
     justify-content: flex-end;
     background: rgba(0, 0, 0, 0.85);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+    transition:
+      opacity 0.3s ease,
+      visibility 0.3s ease;
   }
 
   .menu-overlay.open {
@@ -184,9 +224,10 @@
   }
 
   .menu-link {
-    font-family: var(--font-title);
+    font-family: 'PP Formula Condensed', var(--font-title);
     font-size: clamp(2rem, 6vw, 3.5rem);
-    font-weight: var(--font-title-weight);
+    font-weight: 900;
+    font-variation-settings: 'wght' 900;
     line-height: 1;
     text-transform: uppercase;
     color: #ffffff;
@@ -203,20 +244,14 @@
   }
 
   @media (max-width: 768px) {
+    .navbar {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
     .navbar-inner {
-      padding: 16px 20px;
-    }
-
-    .navbar-title {
-      font-size: 14px;
-      white-space: normal;
-      max-width: calc(100% - 48px);
-    }
-  }
-
-  @media (max-width: 480px) {
-    .navbar-title {
-      font-size: 12px;
+      --navbar-control-height: 20px;
+      padding: 16px 24px;
     }
   }
 </style>

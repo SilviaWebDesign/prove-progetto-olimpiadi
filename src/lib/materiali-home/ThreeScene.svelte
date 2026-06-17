@@ -10,12 +10,16 @@
   import {
     HOME_ORBIT_END,
     HOME_SNOW_DIVE_START,
+    HOME_CARDS_START,
+    HOME_CARDS_END,
     SNOW_ZONE_SCROLL
   } from './scrollStages.js';
   import { homeScrollProgress } from './homeScrollProgress.js';
 
   /** Offset Y rispetto all’inquadratura originale (camera più bassa) */
   const CAM_Y_LOW = -2.9;
+  /** Rotazione orizzontale della vista top-down (90°) */
+  const TOP_DOWN_YAW = Math.PI / 2;
   const smogColor = '#ffffff';
 
   let { snowZoneAt = SNOW_ZONE_SCROLL } = $props();
@@ -41,6 +45,7 @@
    *   startAngle: number;
    *   orbitY: number;
    *   radius: number;
+   *   topDownHeight: number;
    * } | null} */
   let orbitConfig = null;
   const _camPos = new THREE.Vector3();
@@ -73,7 +78,14 @@
     return t * t * (3 - 2 * t);
   }
 
-  /** Esattamente un giro completo (2π) */
+  function easeInOutQuint(t) {
+    return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+  }
+
+  /** Più alto = rotazione più lenta nelle fasi centrali dello scroll */
+  const ORBIT_EASE_POWER = 1.45;
+
+  /** Giro completo intorno alla montagna */
   const ORBIT_ARC = Math.PI * 2;
 
   function zoomAt(scroll) {
@@ -111,7 +123,8 @@
     const endAngle = cfg.startAngle + ORBIT_ARC;
 
     if (scroll <= HOME_SNOW_DIVE_START) {
-      const orbitT = clamp(scroll / orbitSpan, 0, 1);
+      const rawT = clamp(scroll / orbitSpan, 0, 1);
+      const orbitT = easeInOutQuint(Math.pow(rawT, ORBIT_EASE_POWER));
       const angle = cfg.startAngle + ORBIT_ARC * orbitT;
       positionOnOrbit(angle, cfg.radius, cfg, _camPos);
       _lookAt.copy(cfg.center).add(new THREE.Vector3(0, 2.2, 0));
@@ -151,14 +164,14 @@
     const snowT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
     const eased = easeInOutCubic(snowT);
 
-    if (eased < 0.42) {
-      const t = eased / 0.42;
+    if (eased < 0.34) {
+      const t = eased / 0.34;
       const te = easeInOutCubic(t);
       _camPos.lerpVectors(_orbitEndPos, _snowApproachPos, te);
       _lookAt.lerpVectors(_orbitEndLookAt, _snowApproachLookAt, te);
     } else {
-      const t = (eased - 0.42) / 0.58;
-      const te = easeInOutCubic(t);
+      const t = (eased - 0.34) / 0.66;
+      const te = easeInOutQuint(t);
       _camPos.lerpVectors(_snowApproachPos, _snowCamPos, te);
       _lookAt.lerpVectors(_snowApproachLookAt, _snowLookAt, te);
     }
@@ -169,7 +182,7 @@
   /** @param {number} scroll */
   function applySnowWhiteout(scroll) {
     const whiteT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
-    const insideT = smoothstep(0.38, 0.92, whiteT);
+    const insideT = smoothstep(0.30, 0.96, whiteT);
     if (!snowMountainModel) return;
 
     snowMountainModel.visible = insideT < 0.97;
@@ -185,11 +198,29 @@
   }
 
   /**
+   * Vista dall'alto verso il basso — fase cards.
+   * @param {number} cardsT 0→1
+   */
+  function sampleTopDownCamera(cardsT) {
+    const cfg = orbitConfig;
+    if (!cfg) return false;
+
+    const eased = easeInOutCubic(clamp(cardsT, 0, 1));
+    const height = cfg.topDownHeight * lerp(1.12, 1, eased);
+
+    _camPos.set(cfg.center.x, cfg.center.y + height, cfg.center.z);
+    _lookAt.copy(cfg.center);
+
+    return true;
+  }
+
+  /**
    * @param {THREE.Vector3} mountainCenter
    * @param {THREE.Vector3} snowField
    * @param {number} orbitRadius
+   * @param {number} topDownHeight
    */
-  function buildOrbitConfig(mountainCenter, snowField, orbitRadius) {
+  function buildOrbitConfig(mountainCenter, snowField, orbitRadius, topDownHeight) {
     const c = mountainCenter;
     const startCam = new THREE.Vector3(0, CAM_Y_LOW, 7.8);
     const dx = startCam.x - c.x;
@@ -202,7 +233,8 @@
       snowField: snowField.clone(),
       startAngle,
       orbitY: c.y + CAM_Y_LOW + 1.1,
-      radius: Math.max(orbitRadius, heroRadius, 12) * 0.82
+      radius: Math.max(orbitRadius, heroRadius, 12) * 0.82,
+      topDownHeight
     };
   }
 
@@ -258,24 +290,64 @@
     animationFrameId = requestAnimationFrame(animate);
 
     const progress = homeScrollProgress.value;
-    const inSnowZone = progress >= snowZoneAt;
-    container?.classList.toggle('--snow-zone', inSnowZone);
+    const inSnowGap = progress >= snowZoneAt && progress < HOME_CARDS_START;
+    const inCardsPhase = progress >= HOME_CARDS_START;
 
-    if (inSnowZone) {
+    container?.classList.toggle('--snow-zone', inSnowGap);
+    container?.classList.toggle('--cards-zone', inCardsPhase);
+
+    if (inSnowGap) {
       if (snowMountainModel) snowMountainModel.visible = false;
-      if (renderer.domElement) renderer.domElement.style.visibility = 'hidden';
+      if (renderer.domElement) {
+        renderer.domElement.style.visibility = 'hidden';
+        renderer.domElement.style.opacity = '0';
+      }
       return;
     }
 
-    if (renderer.domElement) renderer.domElement.style.visibility = 'visible';
+    if (inCardsPhase) {
+      const cardsT = smoothstep(HOME_CARDS_START, HOME_CARDS_END, progress);
+
+      if (renderer.domElement) {
+        renderer.domElement.style.visibility = 'visible';
+        renderer.domElement.style.opacity = String(cardsT);
+      }
+
+      setMountainVisible(true);
+
+      if (sampleTopDownCamera(cardsT)) {
+        camera.position.copy(_camPos);
+        camera.up.set(Math.cos(TOP_DOWN_YAW), 0, Math.sin(TOP_DOWN_YAW));
+        camera.lookAt(_lookAt);
+      }
+
+      camera.zoom = lerp(1.05, 1.28, easeInOutCubic(cardsT));
+      camera.updateProjectionMatrix();
+
+      if (sceneFog) {
+        sceneFog.density = lerp(0.03, 0.022, cardsT);
+        sceneFog.color.setRGB(1, 1, 1);
+      }
+
+      renderer.setClearColor(0xffffff, 1);
+      renderer.render(scene, camera);
+      return;
+    }
+
+    if (renderer.domElement) {
+      renderer.domElement.style.visibility = 'visible';
+      renderer.domElement.style.opacity = '1';
+    }
 
     const scroll = clamp(progress, 0, snowZoneAt);
 
     if (sampleCameraAt(scroll)) {
       camera.position.copy(_camPos);
+      camera.up.set(0, 1, 0);
       camera.lookAt(_lookAt);
     } else {
       camera.position.set(0, CAM_Y_LOW, 7.8);
+      camera.up.set(0, 1, 0);
       camera.lookAt(0, 0, 0);
     }
 
@@ -283,7 +355,7 @@
     camera.updateProjectionMatrix();
 
     const whiteT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
-    const insideFog = smoothstep(0.35, 1, whiteT);
+    const insideFog = smoothstep(0.28, 1, whiteT);
     if (sceneFog) {
       sceneFog.density = lerp(0.045, 0.38, insideFog);
       sceneFog.color.setRGB(1, 1, 1);
@@ -366,8 +438,9 @@
         if (gen !== initGeneration || !scene) return;
 
         snowMountainModel = gltf.scene.clone(true);
-        const { mountainCenter, snowField, orbitRadius } = fitMountainModel(snowMountainModel);
-        buildOrbitConfig(mountainCenter, snowField, orbitRadius);
+        const { mountainCenter, snowField, orbitRadius, topDownHeight } =
+          fitMountainModel(snowMountainModel);
+        buildOrbitConfig(mountainCenter, snowField, orbitRadius, topDownHeight);
         setupMountainMaterials(snowMountainModel);
         scene.add(snowMountainModel);
         resizeRenderer();
@@ -395,6 +468,10 @@
 
   .three-canvas.--snow-zone :global(canvas) {
     visibility: hidden !important;
+    pointer-events: none;
+  }
+
+  .three-canvas.--cards-zone :global(canvas) {
     pointer-events: none;
   }
 </style>

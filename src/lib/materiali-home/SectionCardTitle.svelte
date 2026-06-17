@@ -1,42 +1,68 @@
 <script>
-  /** @type {{ title: string }} */
-  let { title } = $props();
+  /** @type {{ title: string, theme: 'sustainability' | 'sport' | 'infrastructure' }} */
+  let { title, theme } = $props();
 </script>
 
-<p class="section-card-title" style="--title-chars: {title.length}">{title}</p>
+<p class="section-card-title theme-{theme}">{title}</p>
 
 <style>
   .section-card-title {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
     z-index: 3;
-    margin: 0 0 -0.04em;
-    padding: 0 16px 14px;
-    box-sizing: border-box;
+    margin: 0;
+    height: 52px;
     font-family: 'PP Formula Condensed', var(--font-title);
-    font-size: min(
-      3.25rem,
-      max(1.5rem, calc(100% / (var(--title-chars, 10) * 0.48)))
-    );
+    font-size: 44px;
     font-weight: 900;
     font-variation-settings: 'wght' 900;
     font-stretch: condensed;
-    line-height: 0.72;
-    letter-spacing: clamp(2px, 0.35vw, 8px);
+    line-height: 1.3;
     text-align: center;
     text-transform: uppercase;
-    color: #161a1f;
-    white-space: nowrap;
+    color: #000000;
+    word-break: break-word;
     pointer-events: none;
+    text-shadow:
+      0 0 0.35em #ffffff,
+      0 0 0.7em #ffffff,
+      0 0 1.1em rgba(255, 255, 255, 0.85);
   }
 
-  @media (max-width: 640px) {
-    .section-card-title {
-      font-size: min(2.5rem, max(1.35rem, calc(92vw / (var(--title-chars, 10) * 0.52))));
-      white-space: normal;
-      padding-bottom: 18px;
+  .theme-sustainability {
+    top: 74.74%;
+    left: -23.16%;
+    right: -23.16%;
+  }
+
+  .theme-sport {
+    top: 74.74%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 106.5%;
+  }
+
+  .theme-infrastructure {
+    top: 75%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126.8%;
+  }
+
+  @media (max-width: 768px) {
+    .section-card-title,
+    .section-card-title.theme-sustainability,
+    .section-card-title.theme-sport,
+    .section-card-title.theme-infrastructure {
+      top: 50%;
+      left: 16px;
+      right: 16px;
+      bottom: auto;
+      width: auto;
+      height: auto;
+      transform: translateY(-50%);
+      font-size: clamp(2.25rem, 10vmin, 64px);
+      line-height: 1.1;
+      white-space: nowrap;
     }
   }
 </style>

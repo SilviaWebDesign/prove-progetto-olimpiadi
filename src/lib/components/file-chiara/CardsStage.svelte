@@ -9,15 +9,15 @@
   <SectionCard
     title="SOSTENIBILITÀ"
     theme="sustainability"
-    modelSrc="/oggetti/albero.glb"
+    modelSrc="/oggetti/albero-copia.glb"
     href="/sostenibilita"
     {active}
   />
-  <SectionCard title="SPORT" theme="sport" modelSrc="/oggetti/pattinatrice3.glb" href="/sport" {active} />
+  <SectionCard title="SPORT" theme="sport" modelSrc="/oggetti/ice_skate.glb" href="/sport" {active} />
   <SectionCard
     title="INFRASTRUTTURE"
     theme="infrastructure"
-    modelSrc="/oggetti/torcia.glb"
+    modelSrc="/oggetti/excavator.glb"
     href="/infrastrutture"
     {active}
   />

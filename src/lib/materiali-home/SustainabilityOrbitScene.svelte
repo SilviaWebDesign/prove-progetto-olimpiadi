@@ -5,8 +5,7 @@
   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
   import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
   import FactCard from './FactCard.svelte';
-  import { getModelRotationY, setCardRotationActive } from './cardRotation.js';
-  import { rangeProgress, lerp, smoothRangeProgress, damp } from './scrollStages.js';
+  import { rangeProgress, lerp, damp } from './scrollStages.js';
   import {
     fitModelToCenter,
     applyTreeMaterial,
@@ -55,10 +54,8 @@
   const ORBIT_RX_RATIO = 1;
   const ORBIT_RZ_RATIO = 1;
   const CARD_SCENE_SCALE = 0.00335;
-  /** Quanto la rotazione orbitale segue la rotazione continua dell'albero */
-  const ORBIT_TIME_BLEND = 0.18;
-  /** Smussamento scroll → posizione card (lambda damp) */
-  const SCROLL_SMOOTH_LAMBDA = 8;
+  /** Smussamento scroll → posizione card (lambda damp, stile scrub GSAP) */
+  const SCROLL_SMOOTH_LAMBDA = 6;
 
   let orbitRadius = ORBIT_RADIUS_FALLBACK;
   let targetScrollProgress = 0;
@@ -103,31 +100,36 @@
   const _lookTarget = new THREE.Vector3();
   const _cardWorld = new THREE.Vector3();
 
-  $effect(() => {
-    if (!active) return;
-    setCardRotationActive(true);
-    return () => setCardRotationActive(false);
-  });
+  /**
+   * Rotazione Y dell'albero legata allo scroll (come la ruspa in infrastrutture).
+   * @param {number} progress
+   */
+  function getTreeScrollRotation(progress) {
+    if (reducedMotion || progress < orbitStart) return 0;
+
+    const orbitT = rangeProgress(progress, orbitStart, orbitEnd);
+    const orbitRot = orbitT * Math.PI * 2;
+
+    const inFacts =
+      progress >= factSegments[0]?.start && progress < factSegments[2]?.end;
+    const factT = inFacts
+      ? rangeProgress(progress, factSegments[0].start, factSegments[2].end)
+      : 0;
+    const factRot = factT * Math.PI * 0.65;
+
+    return orbitRot + factRot;
+  }
+
+  /** @param {number} progress scroll smussato */
+  function getOrbitAngle(progress) {
+    return getTreeScrollRotation(progress);
+  }
 
   /** @param {number} index */
   function isFactPast(index) {
     const seg = factSegments[index];
     if (!seg) return false;
     return scrollProgress >= seg.end;
-  }
-
-  /** @param {number} progress scroll smussato */
-  function getOrbitAngle(progress) {
-    if (reducedMotion) return 0;
-    const orbitT = smoothRangeProgress(progress, orbitStart, orbitEnd);
-    const inFacts =
-      progress >= factSegments[0]?.start && progress < factSegments[2]?.end;
-    const factT = inFacts
-      ? smoothRangeProgress(progress, factSegments[0].start, factSegments[2].end)
-      : 0;
-    const scrollAngle = orbitT * Math.PI * 2 + factT * Math.PI * 0.65;
-    const timeAngle = active ? getModelRotationY() * ORBIT_TIME_BLEND : 0;
-    return scrollAngle + timeAngle;
   }
 
   /** @param {CSS3DObject} obj @param {THREE.Vector3} lookAtPoint */
@@ -474,7 +476,7 @@
       }
 
       if (treeRoot) {
-        treeRoot.rotation.y = getModelRotationY();
+        treeRoot.rotation.y = getTreeScrollRotation(smoothedScrollProgress);
         treeRoot.updateMatrixWorld(true);
       }
       syncOrbitFromTree();

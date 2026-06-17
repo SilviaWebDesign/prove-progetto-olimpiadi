@@ -123,7 +123,7 @@
     letter-spacing: clamp(6px, 1.2vw, 18.2px);
     text-align: center;
     text-transform: uppercase;
-    color: #161a1f;
+    color: #000000;
     white-space: nowrap;
     pointer-events: none;
   }

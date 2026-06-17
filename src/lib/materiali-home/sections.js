@@ -9,11 +9,53 @@ const OPINION_QUOTE =
 
 /** Hero condiviso — sfondo alberi + frost interattivo */
 const HERO_ASSETS = {
-  background: '/sections/hero-feature.jpg'
+  background: '/images/hero-feature.jpg'
 };
 
-const SUSTAINABILITY_INTRO_CLAIM =
-  'Le Olimpiadi sono accompagnate da scelte che riguardano ambiente e risorse. Questi interventi possono essere letti come attenzione al territorio oppure come iniziative dal valore limitato, misurabile solo nel tempo.';
+const SPORT_INTRO_PHRASE =
+  'Le Olimpiadi mettono al centro atleti, discipline e competizione. ' +
+  'Prestazioni, regolamenti e scelte organizzative possono essere letti come esaltazione ' +
+  'dello sport o come segnali di distorsione rispetto ai valori originari.';
+
+const SPORT_FACT_BODY =
+  'Milano-Cortina 2026 prevede oltre 100 medaglie in 16 discipline, con sedi che coprono ' +
+  'dalle arena milanesi alle piste dolomitiche. Il Comitato Organizzatore ha promosso programmi ' +
+  'di avvicinamento allo sport nelle scuole e campagne per tifosi e volontari.';
+
+const SPORT_OPINIONS = [
+  {
+    quote:
+      '“Le Olimpiadi aumentano la partecipazione sportiva giovanile e l’interesse verso discipline minori.”'
+  },
+  {
+    quote:
+      '“Gli atleti olimpici ispirano intere generazioni e avvicinano lo sport al grande pubblico.”'
+  },
+  {
+    quote:
+      '“Il programma di gare valorizza tradizioni locali come lo sci alpinismo e il curling.”'
+  },
+  {
+    quote:
+      '“I costi di accesso al top level escludono molti talenti prima ancora delle qualifiche.”'
+  },
+  {
+    quote:
+      '“La pressione mediatica e agonistica pesa in modo sproporzionato sui giovani atleti.”'
+  },
+  {
+    quote:
+      '“Il medagliere rispecchia più la spesa pubblica per lo sport che il merito puro.”'
+  }
+];
+
+const SUSTAINABILITY_INTRO_CLAIM = [
+  'Le Olimpiadi sono accompagnate da scelte che riguardano ambiente e risorse.',
+  'Questi interventi possono essere letti',
+  'come attenzione al territorio oppure',
+  'come iniziative dal valore limitato,',
+  'misurabile solo nel tempo.'
+];
 
 const SUSTAINABILITY_FACT_1_BODY =
   'Milano-Cortina 2026 è stata progettata intorno a un uso esteso di sedi già esistenti o temporanee, al fine di non lasciare “cattedrali nel deserto”, come spesso accade. Secondo la comunicazione ufficiale, circa il 90% delle sedi di gara rientra in questa logica di riuso. Alcuni degli esempi sono lo stadio di San Siro, l’Unipol Forum, e Rho Fiera.';
@@ -33,27 +75,30 @@ export const sections = {
     menuLabel: 'Sostenibilità',
     theme: 'sustainability',
     accent: '#3eaf3f',
-    modelSrc: '/oggetti/albero.glb',
+    modelSrc: '/oggetti/albero-copia.glb',
     hero: {
-      background: '/sections/hero-feature.jpg'
+      background: '/images/foresta.png'
     },
     introClaim: SUSTAINABILITY_INTRO_CLAIM,
     facts: [
       {
         id: 'fact-1',
         label: 'sostenibilità · fact 1',
+        title: 'Riuso delle sedi',
         body: SUSTAINABILITY_FACT_1_BODY,
         sources: 'wikipedia, inarcassa'
       },
       {
         id: 'fact-2',
         label: 'sostenibilità · fact 2',
+        title: 'Il Villaggio Olimpico',
         body: SUSTAINABILITY_FACT_2_BODY,
         sources: 'comune di milano, ioc'
       },
       {
         id: 'fact-3',
         label: 'sostenibilità · fact 3',
+        title: 'Energia e trasporti',
         body: SUSTAINABILITY_FACT_3_BODY,
         sources: 'ministero ambiente'
       }
@@ -189,17 +234,20 @@ export const sections = {
     menuLabel: 'Sport',
     theme: 'sport',
     accent: '#422ccb',
-    modelSrc: '/oggetti/pattinatrice3.glb',
-    hero: HERO_ASSETS,
+    modelSrc: '/oggetti/ice_skate.glb',
+    hero: {
+      background: '/images/alysasfondo.png'
+    },
     intro: INTRO,
+    introPhrase: SPORT_INTRO_PHRASE,
     claim: CLAIM,
     featured: {
-      title:
-        'Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l’evento. Il progetto include edifici residenziali, spazi pubblici e una nuova piazza di quartiere.',
+      title: 'Atleti e competizione',
       cta: 'Scopri di più',
-      body: 'Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l’evento. Il progetto include edifici residenziali, spazi pubblici e una nuova piazza di quartiere.'
+      body: SPORT_FACT_BODY,
+      sources: 'ioc, coni'
     },
-    opinions: Array.from({ length: 6 }, () => ({ quote: OPINION_QUOTE })),
+    opinions: SPORT_OPINIONS,
     footerBand: false,
     footerSnowImage: null,
     footerGradientImage: null
@@ -212,8 +260,10 @@ export const sections = {
     menuLabel: 'Infrastrutture',
     theme: 'infrastructure',
     accent: '#ff783c',
-    modelSrc: '/oggetti/torcia.glb',
-    hero: HERO_ASSETS,
+    modelSrc: '/oggetti/excavator.glb',
+    hero: {
+      background: '/images/villaggio.png'
+    },
     intro: INTRO,
     claim: CLAIM,
     featured: {
@@ -236,4 +286,17 @@ export const sectionList = Object.values(sections);
  */
 export function getSectionBySlug(slug) {
   return sectionList.find((section) => section.slug === slug) ?? null;
+}
+
+/**
+ * @param {typeof sections.sustainability | keyof typeof sections | string} sectionOrKey
+ */
+export function getSectionHref(sectionOrKey) {
+  const section =
+    typeof sectionOrKey === 'string'
+      ? sections[/** @type {keyof typeof sections} */ (sectionOrKey)] ??
+        sectionList.find((item) => item.id === sectionOrKey || item.slug === sectionOrKey)
+      : sectionOrKey;
+
+  return section ? `/sezioni/${section.slug}` : '/prototypes/home';
 }

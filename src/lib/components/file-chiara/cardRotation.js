@@ -1,5 +1,5 @@
-export const MODEL_ROTATION_SPEED = 1.0;
-export const TORCH_LIGHT_ORBIT_SPEED = 1.15;
+export const MODEL_ROTATION_SPEED = 0.35;
+export const TORCH_LIGHT_ORBIT_SPEED = 0.4;
 
 let animBaseY = 0;
 let animBaseTorchY = 0;
@@ -11,7 +11,7 @@ let hoverRefs = 0;
 let motionReduced = false;
 
 function recomputePaused() {
-  const shouldPause = activeRefs === 0 || hoverRefs > 0 || motionReduced;
+  const shouldPause = activeRefs === 0 || motionReduced;
 
   if (paused && !shouldPause) {
     animStart = performance.now();

@@ -18,7 +18,7 @@
     title="INFRASTRUTTURE"
     theme="infrastructure"
     modelSrc="/oggetti/excavator.glb"
-    href="/infrastrutture"
+    href="/sezioni/infrastrutture"
     {active}
   />
 </div>

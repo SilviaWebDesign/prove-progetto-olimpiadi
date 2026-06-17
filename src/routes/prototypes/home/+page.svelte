@@ -49,13 +49,13 @@
   ];
   const TEXT3_LINES_DESKTOP = [
     'Le tue scelte plasmeranno',
-    'gli eroi e i cattivi',
-    'di Milano-Cortina 2026.'
+    'la realtà di',
+    'Milano-Cortina 2026.'
   ];
   const TEXT3_LINES_MOBILE = [
     'Le tue scelte',
-    'plasmeranno gli eroi',
-    'e i cattivi di',
+    'plasmeranno',
+    'la realtà di',
     'Milano-Cortina 2026.'
   ];
 

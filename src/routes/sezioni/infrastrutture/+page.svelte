@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import Lenis from 'lenis';
@@ -14,6 +15,8 @@
   import Navbar from '$lib/materiali-home/Navbar.svelte';
 
   import './tokens.css';
+  import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
+  import { overlayVisible } from '$lib/stores/pageTransition';
 
   // ── Interfaces ────────────────────────────────────────────────────────────
   interface CardData { id: number; body: string; liked: boolean; }
@@ -95,7 +98,15 @@
   );
 
   function goToNextSection() {
-    console.log('goToNextSection — stub');
+    goto('/sezioni/sostenibilita');
+  }
+
+  async function navigateToResults() {
+    if (isTransitioning) return;
+    isTransitioning = true;
+    overlayVisible.set(true);
+    await new Promise<void>(r => setTimeout(r, 400));
+    goto('/risultati');
   }
 
   function computeResult(): string {
@@ -145,6 +156,7 @@
     outTl.kill();
 
     const resultModelPath = computeResult();
+    visitedSections.markCompleted('infrastructure', resultModelPath);
     gsap.to('.layer--bg', { filter: 'blur(12px)', duration: 0.8, ease: 'power2.inOut' });
 
     scene3d?.morphToResult(resultModelPath, () => {
@@ -244,6 +256,7 @@
     if (phase === 'feedback') {
       e.preventDefault();
       if (e.deltaY < 0 && !isTransitioning) exitFeedbackPhase();
+      if (e.deltaY > 0 && $allSectionsCompleted && !isTransitioning) navigateToResults();
       return;
     }
 
@@ -514,17 +527,19 @@
     <!-- Overlay fase B: testo feedback + CTA continua -->
     {#if phase === 'feedback'}
       <p class="feedback-text" style="opacity: 0">
-        Questa è la realtà, plasmata dalla tua opinione
+        Questa è la realtà,<br>plasmata dalla tua opinione
       </p>
       <div
         class="feedback-bottom-cta"
         style="opacity: 0"
         role="button"
         tabindex="0"
-        onclick={goToNextSection}
-        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToNextSection(); } }}
+        onclick={() => { $allSectionsCompleted ? navigateToResults() : goToNextSection(); }}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $allSectionsCompleted ? navigateToResults() : goToNextSection(); } }}
       >
-        <span class="cta-label">Passa al prossimo argomento</span>
+        <span class="cta-label">
+          {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
+        </span>
         <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
           <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round"/>

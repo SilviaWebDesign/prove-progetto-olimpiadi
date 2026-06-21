@@ -49,8 +49,7 @@
   ];
   const TEXT3_LINES_DESKTOP = [
     'Le tue scelte plasmeranno',
-    'la realtà di',
-    'Milano-Cortina 2026.'
+    'la realtà di Milano-Cortina 2026.'
   ];
   const TEXT3_LINES_MOBILE = [
     'Le tue scelte',

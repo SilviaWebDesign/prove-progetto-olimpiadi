@@ -299,14 +299,22 @@
     }
     merged.dispose();
 
+    // Match infrastrutture's world-space visual exactly.
+    // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.008, dirRange=8
+    //   → world sphere radius = 0.008 × 0.6405 = 0.005124
+    //   → world dir half-amp  = 4    × 0.6405 = 2.562 per component
+    // Dividing by current baseScale keeps both world values constant across models.
+    const INFRA_BS       = 0.6405;
+    const particleRadius = 0.008 * INFRA_BS / baseScale;  // world radius = 0.005124
+    const dirScale       = 8    * INFRA_BS / baseScale;   // world amp    = 2.562 per component
     const directions = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
-      directions[i * 3]     = (Math.random() - 0.5) * 8;
-      directions[i * 3 + 1] = (Math.random() - 0.5) * 8;
-      directions[i * 3 + 2] = (Math.random() - 0.5) * 8;
+      directions[i * 3]     = (Math.random() - 0.5) * dirScale;
+      directions[i * 3 + 1] = (Math.random() - 0.5) * dirScale;
+      directions[i * 3 + 2] = (Math.random() - 0.5) * dirScale;
     }
 
-    const geo = new THREE.SphereGeometry(0.008, 4, 4);
+    const geo = new THREE.SphereGeometry(particleRadius, 4, 4);
     geo.setAttribute('aDirection', new THREE.InstancedBufferAttribute(directions, 3));
 
     particleMat = new THREE.ShaderMaterial({

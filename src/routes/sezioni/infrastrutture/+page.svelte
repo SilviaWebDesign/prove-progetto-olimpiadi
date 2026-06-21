@@ -770,7 +770,7 @@
   /* ── Overlay fase B: testo feedback sopra il modello ────────────────────── */
   .feedback-text {
     position: absolute;
-    top: 84px;
+    bottom: 110px;
     left: 0;
     right: 0;
     z-index: 10;

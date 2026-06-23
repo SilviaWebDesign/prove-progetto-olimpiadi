@@ -50,7 +50,7 @@
   class:always-visible={alwaysVisible}
 >
   <div class="navbar-inner">
-    <a href="/prototypes/home" class="navbar-title">Quante facce ha una medaglia?</a>
+    <a href="/prototypes/home#sezioni" class="navbar-title">Quante facce ha una medaglia?</a>
     <button
       type="button"
       class="menu-button"
@@ -74,7 +74,7 @@
   <nav id="site-menu" class="menu-panel" aria-hidden={!menuOpen}>
     <ul class="menu-list">
       <li>
-        <a href="/prototypes/home" class="menu-link" onclick={closeMenu}>Home</a>
+        <a href="/prototypes/home#sezioni" class="menu-link" onclick={closeMenu}>Home</a>
       </li>
       {#each sectionList as section (section.id)}
         <li>

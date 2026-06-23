@@ -90,11 +90,17 @@
     api = {
       setRotationY: (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
       setScale:     (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
-      setOpacity:   (val) => { materials.forEach((m) => { m.opacity = val; }); },
+      setOpacity:   (val) => {
+        materials.forEach((m) => {
+          const needsTransparent = val < 1;
+          if (m.transparent !== needsTransparent) { m.transparent = needsTransparent; m.needsUpdate = true; }
+          m.opacity = val;
+        });
+      },
       settle:       startTransition,
       unsettle:     () => {
         if (transitionState !== 'none') return;
-        materials.forEach(m => { m.opacity = 1; });
+        materials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
       },
       pulse:       triggerManualPulse,
       resetPulse:  () => {
@@ -476,6 +482,7 @@
 
   function startTransition() {
     if (transitionState !== 'none' || !particleMesh) return;
+    materials.forEach(m => { if (!m.transparent) { m.transparent = true; m.needsUpdate = true; } });
     transitionState    = 'in';
     transitionProgress = 0;
     particleCurrent.fill(0);
@@ -573,7 +580,7 @@
       if (t >= 1) {
         morphState = 'none';
         particleMesh.visible = false;
-        resultModelMaterials.forEach(m => { m.opacity = 1; });
+        resultModelMaterials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
         const cb = morphDoneCallback;
         morphDoneCallback = null;
         cb?.();

@@ -1,8 +1,9 @@
 <script>
-  import ThreeScene from '../../../lib/materiali-home/ThreeScene.sveltee
-  import CardsStage from '../../../lib/materiali-home/CardsStage.sveltee
+  import ThreeScene from '../../../lib/materiali-home/ThreeScene.svelte';
+  import CardsStage from '../../../lib/materiali-home/CardsStage.svelte';
   import { browser } from '$app/environment';
   import { onMount, tick } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
   import {
     clamp,
     easeOutCubic,
@@ -10,15 +11,15 @@
     HOME_SNOW_DIVE_START,
     SNOW_ZONE_SCROLL,
     stageMoxyOpacity
-  } from '../../../lib/materiali/scrollStages.js/materiali/scrollStages.js';
-  import { homeScrollProgress } from '../../../lib/materiali/homeScrollProgress.jsiali/homeScrollProgress.js';
+  } from '../../../lib/materiali-home/scrollStages.js';
+  import { homeScrollProgress } from '../../../lib/materiali-home/homeScrollProgress.js';
 
   let scrollProgress = $state(0);
   let container;
   let heroEntered = $state(false);
 
   /** Fade in only — resta visibile fino alla fine dello scroll. */
-  function stageOpacityIn(progress:, fadeInStart, fadeInEnd) {
+  function stageOpacityIn(progress, fadeInStart, fadeInEnd) {
     if (progress < fadeInStart) return 0;
     if (progress < fadeInEnd) return easeOutCubic(rangeProgress(progress, fadeInStart, fadeInEnd));
     return 1;
@@ -79,6 +80,19 @@
     return clamp(window.scrollY / docHeight, 0, 1);
   }
 
+  const CARDS_TARGET_PROGRESS = 0.95;
+
+  function scrollToSezioni() {
+    const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
+    if (scrollMax > 0) {
+      window.scrollTo({ top: scrollMax * CARDS_TARGET_PROGRESS, behavior: 'instant' });
+    }
+  }
+
+  afterNavigate(({ to }) => {
+    if (to?.url.hash === '#sezioni') scrollToSezioni();
+  });
+
   let scrollTicking = false;
 
   function scheduleScrollUpdate() {
@@ -99,6 +113,10 @@
   });
 
   onMount(() => {
+    if (window.location.hash === '#sezioni') {
+      scrollToSezioni();
+    }
+
     const p = readScrollProgress();
     homeScrollProgress.value = p;
     scrollProgress = p;

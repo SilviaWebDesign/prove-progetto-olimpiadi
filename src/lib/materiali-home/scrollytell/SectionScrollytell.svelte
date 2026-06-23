@@ -584,7 +584,7 @@
   }
 
   .layer--bg {
-    z-index: 1;
+    z-index: 0;
     background-size: cover;
     background-position: center;
     opacity: 0.28;

@@ -127,7 +127,7 @@
   function drawBlurredImage(w: number, h: number) {
     const bleed = BLUR_AMOUNT * 2;
     ctx!.save();
-    ctx!.filter = `blur(${BLUR_AMOUNT}px) brightness(1.15) saturate(0.55) contrast(1.08)`;
+    ctx!.filter = `blur(${BLUR_AMOUNT}px) brightness(1.15) saturate(0) contrast(1.08)`;
     drawImageCover(imgEl!, w, h, bleed);
     ctx!.filter = 'none';
     ctx!.restore();
@@ -566,5 +566,6 @@
     height: 100%;
     cursor: crosshair;
     touch-action: none;
+    filter: saturate(0);
   }
 </style>

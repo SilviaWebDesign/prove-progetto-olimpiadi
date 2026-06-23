@@ -90,11 +90,17 @@
     api = {
       setRotationY: (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
       setScale:     (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
-      setOpacity:   (val) => { materials.forEach((m) => { m.opacity = val; }); },
+      setOpacity:   (val) => {
+        materials.forEach((m) => {
+          const needsTransparent = val < 1;
+          if (m.transparent !== needsTransparent) { m.transparent = needsTransparent; m.needsUpdate = true; }
+          m.opacity = val;
+        });
+      },
       settle:       startTransition,
       unsettle:     () => {
         if (transitionState !== 'none') return;
-        materials.forEach(m => { m.opacity = 1; });
+        materials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
       },
       pulse:       triggerManualPulse,
       resetPulse:  () => {
@@ -299,14 +305,22 @@
     }
     merged.dispose();
 
+    // Match infrastrutture's world-space visual exactly.
+    // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.008, dirRange=8
+    //   → world sphere radius = 0.008 × 0.6405 = 0.005124
+    //   → world dir half-amp  = 4    × 0.6405 = 2.562 per component
+    // Dividing by current baseScale keeps both world values constant across models.
+    const INFRA_BS       = 0.6405;
+    const particleRadius = 0.008 * INFRA_BS / baseScale;  // world radius = 0.005124
+    const dirScale       = 8    * INFRA_BS / baseScale;   // world amp    = 2.562 per component
     const directions = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
-      directions[i * 3]     = (Math.random() - 0.5) * 8;
-      directions[i * 3 + 1] = (Math.random() - 0.5) * 8;
-      directions[i * 3 + 2] = (Math.random() - 0.5) * 8;
+      directions[i * 3]     = (Math.random() - 0.5) * dirScale;
+      directions[i * 3 + 1] = (Math.random() - 0.5) * dirScale;
+      directions[i * 3 + 2] = (Math.random() - 0.5) * dirScale;
     }
 
-    const geo = new THREE.SphereGeometry(0.008, 4, 4);
+    const geo = new THREE.SphereGeometry(particleRadius, 4, 4);
     geo.setAttribute('aDirection', new THREE.InstancedBufferAttribute(directions, 3));
 
     particleMat = new THREE.ShaderMaterial({
@@ -468,6 +482,7 @@
 
   function startTransition() {
     if (transitionState !== 'none' || !particleMesh) return;
+    materials.forEach(m => { if (!m.transparent) { m.transparent = true; m.needsUpdate = true; } });
     transitionState    = 'in';
     transitionProgress = 0;
     particleCurrent.fill(0);
@@ -565,7 +580,7 @@
       if (t >= 1) {
         morphState = 'none';
         particleMesh.visible = false;
-        resultModelMaterials.forEach(m => { m.opacity = 1; });
+        resultModelMaterials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
         const cb = morphDoneCallback;
         morphDoneCallback = null;
         cb?.();

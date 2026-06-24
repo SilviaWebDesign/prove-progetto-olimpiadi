@@ -318,7 +318,7 @@
     }
 
     // ── 4. Build InstancedMesh with ShaderMaterial
-    const geo = new THREE.SphereGeometry(0.008, 4, 4);
+    const geo = new THREE.SphereGeometry(0.012, 4, 4);
     geo.setAttribute('aDirection', new THREE.InstancedBufferAttribute(directions, 3));
 
     particleMat = new THREE.ShaderMaterial({
@@ -568,11 +568,11 @@
       if (manualPulseActive) {
         manualPulseElapsed += dt;
         const t = Math.min(1, manualPulseElapsed / MANUAL_PULSE_DURATION);
-        particleMat.uniforms.uPulse.value = Math.sin(t * Math.PI) * 1.2;
+        particleMat.uniforms.uPulse.value = Math.sin(t * Math.PI) * 0.8;
         if (t >= 1) manualPulseActive = false;
       } else {
         // Gentle auto-pulse: barely perceptible blink at rest
-        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.08;
+        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.04;
       }
     }
 

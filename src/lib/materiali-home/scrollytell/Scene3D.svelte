@@ -311,12 +311,12 @@
     merged.dispose();
 
     // Match infrastrutture's world-space visual exactly.
-    // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.008, dirRange=8
-    //   → world sphere radius = 0.008 × 0.6405 = 0.005124
+    // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.012, dirRange=8
+    //   → world sphere radius = 0.012 × 0.6405 = 0.007686
     //   → world dir half-amp  = 4    × 0.6405 = 2.562 per component
     // Dividing by current baseScale keeps both world values constant across models.
     const INFRA_BS       = 0.6405;
-    const particleRadius = 0.008 * INFRA_BS / baseScale;  // world radius = 0.005124
+    const particleRadius = 0.012 * INFRA_BS / baseScale;  // world radius = 0.007686
     const dirScale       = 8    * INFRA_BS / baseScale;   // world amp    = 2.562 per component
     const directions = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
@@ -555,10 +555,10 @@
       if (manualPulseActive) {
         manualPulseElapsed += dt;
         const t = Math.min(1, manualPulseElapsed / MANUAL_PULSE_DURATION);
-        particleMat.uniforms.uPulse.value = Math.sin(t * Math.PI) * 1.2;
+        particleMat.uniforms.uPulse.value = Math.sin(t * Math.PI) * 0.8;
         if (t >= 1) manualPulseActive = false;
       } else {
-        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.08;
+        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.04;
       }
     }
 

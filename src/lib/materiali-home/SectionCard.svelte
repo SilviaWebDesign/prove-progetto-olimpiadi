@@ -75,16 +75,16 @@
     transition: opacity 0.35s ease;
   }
 
-  .card-halo.theme-sustainability {
-    background: var(--section-sustainability-halo);
-  }
-
-  .card-halo.theme-sport {
-    background: var(--section-sport-halo);
-  }
-
+  .card-halo.theme-sustainability,
+  .card-halo.theme-sport,
   .card-halo.theme-infrastructure {
-    background: var(--section-infrastructure-halo);
+    background: radial-gradient(
+      ellipse 72% 68% at 50% 44%,
+      rgba(22, 26, 31, 0.18) 0%,
+      rgba(22, 26, 31, 0.09) 38%,
+      rgba(22, 26, 31, 0.04) 58%,
+      rgba(22, 26, 31, 0) 78%
+    );
   }
 
   .section-card-link:hover .card-halo,
@@ -107,31 +107,13 @@
       box-shadow 0.35s ease;
   }
 
-  .section-card-link:hover .theme-sustainability.section-card,
-  .section-card-link:focus-within .theme-sustainability.section-card {
-    border-color: var(--section-sustainability-500);
+  .section-card-link:hover .section-card,
+  .section-card-link:focus-within .section-card {
+    border-color: #161a1f;
     box-shadow:
-      0 0 24px rgba(71, 208, 142, 0.5),
-      0 0 48px rgba(71, 208, 142, 0.32),
-      0 0 80px rgba(71, 208, 142, 0.18);
-  }
-
-  .section-card-link:hover .theme-sport.section-card,
-  .section-card-link:focus-within .theme-sport.section-card {
-    border-color: var(--section-sport-500);
-    box-shadow:
-      0 0 24px rgba(137, 186, 255, 0.52),
-      0 0 48px rgba(137, 186, 255, 0.34),
-      0 0 80px rgba(137, 186, 255, 0.2);
-  }
-
-  .section-card-link:hover .theme-infrastructure.section-card,
-  .section-card-link:focus-within .theme-infrastructure.section-card {
-    border-color: var(--section-infrastructure-500);
-    box-shadow:
-      0 0 24px rgba(255, 131, 76, 0.5),
-      0 0 48px rgba(255, 131, 76, 0.32),
-      0 0 80px rgba(255, 131, 76, 0.18);
+      0 0 24px rgba(0, 0, 0, 0.12),
+      0 0 48px rgba(0, 0, 0, 0.07),
+      0 0 80px rgba(0, 0, 0, 0.04);
   }
 
   .card-object {

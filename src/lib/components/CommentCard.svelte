@@ -64,6 +64,7 @@
     box-shadow:
       0 6px 20px rgba(0, 0, 0, 0.08),
       inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    overflow: hidden;
     cursor: pointer;
     transition:
       transform 300ms cubic-bezier(0.25, 1, 0.5, 1),
@@ -85,66 +86,32 @@
     opacity: 0;
     transition: opacity 400ms ease;
     pointer-events: none;
-    filter: blur(20px);
-    background-size: 300% 100%;
-    background-position: 100% 50%;
-    background-repeat: no-repeat;
-  }
-
-  .comment-card-glass[data-section='sustainability']::before {
-    background-image: linear-gradient(to right, var(--color-section-sustainability, #47D08E) 0%, rgba(255, 255, 255, 0) 50%);
-  }
-  .comment-card-glass[data-section='sport']::before {
-    background-image: linear-gradient(to right, var(--color-section-sport, #89BAFF) 0%, rgba(255, 255, 255, 0) 50%);
-  }
-  .comment-card-glass[data-section='infrastructure']::before {
-    background-image: linear-gradient(to right, var(--color-section-infrastructure, #FF834C) 0%, rgba(255, 255, 255, 0) 50%);
+    filter: blur(6px);
+    background-image: radial-gradient(
+      ellipse 75% 75% at 22% 50%,
+      rgba(22, 24, 29, 0.26) 0%,
+      rgba(22, 24, 29, 0.06) 60%,
+      rgba(255, 255, 255, 0) 100%
+    );
   }
 
   .comment-card-glass:hover::before {
     opacity: 1;
-    animation: sweep 800ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
   }
 
   .comment-card-glass[data-liked='true']::before {
     opacity: 0.6;
-    background-position: 50% 50%;
   }
 
-  @keyframes sweep {
-    from { background-position: 100% 50%; }
-    to   { background-position: 0%   50%; }
+  .comment-card-glass:hover {
+    transform: translateY(-0.5px);
+    border-color: rgba(22, 24, 29, 0.8);
+    outline-color: rgba(22, 24, 29, 0.8);
   }
 
-  .comment-card-glass:hover { transform: translateY(-1px); }
-
-  .comment-card-glass[data-section='sustainability']:hover {
-    border-color: var(--color-section-sustainability, #47D08E);
-    outline-color: var(--color-section-sustainability, #47D08E);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.10), 0 0 24px rgba(71,208,142,0.25), inset 0 1px 1px rgba(255,255,255,0.5);
-  }
-  .comment-card-glass[data-section='sport']:hover {
-    border-color: var(--color-section-sport, #89BAFF);
-    outline-color: var(--color-section-sport, #89BAFF);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.10), 0 0 24px rgba(137,186,255,0.30), inset 0 1px 1px rgba(255,255,255,0.5);
-  }
-  .comment-card-glass[data-section='infrastructure']:hover {
-    border-color: var(--color-section-infrastructure, #FF834C);
-    outline-color: var(--color-section-infrastructure, #FF834C);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.10), 0 0 24px rgba(255,131,76,0.28), inset 0 1px 1px rgba(255,255,255,0.5);
-  }
-
-  .comment-card-glass[data-section='sustainability'][data-liked='true'] {
-    border-color: var(--color-section-sustainability, #47D08E);
-    outline-color: var(--color-section-sustainability, #47D08E);
-  }
-  .comment-card-glass[data-section='sport'][data-liked='true'] {
-    border-color: var(--color-section-sport, #89BAFF);
-    outline-color: var(--color-section-sport, #89BAFF);
-  }
-  .comment-card-glass[data-section='infrastructure'][data-liked='true'] {
-    border-color: var(--color-section-infrastructure, #FF834C);
-    outline-color: var(--color-section-infrastructure, #FF834C);
+  .comment-card-glass[data-liked='true'] {
+    border-color: rgba(22, 24, 29, 0.8);
+    outline-color: rgba(22, 24, 29, 0.8);
   }
 
   .comment-card-glass__body { flex: 1; margin: 0; }
@@ -175,16 +142,8 @@
     transition: fill 200ms ease, stroke 200ms ease;
   }
 
-  .comment-card-glass[data-section='sustainability'][data-liked='true'] .comment-card-glass__heart-shape {
-    fill: var(--color-section-sustainability, #47D08E);
-    stroke: var(--color-section-sustainability, #47D08E);
-  }
-  .comment-card-glass[data-section='sport'][data-liked='true'] .comment-card-glass__heart-shape {
-    fill: var(--color-section-sport, #89BAFF);
-    stroke: var(--color-section-sport, #89BAFF);
-  }
-  .comment-card-glass[data-section='infrastructure'][data-liked='true'] .comment-card-glass__heart-shape {
-    fill: var(--color-section-infrastructure, #FF834C);
-    stroke: var(--color-section-infrastructure, #FF834C);
+  .comment-card-glass[data-liked='true'] .comment-card-glass__heart-shape {
+    fill: #161a1f;
+    stroke: #161a1f;
   }
 </style>

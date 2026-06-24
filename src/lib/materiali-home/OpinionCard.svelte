@@ -76,12 +76,12 @@
   }
 
   .opinion-card.liked {
-    border-color: #3eaf3f;
+    border-color: #161a1f;
     background: var(--glass-bg-emphasis);
   }
 
   .opinion-card.liked .heart-btn {
-    color: #3eaf3f;
+    color: #161a1f;
   }
 
   .opinion-card.disabled {
@@ -128,13 +128,12 @@
   }
 
   .opinion-card.docked.liked {
-    border-color: #3eaf3f;
+    border-color: #161a1f;
     background: var(--glass-bg-emphasis);
   }
 
   .opinion-card.docked.liked .heart-icon {
-    filter: brightness(0) saturate(100%) invert(52%) sepia(42%) saturate(749%)
-      hue-rotate(76deg) brightness(95%) contrast(89%);
+    filter: brightness(0);
   }
 
   .heart-icon {

@@ -10,15 +10,21 @@
     rangeProgress,
     HOME_SNOW_DIVE_START,
     SNOW_ZONE_SCROLL,
+    HOME_CARDS_START,
+    HOME_CARDS_END,
     stageMoxyOpacity
   } from '../../../lib/materiali-home/scrollStages.js';
   import { homeScrollProgress } from '../../../lib/materiali-home/homeScrollProgress.js';
 
   let scrollProgress = $state(0);
+  /** @type {HTMLDivElement | undefined} */
   let container;
   let heroEntered = $state(false);
 
-  /** Fade in only — resta visibile fino alla fine dello scroll. */
+  /**
+   * Fade in only — resta visibile fino alla fine dello scroll.
+   * @param {number} progress @param {number} fadeInStart @param {number} fadeInEnd
+   */
   function stageOpacityIn(progress, fadeInStart, fadeInEnd) {
     if (progress < fadeInStart) return 0;
     if (progress < fadeInEnd) return easeOutCubic(rangeProgress(progress, fadeInStart, fadeInEnd));
@@ -64,7 +70,10 @@
   let cardsInteractive = $derived(cardsOpacity > 0.05);
 
   let snowWhiteOpacity = $derived(
-    easeOutCubic(rangeProgress(scrollProgress, HOME_SNOW_DIVE_START, SNOW_ZONE_SCROLL))
+    Math.min(
+      easeOutCubic(rangeProgress(scrollProgress, HOME_SNOW_DIVE_START, SNOW_ZONE_SCROLL)),
+      1 - easeOutCubic(rangeProgress(scrollProgress, HOME_CARDS_START, HOME_CARDS_END))
+    )
   );
 
   let heroScrollFade = $derived(Math.max(0, 1 - easeOutCubic(clamp(scrollProgress * 3.8, 0, 1))));

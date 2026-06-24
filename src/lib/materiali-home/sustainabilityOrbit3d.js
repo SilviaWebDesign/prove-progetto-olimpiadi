@@ -53,8 +53,8 @@ export function getOrbitRadiusFromTree(treeRoot, outCenter) {
 export function applyTreeMaterial(object) {
   const METALLIC_GRAY = new THREE.Color(0x8a8d94);
   object.traverse((child) => {
-    if (!child.isMesh) return;
-    const mesh = /** @type {THREE.Mesh} */ (child);
+    if (!(child instanceof THREE.Mesh)) return;
+    const mesh = child;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     const metallic = materials.map(
       () =>

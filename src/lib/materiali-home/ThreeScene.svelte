@@ -61,23 +61,28 @@
   /** @type {{ material: THREE.Material, originalColor: THREE.Color }[]} */
   let mountainMaterials = [];
 
+  /** @param {number} value @param {number} min @param {number} max */
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
 
+  /** @param {number} a @param {number} b @param {number} t */
   function lerp(a, b, t) {
     return a + (b - a) * t;
   }
 
+  /** @param {number} t */
   function easeInOutCubic(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
+  /** @param {number} edge0 @param {number} edge1 @param {number} x */
   function smoothstep(edge0, edge1, x) {
     const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
     return t * t * (3 - 2 * t);
   }
 
+  /** @param {number} t */
   function easeInOutQuint(t) {
     return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
   }
@@ -88,6 +93,7 @@
   /** Giro completo intorno alla montagna */
   const ORBIT_ARC = Math.PI * 2;
 
+  /** @param {number} scroll */
   function zoomAt(scroll) {
     const orbitU = clamp(scroll / Math.max(HOME_ORBIT_END, 0.01), 0, 1);
     const orbitZoom = easeInOutCubic(orbitU) * 0.85;
@@ -100,7 +106,7 @@
   /**
    * @param {number} angle
    * @param {number} radius
-   * @param {typeof orbitConfig} cfg
+   * @param {NonNullable<typeof orbitConfig>} cfg
    * @param {THREE.Vector3} target
    */
   function positionOnOrbit(angle, radius, cfg, target) {
@@ -242,13 +248,13 @@
   function setupMountainMaterials(object) {
     mountainMaterials = [];
     object.traverse((o) => {
-      if (!o.isMesh) return;
-      const mesh = /** @type {THREE.Mesh} */ (o);
+      if (!(o instanceof THREE.Mesh)) return;
+      const mesh = o;
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const cloned = materials.map((mat) => {
         const material = mat.clone();
         material.transparent = true;
-        material.fog = true;
+        /** @type {any} */ (material).fog = true;
         material.side = THREE.FrontSide;
         const color =
           'color' in material && material.color instanceof THREE.Color
@@ -261,7 +267,7 @@
     });
   }
 
-  /** Montagna visibile solo prima della zona neve (niente fade sul mesh). */
+  /** @param {boolean} visible */
   function setMountainVisible(visible) {
     if (!snowMountainModel) return;
     snowMountainModel.visible = visible;

@@ -278,7 +278,6 @@ export const sections = {
   }
 };
 
-/** @type {typeof sections.sustainability} */
 export const sectionList = Object.values(sections);
 
 /**
@@ -289,7 +288,7 @@ export function getSectionBySlug(slug) {
 }
 
 /**
- * @param {typeof sections.sustainability | keyof typeof sections | string} sectionOrKey
+ * @param {typeof sections[keyof typeof sections] | keyof typeof sections | string} sectionOrKey
  */
 export function getSectionHref(sectionOrKey) {
   const section =

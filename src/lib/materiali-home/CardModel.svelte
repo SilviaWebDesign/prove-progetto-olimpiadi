@@ -66,7 +66,7 @@
     for (const mat of materials) {
       if (!mat) continue;
       for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
-        const tex = /** @type {Record<string, THREE.Texture | undefined>} */ (mat)[key];
+        const tex = /** @type {Record<string, THREE.Texture | undefined>} */ (/** @type {unknown} */ (mat))[key];
         tex?.dispose?.();
       }
       mat.dispose();
@@ -123,7 +123,7 @@
     mesh.geometry.dispose();
     const mat = mesh.material;
     if (!Array.isArray(mat)) {
-      mat.map?.dispose();
+      /** @type {THREE.MeshStandardMaterial} */ (mat).map?.dispose();
       mat.dispose();
     }
   }
@@ -208,6 +208,7 @@
     return mesh;
   }
 
+  /** @type {HTMLDivElement | undefined} */
   let container;
   /** @type {THREE.WebGLRenderer | undefined} */
   let renderer;

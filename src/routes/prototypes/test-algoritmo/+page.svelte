@@ -62,7 +62,7 @@
 						{#each argomento.opinioni.filter((o) => o.tipo === 'positiva') as op (op.id)}
 							<Opinione
 								testo={op.testo}
-								tipo={op.tipo}
+								tipo={op.tipo as 'positiva' | 'negativa'}
 								likata={likedIds.has(op.id)}
 								ontoggle={() => toggleLike(op.id)}
 							/>
@@ -74,7 +74,7 @@
 						{#each argomento.opinioni.filter((o) => o.tipo === 'negativa') as op (op.id)}
 							<Opinione
 								testo={op.testo}
-								tipo={op.tipo}
+								tipo={op.tipo as 'positiva' | 'negativa'}
 								likata={likedIds.has(op.id)}
 								ontoggle={() => toggleLike(op.id)}
 							/>

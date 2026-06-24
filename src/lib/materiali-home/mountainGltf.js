@@ -68,9 +68,10 @@ export function fitMountainModel(model) {
  * Attende che il container abbia dimensioni > 0 (layout post-navigazione).
  * @param {HTMLElement | undefined} el
  * @param {number} [maxFrames=40]
+ * @returns {Promise<void>}
  */
 export function waitForContainerSize(el, maxFrames = 40) {
-  return new Promise((resolve) => {
+  return new Promise(/** @param {() => void} resolve */ (resolve) => {
     let frames = 0;
     const check = () => {
       if (el && el.clientWidth > 0 && el.clientHeight > 0) {

@@ -343,14 +343,14 @@
       const proxy = { rot: 0, scale: 1, appear: 0 };
 
       const threeTl = gsap.timeline({
-        scrollTrigger: {
+        scrollTrigger: /** @type {any} */ ({
           trigger:           sceneEl,
           start:             () => `top+=${window.innerHeight * 1.85}`,
           end:               'bottom bottom',
           scrub:             1.2,
           onUpdate:          (self: { progress: number }) => { if (self.progress >= 0.999) { scene3d?.settle(); enterTopicsMode(); } },
           onReverseComplete: () => { scene3d?.unsettle(); exitTopicsMode(); },
-        },
+        }),
       });
 
       threeTl.fromTo(proxy, { appear: 0 }, {

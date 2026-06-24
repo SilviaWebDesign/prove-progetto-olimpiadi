@@ -63,7 +63,7 @@
   let lastFrameTime = 0;
   const treeCenter = new THREE.Vector3(0, 0, 0);
 
-  let container = $state(null);
+  let container = $state(/** @type {HTMLDivElement | null} */ (null));
   /** @type {THREE.WebGLRenderer | undefined} */
   let renderer;
   /** @type {CSS3DRenderer | undefined} */
@@ -231,7 +231,7 @@
       obj.scale.setScalar(scale);
       obj.updateMatrixWorld(true);
 
-      if (activeCard && dockT > 0.2) {
+      if (activeCard && dockT > 0.2 && camera) {
         _lookTarget.copy(treeCenter).lerp(camera.position, dockT);
         orientCardTo(obj, _lookTarget);
       } else {
@@ -404,7 +404,7 @@
 
       const placeholder = new THREE.CanvasTexture(document.createElement('canvas'));
       const mesh = createCardMesh(placeholder, CARD_SCENE_SCALE, false);
-      cardMeshGroup.add(mesh);
+      cardMeshGroup?.add(mesh);
 
       cardMounts.push({
         el,
@@ -420,7 +420,7 @@
       const obj = new CSS3DObject(el);
       obj.scale.setScalar(CARD_SCENE_SCALE);
       cardObjects.push(obj);
-      scene.add(obj);
+      scene?.add(obj);
 
       setTimeout(() => {
         refreshCardMeshTexture(index);
@@ -458,7 +458,7 @@
     smoothedScrollProgress = scrollProgress;
     lastFrameTime = performance.now();
 
-    const animate = (now) => {
+    const animate = (/** @type {DOMHighResTimeStamp} */ now) => {
       animationFrameId = requestAnimationFrame(animate);
       if (!renderer || !css3dFrontRenderer || !scene || !camera) return;
 
@@ -500,8 +500,8 @@
         if (m.texture) m.texture.dispose();
         if (m.mesh) {
           m.mesh.geometry.dispose();
-          /** @type {THREE.MeshBasicMaterial} */ (m.mesh.material).map?.dispose();
-          m.mesh.material.dispose();
+          const mats = Array.isArray(m.mesh.material) ? m.mesh.material : [m.mesh.material];
+          mats.forEach((mat) => { /** @type {THREE.MeshBasicMaterial} */ (mat).map?.dispose(); mat.dispose(); });
         }
       });
       cardMounts = [];

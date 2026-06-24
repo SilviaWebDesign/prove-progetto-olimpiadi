@@ -45,13 +45,19 @@ export function remap(t, edge0, edge1) {
   return rangeProgress(t, edge0, edge1);
 }
 
-/** Easing morbido 0→1 (Hermite) */
+/**
+ * Easing morbido 0→1 (Hermite)
+ * @param {number} t
+ */
 export function smoothstep(t) {
   const x = clamp(t, 0, 1);
   return x * x * (3 - 2 * x);
 }
 
-/** Ease-out morbido (stile moxy.studio) */
+/**
+ * Ease-out morbido (stile moxy.studio)
+ * @param {number} t
+ */
 export function easeOutCubic(t) {
   const x = clamp(t, 0, 1);
   return 1 - Math.pow(1 - x, 3);
@@ -117,7 +123,10 @@ export function scrollLineReveal(progress, seg, lineIndex, lineCount) {
   return 0;
 }
 
-/** Progresso di segmento con ease-in-out */
+/**
+ * Progresso di segmento con ease-in-out
+ * @param {number} progress @param {number} start @param {number} end
+ */
 export function smoothRangeProgress(progress, start, end) {
   return smoothstep(rangeProgress(progress, start, end));
 }

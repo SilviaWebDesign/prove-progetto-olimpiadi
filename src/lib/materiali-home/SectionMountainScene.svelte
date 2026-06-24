@@ -33,14 +33,17 @@
   let snowMountainModel;
   let initGeneration = 0;
 
+  /** @param {number} value @param {number} min @param {number} max */
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
 
+  /** @param {number} a @param {number} b @param {number} t */
   function lerp(a, b, t) {
     return a + (b - a) * t;
   }
 
+  /** @param {number} t */
   function easeInOutCubic(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
@@ -80,8 +83,8 @@
     if (snowMountainModel && scene) {
       scene.remove(snowMountainModel);
       snowMountainModel.traverse((o) => {
-        if (!o.isMesh) return;
-        const mesh = /** @type {THREE.Mesh} */ (o);
+        if (!(o instanceof THREE.Mesh)) return;
+        const mesh = o;
         mesh.geometry?.dispose();
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         mats.forEach((m) => m.dispose());

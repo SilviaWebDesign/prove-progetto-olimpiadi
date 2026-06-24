@@ -56,6 +56,16 @@
     width: 354px;
     height: 380px;
     outline: none;
+    transform-origin: center center;
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @media (hover: hover) {
+    .section-card-link:hover,
+    .section-card-link:focus-within {
+      transform: scale(1.06);
+      z-index: 2;
+    }
   }
 
   .section-card-link:focus-visible .section-card {

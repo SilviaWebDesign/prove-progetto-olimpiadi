@@ -46,6 +46,10 @@
   let materials:  THREE.MeshPhysicalMaterial[] = [];
   let baseScale = 1;
 
+  const MODEL_FIT_FACTOR: Record<string, number> = {
+    '/oggetti/ice_skate.glb': 0.72,
+  };
+
   let rafId:    number | null = null;
   let spinner:  THREE.Group | null = null;
   let controls: OrbitControls | null = null;
@@ -223,7 +227,8 @@
         const dist     = camera.position.z;
         const visibleH = 2 * Math.tan(fov / 2) * dist;
         const maxDim   = Math.max(size.x, size.y, size.z);
-        baseScale      = (visibleH * 0.9) / maxDim;
+        const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
+        baseScale      = (visibleH * 0.9 * fitFactor) / maxDim;
 
         const group = new THREE.Group();
         group.add(gltf.scene);

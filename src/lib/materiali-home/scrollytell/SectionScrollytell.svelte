@@ -25,6 +25,7 @@
     pageTitle: string;
     heroTitle: string;
     heroTitleStyle?: 'svg' | 'section';
+    heroTitleLayout?: 'center' | 'spread';
     heroAriaLabel: string;
     frostSrc: string;
     bgSrc: string;
@@ -412,7 +413,7 @@
   <title>{config.pageTitle}</title>
 </svelte:head>
 
-<section class="scene" bind:this={sceneEl}>
+<section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
   <div class="scene__viewport">
 
     <!-- Layer frost -->
@@ -429,8 +430,13 @@
 
     <!-- Titolone -->
     {#if config.heroTitleStyle === 'section'}
-      <div class="hero-title hero-title--section" role="img" aria-label={config.heroAriaLabel}>
-        <SectionHeroTitle title={config.heroTitle} />
+      <div
+        class="hero-title hero-title--section"
+        class:hero-title--spread={config.heroTitleLayout === 'spread'}
+        role="img"
+        aria-label={config.heroAriaLabel}
+      >
+        <SectionHeroTitle title={config.heroTitle} layout={config.heroTitleLayout ?? 'center'} />
       </div>
     {:else}
       <svg
@@ -591,6 +597,10 @@
     pointer-events: none;
   }
 
+  .scene--sustainability .layer--bg {
+    opacity: 0.16;
+  }
+
   /* ── Titolone SVG ──────────────────────────────────────────────────────── */
   .hero-title {
     display: block;
@@ -627,6 +637,11 @@
     inset: 0;
     height: 100%;
     overflow: hidden;
+  }
+
+  .hero-title--section.hero-title--spread {
+    align-items: stretch;
+    padding: 0;
   }
 
   /* ── Frase ───────────────────────────────────────────────────────────── */

@@ -649,7 +649,7 @@
 
   .layer--bg {
     z-index: 1;
-    background-image: url('/images/sfondo-infrastrutture.jpg');
+    background-image: url('/images/frost-infrastrutture.jpg');
     background-size: cover;
     background-position: center;
     opacity: 0.28;

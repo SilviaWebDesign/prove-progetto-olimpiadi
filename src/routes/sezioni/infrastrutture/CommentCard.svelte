@@ -108,8 +108,12 @@
   }
 
   .comment-card-glass[data-liked='true']::before {
-    opacity: 0.6;
-    background-position: 50% 50%;
+    opacity: 0;
+  }
+
+  .comment-card-glass[data-liked='true']:hover::before {
+    opacity: 1;
+    animation: sweep 800ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
   }
 
   @keyframes sweep {

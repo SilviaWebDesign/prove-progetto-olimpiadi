@@ -100,7 +100,11 @@
   }
 
   .comment-card-glass[data-liked='true']::before {
-    opacity: 0.6;
+    opacity: 0;
+  }
+
+  .comment-card-glass[data-liked='true']:hover::before {
+    opacity: 1;
   }
 
   .comment-card-glass:hover {

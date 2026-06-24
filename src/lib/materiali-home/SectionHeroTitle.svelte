@@ -1,9 +1,19 @@
 <script>
-  /** @type {{ title: string, id?: string }} */
-  let { title, id = undefined } = $props();
+  /** @type {{ title: string, id?: string, layout?: 'center' | 'spread' }} */
+  let { title, id = undefined, layout = 'center' } = $props();
+
+  const letters = $derived([...title]);
 </script>
 
-<h1 {id} class="section-hero-title" style="--title-chars: {title.length}">{title}</h1>
+{#if layout === 'spread'}
+  <h1 {id} class="section-hero-title section-hero-title--spread" aria-label={title}>
+    {#each letters as letter, index (index)}
+      <span class="section-hero-title__letter" aria-hidden="true">{letter}</span>
+    {/each}
+  </h1>
+{:else}
+  <h1 {id} class="section-hero-title" style="--title-chars: {title.length}">{title}</h1>
+{/if}
 
 <style>
   /* Titolo grande sezione — come hero SectionPage / card home */
@@ -33,7 +43,7 @@
   }
 
   @media (max-width: 900px) {
-    .section-hero-title {
+    .section-hero-title:not(.section-hero-title--spread) {
       font-size: min(
         10rem,
         max(15vw, calc(100vw / (var(--title-chars, 12) * 0.5)))
@@ -43,6 +53,30 @@
       white-space: normal;
       padding: 0.1em 0.5rem 0;
       margin-bottom: -0.06em;
+    }
+  }
+
+  .section-hero-title--spread {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+    max-width: 100%;
+    padding: 0.12em 0 0;
+    letter-spacing: 0;
+    text-align: initial;
+    white-space: nowrap;
+    font-size: min(300px, 22vw);
+  }
+
+  .section-hero-title__letter {
+    flex: 0 0 auto;
+  }
+
+  @media (max-width: 900px) {
+    .section-hero-title--spread {
+      font-size: min(10rem, 18vw);
+      padding: 0.1em 0 0;
     }
   }
 </style>

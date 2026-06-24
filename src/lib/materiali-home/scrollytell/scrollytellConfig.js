@@ -172,12 +172,17 @@ export function getScrollytellConfig(key) {
       'Le Olimpiadi prendono forma attraverso cantieri, impianti e collegamenti tra territori. Queste opere possono essere lette come investimenti utili o come interventi costosi, il cui valore dipende da cosa resterà dopo l\'evento.',
   };
 
+  const heroTitleLayoutByKey = {
+    sport: 'spread',
+  };
+
   return {
     pageTitle: `${section.title} — Quante facce ha una medaglia?`,
     heroTitle: sectionHeroTitles.has(key) ? section.heroTitle : section.title,
     heroTitleStyle: /** @type {'svg' | 'section'} */ (
       sectionHeroTitles.has(key) ? 'section' : 'svg'
     ),
+    heroTitleLayout: /** @type {'center' | 'spread'} */ (heroTitleLayoutByKey[key] ?? 'center'),
     heroAriaLabel: section.title,
     frostSrc: section.hero.background,
     bgSrc: section.hero.background,

@@ -74,7 +74,7 @@
   <nav id="site-menu" class="menu-panel" aria-hidden={!menuOpen}>
     <ul class="menu-list">
       <li>
-        <a href="/prototypes/home#sezioni" class="menu-link" onclick={closeMenu}>Home</a>
+        <a href="/prototypes/home" class="menu-link" onclick={closeMenu}>Home</a>
       </li>
       {#each sectionList as section (section.id)}
         <li>
@@ -132,7 +132,7 @@
     align-items: center;
     width: 100%;
     min-height: var(--navbar-control-height);
-    padding: 16px 20px;
+    padding: 16px 6vw;
     box-sizing: border-box;
     pointer-events: auto;
     gap: 12px;
@@ -251,7 +251,7 @@
 
     .navbar-inner {
       --navbar-control-height: 20px;
-      padding: 16px 24px;
+      padding: 16px 6vw;
     }
   }
 </style>

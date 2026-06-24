@@ -138,11 +138,12 @@
     flex-shrink: 0;
     width: 36px;
     height: 36px;
+    overflow: visible;
     transition: color 200ms ease;
   }
 
   .comment-card-glass__heart-shape {
-    fill: none;
+    fill: transparent;
     transition: fill 200ms ease, stroke 200ms ease;
   }
 

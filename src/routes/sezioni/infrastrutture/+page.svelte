@@ -94,10 +94,14 @@
   const ctaLabel = $derived(
     currentTopic === 2 && anyLiked
       ? 'Scopri il tuo risultato'
-      : 'Clicca per continuare'
+      : 'Continua'
   );
 
-  function goToNextSection() {
+  async function goToNextSection() {
+    if (isTransitioning) return;
+    isTransitioning = true;
+    overlayVisible.set(true);
+    await new Promise<void>(r => setTimeout(r, 400));
     goto('/sezioni/sostenibilita');
   }
 
@@ -236,6 +240,10 @@
   // ── Topics-mode scroll interception ──────────────────────────────────────
   let topicsMode = false;
   let lenisRef: { stop: () => void; start: () => void } | null = null;
+  let feedbackScrollAccum = 0;
+  let feedbackScrollResetTimer: ReturnType<typeof setTimeout> | null = null;
+  const FEEDBACK_SCROLL_THRESHOLD = 450;
+  const FEEDBACK_SCROLL_RESET_MS  = 700;
 
   function enterTopicsMode() {
     if (topicsMode) return;
@@ -252,11 +260,28 @@
     lenisRef?.start();
   }
 
+  function clearFeedbackScroll() {
+    feedbackScrollAccum = 0;
+    if (feedbackScrollResetTimer) { clearTimeout(feedbackScrollResetTimer); feedbackScrollResetTimer = null; }
+  }
+
   function onTopicsWheel(e: WheelEvent) {
     if (phase === 'feedback') {
       e.preventDefault();
-      if (e.deltaY < 0 && !isTransitioning) exitFeedbackPhase();
-      if (e.deltaY > 0 && $allSectionsCompleted && !isTransitioning) navigateToResults();
+      if (e.deltaY < 0 && !isTransitioning) {
+        clearFeedbackScroll();
+        exitFeedbackPhase();
+      }
+      if (e.deltaY > 0 && !isTransitioning) {
+        feedbackScrollAccum += e.deltaY;
+        if (feedbackScrollResetTimer) clearTimeout(feedbackScrollResetTimer);
+        feedbackScrollResetTimer = setTimeout(() => { feedbackScrollAccum = 0; feedbackScrollResetTimer = null; }, FEEDBACK_SCROLL_RESET_MS);
+        if (feedbackScrollAccum >= FEEDBACK_SCROLL_THRESHOLD) {
+          clearFeedbackScroll();
+          if ($allSectionsCompleted) navigateToResults();
+          else goToNextSection();
+        }
+      }
       return;
     }
 
@@ -285,6 +310,8 @@
   // ── Setup ────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!browser || !sceneEl) return;
+
+    if ($overlayVisible) setTimeout(() => overlayVisible.set(false), 60);
 
     history.scrollRestoration = 'manual';
     window.scrollTo(0, 0);

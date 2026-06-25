@@ -42,13 +42,22 @@
 
   <p class="quote">
     La realtà non è mai unica e uguale per tutti.<br>
-    Lo stesso evento può generare visioni differenti<br>
-    e soggettive, in base alle opinioni di ognuno
+    Lo stesso evento può generare visioni differenti e soggettive, in base alle opinioni di ognuno
   </p>
 
-  <button class="home-cta" onclick={tornareAllaHome}>
-    Torna alla home
-  </button>
+  <div
+    class="home-cta"
+    role="button"
+    tabindex="0"
+    onclick={tornareAllaHome}
+    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tornareAllaHome(); } }}
+  >
+    <span class="cta-label">Torna alla home</span>
+    <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+      <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
 </div>
 
 <style>
@@ -116,33 +125,44 @@
     width: 100%;
     max-width: 1200px;
     flex: 1;
-    min-height: 420px;
+    min-height: 520px;
   }
 
   .model-wrap {
     flex: 1;
-    min-height: 360px;
-    max-height: 520px;
+    min-height: 460px;
+    max-height: 640px;
   }
 
   .home-cta {
     position: relative;
     z-index: 1;
-    background: none;
-    border: 1.5px solid #161A1F;
-    border-radius: 100px;
-    padding: 12px 32px;
-    font-family: 'Supreme Variable', sans-serif;
-    font-weight: 600;
-    font-size: 16px;
-    color: #161A1F;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
     cursor: pointer;
-    letter-spacing: 0.01em;
-    transition: background 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
   }
 
-  .home-cta:hover {
-    background: #161A1F;
-    color: #ffffff;
+  .cta-label {
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #161A1F;
+  }
+
+  .cta-chevron {
+    display: block;
+    width: 38px;
+    height: 19px;
+    animation: chevron-bounce 1.4s ease-in-out infinite;
+  }
+
+  @keyframes chevron-bounce {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(5px); }
   }
 </style>

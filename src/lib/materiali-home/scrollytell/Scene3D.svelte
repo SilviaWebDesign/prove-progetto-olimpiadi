@@ -281,7 +281,24 @@
       if (!posAttr) return;
 
       const g = new THREE.BufferGeometry();
-      g.setAttribute('position', posAttr.clone());
+
+      // For SkinnedMesh, bake the current bone pose so particles match the rendered deformed shape.
+      if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) {
+        const sm = mesh as THREE.SkinnedMesh;
+        const count = posAttr.count;
+        const baked = new Float32Array(count * 3);
+        const p = new THREE.Vector3();
+        for (let i = 0; i < count; i++) {
+          sm.getVertexPosition(i, p);
+          baked[i * 3]     = p.x;
+          baked[i * 3 + 1] = p.y;
+          baked[i * 3 + 2] = p.z;
+        }
+        g.setAttribute('position', new THREE.Float32BufferAttribute(baked, 3));
+      } else {
+        g.setAttribute('position', posAttr.clone());
+      }
+
       if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
 
       const deindexed = g.toNonIndexed();
@@ -407,7 +424,7 @@
     const maxDim     = Math.max(size.x, size.y, size.z);
     const resultBase = (visibleH * 0.9) / maxDim;
     const settled    = modelGroup.scale.x / baseScale;
-    resultGroup.scale.setScalar(resultBase * settled * 1.33);
+    resultGroup.scale.setScalar(resultBase * settled * 1.8);
 
     resultModelMaterials = [];
     resultGroup.traverse(node => {
@@ -434,7 +451,23 @@
       const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
       if (!posAttr) return;
       const g = new THREE.BufferGeometry();
-      g.setAttribute('position', posAttr.clone());
+
+      if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) {
+        const sm = mesh as THREE.SkinnedMesh;
+        const count = posAttr.count;
+        const baked = new Float32Array(count * 3);
+        const p = new THREE.Vector3();
+        for (let i = 0; i < count; i++) {
+          sm.getVertexPosition(i, p);
+          baked[i * 3]     = p.x;
+          baked[i * 3 + 1] = p.y;
+          baked[i * 3 + 2] = p.z;
+        }
+        g.setAttribute('position', new THREE.Float32BufferAttribute(baked, 3));
+      } else {
+        g.setAttribute('position', posAttr.clone());
+      }
+
       if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
       const deindexed = g.toNonIndexed();
       g.dispose();

@@ -162,11 +162,6 @@
       overflow: hidden;
     }
 
-    .theme-sport .card-object {
-      transform: scale(1.35);
-      transform-origin: center 55%;
-    }
-
     .card-halo {
       inset: -20px;
       border-radius: 40px;

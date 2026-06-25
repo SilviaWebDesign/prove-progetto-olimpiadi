@@ -20,24 +20,21 @@
 
   const CARD_OBJECT_SIZE = 2.4;
   const CARD_CAMERA_Z = 3.6;
+  const ICE_SKATE_OBJECT_SIZE = 1.75;
 
-  /** @type {Record<string, { desiredSize: number, cameraZ: number, offsetY?: number, rotationX?: number, rotationY?: number, rotationZ?: number }>} */
+  /** @type {Record<string, { desiredSize?: number, cameraZ?: number, offsetY?: number, rotationX?: number, rotationY?: number, rotationZ?: number }>} */
   const MODEL_CONFIG = {
-    '/oggetti/sostenibilita.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
-    '/oggetti/albero.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
-    '/oggetti/ice_skate.glb': {
-      desiredSize: 1.75,
-      cameraZ: CARD_CAMERA_Z
-    },
-    '/oggetti/excavator.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
-    '/oggetti/pattinatrice3.glb': { desiredSize: 2.65, cameraZ: 4.5 },
-    '/oggetti/torcia.glb': { desiredSize: 2.15, cameraZ: 3.5 },
-    '/oggetti/infrastrutture.glb': { desiredSize: 2.4, cameraZ: 4 }
+    '/oggetti/sport.glb': { desiredSize: ICE_SKATE_OBJECT_SIZE },
+    '/oggetti/ice_skate.glb': { desiredSize: ICE_SKATE_OBJECT_SIZE }
   };
 
   /** @param {string} path */
   function getConfig(path) {
-    return MODEL_CONFIG[path] ?? { desiredSize: 2.5, cameraZ: 3.5 };
+    return {
+      desiredSize: CARD_OBJECT_SIZE,
+      cameraZ: CARD_CAMERA_Z,
+      ...MODEL_CONFIG[path]
+    };
   }
 
   /** @param {THREE.Object3D} object @param {number} desiredSize */

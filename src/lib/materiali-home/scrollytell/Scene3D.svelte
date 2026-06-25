@@ -45,10 +45,26 @@
   let modelGroup: THREE.Group | null = null;
   let materials:  THREE.MeshPhysicalMaterial[] = [];
   let baseScale = 1;
+  const topicsPose = {
+    modelPosition: new THREE.Vector3(),
+    modelRotation: new THREE.Euler(),
+    modelScale: 1,
+    cameraPosition: new THREE.Vector3(),
+    cameraLookAt: new THREE.Vector3(),
+  };
+  let topicsPoseSaved = false;
 
   const MODEL_FIT_FACTOR: Record<string, number> = {
     '/oggetti/ice_skate.glb': 0.72,
   };
+
+  const MODEL_DISABLE_IDLE_SPIN = new Set(['/oggetti/sostenibilita.glb']);
+
+  /** Scala del modello in fase feedback (moltiplicatore su baseScale). */
+  const MODEL_RESULT_SCALE: Record<string, number> = {
+    '/oggetti/sostenibilita.glb': 0.85,
+  };
+  const DEFAULT_RESULT_SCALE = 1.33;
 
   let rafId:    number | null = null;
   let spinner:  THREE.Group | null = null;
@@ -86,14 +102,21 @@
   const MORPH_DURATION = 1.5;
   let morphDoneCallback: (() => void) | null = null;
   let resultModelMaterials: THREE.MeshPhysicalMaterial[] = [];
+  let useParticleCrossfade = false;
 
   // ── Mount ──────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!canvasEl || !wrapperEl) return;
 
     api = {
-      setRotationY: (rad) => { if (modelGroup) modelGroup.rotation.y = rad; },
-      setScale:     (f)   => { if (modelGroup) modelGroup.scale.setScalar(baseScale * f); },
+      setRotationY: (rad) => {
+        if (modelGroup && transitionState === 'none') modelGroup.rotation.y = rad;
+      },
+      setScale: (f) => {
+        if (modelGroup && transitionState === 'none') {
+          modelGroup.scale.setScalar(baseScale * f);
+        }
+      },
       setOpacity:   (val) => {
         materials.forEach((m) => {
           const needsTransparent = val < 1;
@@ -116,6 +139,8 @@
       morphToResult,
       returnToParticles: () => {
         if (controls) controls.enabled = false;
+        restoreTopicsPose();
+        materials.forEach(m => { m.opacity = 0; m.visible = false; });
         if (particleMesh) particleMesh.visible = true;
         if (particleMat) {
           particleMat.uniforms.uBaseOpacity.value = 0.85;
@@ -235,9 +260,11 @@
         group.scale.setScalar(baseScale);
 
         materials = [];
+        let hasSkinnedMesh = false;
         group.traverse((node) => {
           const mesh = node as THREE.Mesh;
           if (!mesh.isMesh) return;
+          if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true;
           mesh.geometry.computeVertexNormals();
           const chrome = new THREE.MeshPhysicalMaterial({
             color:              0x181818,
@@ -254,6 +281,7 @@
         });
 
         modelGroup = group;
+        useParticleCrossfade = hasSkinnedMesh;
         spinner = new THREE.Group();
         spinner.add(group);
         scene.add(spinner);
@@ -267,29 +295,50 @@
     );
   }
 
-  function buildParticles(root: THREE.Group) {
-    if (!scene || !spinner) return;
+  function meshToRootGeometry(mesh: THREE.Mesh, rootWorldInv: THREE.Matrix4): THREE.BufferGeometry | null {
+    const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!posAttr) return null;
 
-    scene.updateMatrixWorld();
+    const g = new THREE.BufferGeometry();
+    const skinned = mesh as THREE.SkinnedMesh;
+
+    if (skinned.isSkinnedMesh && skinned.skeleton) {
+      mesh.updateWorldMatrix(true, false);
+      skinned.skeleton.update();
+
+      const baked = new Float32Array(posAttr.count * 3);
+      const p = new THREE.Vector3();
+      for (let i = 0; i < posAttr.count; i++) {
+        skinned.getVertexPosition(i, p);
+        baked[i * 3]     = p.x;
+        baked[i * 3 + 1] = p.y;
+        baked[i * 3 + 2] = p.z;
+      }
+      g.setAttribute('position', new THREE.BufferAttribute(baked, 3));
+    } else {
+      g.setAttribute('position', posAttr.clone());
+    }
+
+    if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
+    const deindexed = g.toNonIndexed();
+    g.dispose();
+
+    const relMatrix = new THREE.Matrix4().multiplyMatrices(rootWorldInv, mesh.matrixWorld);
+    deindexed.applyMatrix4(relMatrix);
+    return deindexed;
+  }
+
+  function sampleParticleTargets(root: THREE.Group) {
+    scene?.updateMatrixWorld(true);
+    root.updateMatrixWorld(true);
     const rootWorldInv = new THREE.Matrix4().copy(root.matrixWorld).invert();
 
     const geos: THREE.BufferGeometry[] = [];
     root.traverse((node) => {
       const mesh = node as THREE.Mesh;
-      if (!mesh.isMesh || !mesh.geometry) return;
-      const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
-      if (!posAttr) return;
-
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', posAttr.clone());
-      if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
-
-      const deindexed = g.toNonIndexed();
-      g.dispose();
-
-      const relMatrix = new THREE.Matrix4().multiplyMatrices(rootWorldInv, mesh.matrixWorld);
-      deindexed.applyMatrix4(relMatrix);
-      geos.push(deindexed);
+      if (!mesh.isMesh || !mesh.geometry || mesh === particleMesh) return;
+      const geo = meshToRootGeometry(mesh, rootWorldInv);
+      if (geo) geos.push(geo);
     });
 
     if (geos.length === 0) return;
@@ -309,15 +358,27 @@
       particleTargets[i * 3 + 2] = p.z;
     }
     merged.dispose();
+  }
 
-    // Match infrastrutture's world-space visual exactly.
-    // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.012, dirRange=8
-    //   → world sphere radius = 0.012 × 0.6405 = 0.007686
-    //   → world dir half-amp  = 4    × 0.6405 = 2.562 per component
-    // Dividing by current baseScale keeps both world values constant across models.
+  function writeParticlePositions(positions: Float32Array) {
+    if (!particleMesh || !iMatBuf) return;
+    for (let i = 0; i < COUNT; i++) {
+      const b = i * 16 + 12;
+      iMatBuf[b]     = positions[i * 3];
+      iMatBuf[b + 1] = positions[i * 3 + 1];
+      iMatBuf[b + 2] = positions[i * 3 + 2];
+    }
+    particleMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  function buildParticles(root: THREE.Group) {
+    if (!scene || !spinner) return;
+
+    sampleParticleTargets(root);
+
     const INFRA_BS       = 0.6405;
-    const particleRadius = 0.012 * INFRA_BS / baseScale;  // world radius = 0.007686
-    const dirScale       = 8    * INFRA_BS / baseScale;   // world amp    = 2.562 per component
+    const particleRadius = 0.012 * INFRA_BS / baseScale;
+    const dirScale       = 8    * INFRA_BS / baseScale;
     const directions = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
       directions[i * 3]     = (Math.random() - 0.5) * dirScale;
@@ -391,15 +452,39 @@
     });
   }
 
+  function showEnlargedSourceModel(scaleMul: number, onDone: () => void) {
+    if (!modelGroup || !particleMesh) return;
+
+    morphState = 'none';
+    particleMesh.visible = false;
+    if (particleMat) {
+      particleMat.uniforms.uPulse.value = 0;
+      particleMat.uniforms.uBaseOpacity.value = 0;
+    }
+
+    modelGroup.scale.setScalar(baseScale * scaleMul);
+    materials.forEach((m) => {
+      m.opacity = 1;
+      m.transparent = false;
+      m.visible = true;
+      m.needsUpdate = true;
+    });
+
+    onDone();
+  }
+
   function doMorph(source: THREE.Group, onDone: () => void) {
     if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) return;
 
     const resultGroup = source.clone();
 
-    resultGroup.updateMatrixWorld(true);
-    const box    = new THREE.Box3().setFromObject(resultGroup);
-    const center = box.getCenter(new THREE.Vector3());
-    const size   = box.getSize(new THREE.Vector3());
+    const meshBox = new THREE.Box3();
+    resultGroup.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (mesh.isMesh && mesh.geometry) meshBox.expandByObject(mesh);
+    });
+    const center = meshBox.getCenter(new THREE.Vector3());
+    const size   = meshBox.getSize(new THREE.Vector3());
     resultGroup.position.sub(center);
 
     const fov        = camera.fov * (Math.PI / 180);
@@ -407,7 +492,13 @@
     const maxDim     = Math.max(size.x, size.y, size.z);
     const resultBase = (visibleH * 0.9) / maxDim;
     const settled    = modelGroup.scale.x / baseScale;
-    resultGroup.scale.setScalar(resultBase * settled * 1.33);
+    const resultMul  = MODEL_RESULT_SCALE[modelSrc] ?? DEFAULT_RESULT_SCALE;
+
+    if (modelSrc in MODEL_RESULT_SCALE) {
+      resultGroup.scale.setScalar(baseScale * resultMul);
+    } else {
+      resultGroup.scale.setScalar(resultBase * settled * resultMul);
+    }
 
     resultModelMaterials = [];
     resultGroup.traverse(node => {
@@ -468,6 +559,12 @@
   }
 
   function morphToResult(path: string, onDone: () => void) {
+    const feedbackScale = MODEL_RESULT_SCALE[modelSrc];
+    if (feedbackScale !== undefined && path === modelSrc) {
+      showEnlargedSourceModel(feedbackScale, onDone);
+      return;
+    }
+
     const cached = resultModels.get(path);
     if (cached) { doMorph(cached, onDone); return; }
 
@@ -485,12 +582,61 @@
     });
   }
 
+  function freezeSpinnerRotation() {
+    if (!spinner || !modelGroup || spinner.rotation.y === 0) return;
+    modelGroup.rotation.y += spinner.rotation.y;
+    spinner.rotation.y = 0;
+  }
+
+  function captureTopicsPose() {
+    if (modelGroup) {
+      topicsPose.modelPosition.copy(modelGroup.position);
+      topicsPose.modelRotation.copy(modelGroup.rotation);
+      topicsPose.modelScale = modelGroup.scale.x;
+    }
+    if (camera) topicsPose.cameraPosition.copy(camera.position);
+    if (controls) {
+      topicsPose.cameraLookAt.copy(controls.target);
+    } else if (camera) {
+      topicsPose.cameraLookAt.set(0, 0.3, 0);
+    }
+    topicsPoseSaved = true;
+  }
+
+  function restoreTopicsPose() {
+    if (!topicsPoseSaved || !modelGroup) return;
+    if (spinner) spinner.rotation.set(0, 0, 0);
+    modelGroup.position.copy(topicsPose.modelPosition);
+    modelGroup.rotation.copy(topicsPose.modelRotation);
+    modelGroup.scale.setScalar(topicsPose.modelScale);
+    if (camera) {
+      camera.position.copy(topicsPose.cameraPosition);
+      camera.lookAt(topicsPose.cameraLookAt);
+    }
+    if (controls) {
+      controls.target.copy(topicsPose.cameraLookAt);
+      controls.update();
+    }
+  }
+
   function startTransition() {
-    if (transitionState !== 'none' || !particleMesh) return;
+    if (transitionState !== 'none' || !particleMesh || !modelGroup) return;
+    freezeSpinnerRotation();
+    scene?.updateMatrixWorld(true);
+    spinner?.updateMatrixWorld(true);
+    modelGroup.updateMatrixWorld(true);
+    sampleParticleTargets(modelGroup);
+    captureTopicsPose();
     materials.forEach(m => { if (!m.transparent) { m.transparent = true; m.needsUpdate = true; } });
     transitionState    = 'in';
     transitionProgress = 0;
-    particleCurrent.fill(0);
+    if (useParticleCrossfade) {
+      particleCurrent.set(particleTargets);
+      writeParticlePositions(particleCurrent);
+      if (particleMat) particleMat.uniforms.uPulse.value = 0;
+    } else {
+      particleCurrent.fill(0);
+    }
     particleMesh.visible = true;
   }
 
@@ -516,36 +662,38 @@
     const dt      = clock.getDelta();
     const elapsed = clock.elapsedTime;
 
-    if (spinner && !orbitEnabled && transitionState !== 'done') spinner.rotation.y += IDLE_RAD_S * dt;
+    if (spinner && !orbitEnabled && transitionState === 'none' && !MODEL_DISABLE_IDLE_SPIN.has(modelSrc)) {
+      spinner.rotation.y += IDLE_RAD_S * dt;
+    }
     if (controls?.enabled) controls.update(dt);
 
     if (transitionState === 'in' && particleMesh && particleMat && iMatBuf) {
       transitionProgress = Math.min(1, transitionProgress + dt / TRANSITION_DURATION);
 
-      for (let i = 0; i < COUNT; i++) {
-        particleCurrent[i * 3]     += (particleTargets[i * 3]     - particleCurrent[i * 3])     * 0.04;
-        particleCurrent[i * 3 + 1] += (particleTargets[i * 3 + 1] - particleCurrent[i * 3 + 1]) * 0.04;
-        particleCurrent[i * 3 + 2] += (particleTargets[i * 3 + 2] - particleCurrent[i * 3 + 2]) * 0.04;
-        const b = i * 16 + 12;
-        iMatBuf[b]     = particleCurrent[i * 3];
-        iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
-        iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
-      }
-      particleMesh.instanceMatrix.needsUpdate = true;
+      if (useParticleCrossfade) {
+        particleMat.uniforms.uPulse.value = 0;
+        particleMat.uniforms.uBaseOpacity.value = Math.min(0.85, transitionProgress * 0.85);
+        materials.forEach(m => { m.opacity = Math.max(0, 1 - transitionProgress); });
+      } else {
+        for (let i = 0; i < COUNT; i++) {
+          particleCurrent[i * 3]     += (particleTargets[i * 3]     - particleCurrent[i * 3])     * 0.04;
+          particleCurrent[i * 3 + 1] += (particleTargets[i * 3 + 1] - particleCurrent[i * 3 + 1]) * 0.04;
+          particleCurrent[i * 3 + 2] += (particleTargets[i * 3 + 2] - particleCurrent[i * 3 + 2]) * 0.04;
+          const b = i * 16 + 12;
+          iMatBuf[b]     = particleCurrent[i * 3];
+          iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
+          iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
+        }
+        particleMesh.instanceMatrix.needsUpdate = true;
 
-      particleMat.uniforms.uPulse.value       = Math.sin(transitionProgress * Math.PI) * 3.0;
-      particleMat.uniforms.uBaseOpacity.value  = Math.min(0.85, transitionProgress * 1.7 * 0.85);
-      materials.forEach(m => { m.opacity = Math.max(0, 1 - transitionProgress); });
+        particleMat.uniforms.uPulse.value       = Math.sin(transitionProgress * Math.PI) * 3.0;
+        particleMat.uniforms.uBaseOpacity.value  = Math.min(0.85, transitionProgress * 1.7 * 0.85);
+        materials.forEach(m => { m.opacity = Math.max(0, 1 - transitionProgress); });
+      }
 
       if (transitionProgress >= 1) {
         transitionState = 'done';
-        for (let i = 0; i < COUNT; i++) {
-          const b = i * 16 + 12;
-          iMatBuf[b]     = particleTargets[i * 3];
-          iMatBuf[b + 1] = particleTargets[i * 3 + 1];
-          iMatBuf[b + 2] = particleTargets[i * 3 + 2];
-        }
-        particleMesh.instanceMatrix.needsUpdate = true;
+        writeParticlePositions(particleTargets);
         particleMat.uniforms.uBaseOpacity.value = 0.85;
         materials.forEach(m => { m.opacity = 0; m.visible = false; });
       }

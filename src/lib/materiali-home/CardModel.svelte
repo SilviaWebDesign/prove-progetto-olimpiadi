@@ -23,7 +23,7 @@
 
   /** @type {Record<string, { desiredSize: number, cameraZ: number, offsetY?: number, rotationX?: number, rotationY?: number, rotationZ?: number }>} */
   const MODEL_CONFIG = {
-    '/oggetti/albero-copia.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
+    '/oggetti/sostenibilita.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
     '/oggetti/albero.glb': { desiredSize: CARD_OBJECT_SIZE, cameraZ: CARD_CAMERA_Z },
     '/oggetti/ice_skate.glb': {
       desiredSize: 1.75,

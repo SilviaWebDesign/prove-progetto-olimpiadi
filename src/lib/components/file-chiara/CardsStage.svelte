@@ -9,7 +9,7 @@
   <SectionCard
     title="SOSTENIBILITÀ"
     theme="sustainability"
-    modelSrc="/oggetti/albero-copia.glb"
+    modelSrc="/oggetti/sostenibilita.glb"
     href="/sostenibilita"
     {active}
   />

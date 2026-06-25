@@ -74,8 +74,13 @@
       const fov      = camera.fov * (Math.PI / 180);
       const dist     = camera.position.z;
       const visibleH = 2 * Math.tan(fov / 2) * dist;
-      const maxDim   = Math.max(size.x, size.y, size.z);
-      const scale    = (visibleH * 0.72) / maxDim;
+      const visibleW = visibleH * (w / h);
+      // During Y-axis auto-rotation the worst-case horizontal extent is the XZ diagonal
+      const maxHoriz = Math.hypot(size.x, size.z);
+      const maxVert  = Math.max(size.y, Math.max(size.x, size.z));
+      const scaleByH = (visibleH * 0.72) / maxVert;
+      const scaleByW = (visibleW * 0.72) / maxHoriz;
+      const scale    = Math.min(scaleByH, scaleByW);
 
       const group = new THREE.Group();
       group.add(gltf.scene);

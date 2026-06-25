@@ -21,22 +21,23 @@
 <div class="risultati">
   <div class="bg" aria-hidden="true"></div>
 
-  <p class="quote">
-    Gli eroi e i cattivi sono creati dalla percezione soggettiva
-    di ognuno, non esiste una sola realtà per tutti.
-  </p>
-
   <div class="models-row">
-    <div class="model-wrap">
-      <ModelViewer src={$visitedSections.infrastructure.resultModelPath} />
-    </div>
     <div class="model-wrap">
       <ModelViewer src={$visitedSections.sustainability.resultModelPath} />
     </div>
     <div class="model-wrap">
       <ModelViewer src={$visitedSections.sport.resultModelPath} />
     </div>
+    <div class="model-wrap">
+      <ModelViewer src={$visitedSections.infrastructure.resultModelPath} />
+    </div>
   </div>
+
+  <p class="quote">
+    La realtà non è mai unica e uguale per tutti.<br>
+    Lo stesso evento può generare visioni differenti<br>
+    e soggettive, in base alle opinioni di ognuno
+  </p>
 </div>
 
 <style>
@@ -86,9 +87,9 @@
     position: relative;
     z-index: 1;
     font-family: 'Supreme Variable', sans-serif;
-    font-weight: 700;
+    font-weight: 500;
     font-size: 30px;
-    line-height: 1.2;
+    line-height: 1.35;
     text-align: center;
     color: #161A1F;
     max-width: 860px;

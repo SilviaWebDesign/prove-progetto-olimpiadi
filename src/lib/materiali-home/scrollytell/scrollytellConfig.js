@@ -143,6 +143,14 @@ const INFRASTRUCTURE_RESULT_PATHS = [
   '/oggetti/infrastrutture-neutro.glb',
 ];
 
+const SPORT_RESULT_PATHS = [
+  '/oggetti/sport-positivo.glb',
+  '/oggetti/sport-negativo.glb',
+  '/oggetti/sport-piu-positivo.glb',
+  '/oggetti/sport-piu-negativo.glb',
+  '/oggetti/sport-neutro.glb',
+];
+
 const NEUTRAL_RESULT_PATHS = Array(5).fill('/oggetti/neutro.glb');
 
 /**
@@ -159,7 +167,7 @@ export function getScrollytellConfig(key) {
 
   const resultPathsByKey = {
     infrastructure: INFRASTRUCTURE_RESULT_PATHS,
-    sport: NEUTRAL_RESULT_PATHS,
+    sport: SPORT_RESULT_PATHS,
     sustainability: NEUTRAL_RESULT_PATHS,
   };
 

@@ -234,7 +234,7 @@ export const sections = {
     menuLabel: 'Sport',
     theme: 'sport',
     accent: '#422ccb',
-    modelSrc: '/oggetti/ice_skate.glb',
+    modelSrc: '/oggetti/sport.glb',
     hero: {
       background: '/images/alysasfondo.png'
     },

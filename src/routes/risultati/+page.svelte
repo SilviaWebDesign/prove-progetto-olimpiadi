@@ -1,15 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import Navbar from '$lib/materiali-home/Navbar.svelte';
   import ModelViewer from '$lib/components/ModelViewer.svelte';
   import { visitedSections } from '$lib/stores/visitedSections';
   import { overlayVisible } from '$lib/stores/pageTransition';
 
   onMount(() => {
-    // Small delay so the page content is painted before fading out the overlay
     const t = setTimeout(() => overlayVisible.set(false), 60);
     return () => clearTimeout(t);
   });
+
+  async function tornareAllaHome() {
+    overlayVisible.set(true);
+    await new Promise(r => setTimeout(r, 400));
+    visitedSections.reset();
+    goto('/');
+  }
 </script>
 
 <svelte:head>
@@ -38,6 +45,10 @@
     Lo stesso evento può generare visioni differenti<br>
     e soggettive, in base alle opinioni di ognuno
   </p>
+
+  <button class="home-cta" onclick={tornareAllaHome}>
+    Torna alla home
+  </button>
 </div>
 
 <style>
@@ -66,8 +77,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 96px 6vw 48px;
-    gap: 48px;
+    padding: 96px 6vw 40px;
+    gap: 32px;
     background: #ffffff;
   }
 
@@ -112,5 +123,26 @@
     flex: 1;
     min-height: 360px;
     max-height: 520px;
+  }
+
+  .home-cta {
+    position: relative;
+    z-index: 1;
+    background: none;
+    border: 1.5px solid #161A1F;
+    border-radius: 100px;
+    padding: 12px 32px;
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: #161A1F;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  .home-cta:hover {
+    background: #161A1F;
+    color: #ffffff;
   }
 </style>

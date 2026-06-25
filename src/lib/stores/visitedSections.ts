@@ -26,7 +26,7 @@ function loadFromSession(): VisitedState {
 }
 
 function createStore() {
-  const { subscribe, update } = writable<VisitedState>(loadFromSession());
+  const { subscribe, update, set } = writable<VisitedState>(loadFromSession());
   return {
     subscribe,
     markCompleted(sectionId: SectionId, resultModelPath: string) {
@@ -37,6 +37,12 @@ function createStore() {
         }
         return next;
       });
+    },
+    reset() {
+      if (browser) {
+        try { sessionStorage.removeItem('visitedSections'); } catch {}
+      }
+      set({ ...INITIAL });
     },
   };
 }

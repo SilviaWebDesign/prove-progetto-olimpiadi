@@ -151,7 +151,7 @@ const SPORT_RESULT_PATHS = [
   '/oggetti/sport-neutro.glb',
 ];
 
-const NEUTRAL_RESULT_PATHS = Array(5).fill('/oggetti/neutro.glb');
+const SUSTAINABILITY_RESULT_PATHS = Array(5).fill('/oggetti/sostenibilita.glb');
 
 /**
  * @param {'sustainability' | 'sport' | 'infrastructure'} key
@@ -168,7 +168,7 @@ export function getScrollytellConfig(key) {
   const resultPathsByKey = {
     infrastructure: INFRASTRUCTURE_RESULT_PATHS,
     sport: SPORT_RESULT_PATHS,
-    sustainability: NEUTRAL_RESULT_PATHS,
+    sustainability: SUSTAINABILITY_RESULT_PATHS,
   };
 
   const sectionHeroTitles = new Set(['sustainability', 'sport']);
@@ -196,7 +196,7 @@ export function getScrollytellConfig(key) {
     bgSrc: section.hero.background,
     phrase: phraseByKey[key] ?? section.intro,
     modelSrc: key === 'infrastructure' ? '/oggetti/infrastrutture.glb' : section.modelSrc,
-    resultPaths: resultPathsByKey[key] ?? NEUTRAL_RESULT_PATHS,
+    resultPaths: resultPathsByKey[key] ?? [],
     sectionId: /** @type {'infrastructure' | 'sport' | 'sustainability'} */ (section.id),
     topics: topicsByKey[key] ?? SPORT_TOPICS,
   };

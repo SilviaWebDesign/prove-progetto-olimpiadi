@@ -516,7 +516,7 @@
     const dt      = clock.getDelta();
     const elapsed = clock.elapsedTime;
 
-    if (spinner && !orbitEnabled) spinner.rotation.y += IDLE_RAD_S * dt;
+    if (spinner && !orbitEnabled && transitionState !== 'done') spinner.rotation.y += IDLE_RAD_S * dt;
     if (controls?.enabled) controls.update(dt);
 
     if (transitionState === 'in' && particleMesh && particleMat && iMatBuf) {

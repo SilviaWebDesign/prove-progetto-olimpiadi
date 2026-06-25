@@ -376,9 +376,14 @@
 
     sampleParticleTargets(root);
 
+    // Match infrastrutture's world-space visual exactly.
+    // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.012, dirRange=8
+    //   → world sphere radius = 0.012 × 0.6405 = 0.007686
+    //   → world dir half-amp  = 4    × 0.6405 = 2.562 per component
+    // Dividing by current baseScale keeps both world values constant across models.
     const INFRA_BS       = 0.6405;
-    const particleRadius = 0.012 * INFRA_BS / baseScale;
-    const dirScale       = 8    * INFRA_BS / baseScale;
+    const particleRadius = 0.012 * INFRA_BS / baseScale;  // world radius = 0.007686
+    const dirScale       = 8    * INFRA_BS / baseScale;   // world amp    = 2.562 per component
     const directions = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
       directions[i * 3]     = (Math.random() - 0.5) * dirScale;
@@ -478,13 +483,10 @@
 
     const resultGroup = source.clone();
 
-    const meshBox = new THREE.Box3();
-    resultGroup.traverse((node) => {
-      const mesh = node as THREE.Mesh;
-      if (mesh.isMesh && mesh.geometry) meshBox.expandByObject(mesh);
-    });
-    const center = meshBox.getCenter(new THREE.Vector3());
-    const size   = meshBox.getSize(new THREE.Vector3());
+    resultGroup.updateMatrixWorld(true);
+    const box    = new THREE.Box3().setFromObject(resultGroup);
+    const center = box.getCenter(new THREE.Vector3());
+    const size   = box.getSize(new THREE.Vector3());
     resultGroup.position.sub(center);
 
     const fov        = camera.fov * (Math.PI / 180);
@@ -525,7 +527,23 @@
       const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
       if (!posAttr) return;
       const g = new THREE.BufferGeometry();
-      g.setAttribute('position', posAttr.clone());
+
+      if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) {
+        const sm = mesh as THREE.SkinnedMesh;
+        const count = posAttr.count;
+        const baked = new Float32Array(count * 3);
+        const p = new THREE.Vector3();
+        for (let i = 0; i < count; i++) {
+          sm.getVertexPosition(i, p);
+          baked[i * 3]     = p.x;
+          baked[i * 3 + 1] = p.y;
+          baked[i * 3 + 2] = p.z;
+        }
+        g.setAttribute('position', new THREE.Float32BufferAttribute(baked, 3));
+      } else {
+        g.setAttribute('position', posAttr.clone());
+      }
+
       if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
       const deindexed = g.toNonIndexed();
       g.dispose();

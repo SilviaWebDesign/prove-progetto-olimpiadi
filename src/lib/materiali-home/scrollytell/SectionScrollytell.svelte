@@ -48,6 +48,7 @@
 
   type PagePhase = 'intro' | 'topics' | 'feedback';
   let phase = $state<PagePhase>('intro');
+  let currentResultPath = $state<string>('');
 
   const cards: CardData[] = $derived(
     topics[currentTopic].comments.map((body, i) => ({
@@ -109,12 +110,21 @@
     return neutro;
   }
 
+  function getResultLabel(path: string): string {
+    if (path.includes('piu-positivo')) return 'Placeholder testo per il modello maggiormente positivo. La tua visione è prevalentemente ottimista con qualche riserva.';
+    if (path.includes('piu-negativo')) return 'Placeholder testo per il modello maggiormente negativo. La tua visione è prevalentemente critica con qualche apertura.';
+    if (path.includes('positivo'))    return 'Placeholder testo per il modello positivo. Il tuo punto di vista guarda alle opportunità di questo grande evento.';
+    if (path.includes('negativo'))    return 'Placeholder testo per il modello negativo. Il tuo punto di vista si concentra sulle criticità di questo grande evento.';
+    return 'Placeholder testo per il modello neutro. La tua visione è equilibrata tra aspetti positivi e negativi.';
+  }
+
   async function exitFeedbackPhase() {
     if (phase !== 'feedback' || isTransitioning) return;
     isTransitioning = true;
 
     const OUT = 0.35;
-    gsap.to('.feedback-text',       { opacity: 0, duration: OUT });
+    gsap.to('.feedback-top',        { opacity: 0, duration: OUT });
+    gsap.to('.feedback-subtitle',   { opacity: 0, duration: OUT });
     gsap.to('.feedback-bottom-cta', { opacity: 0, duration: OUT });
     await new Promise<void>(r => setTimeout(r, OUT * 1000));
 
@@ -143,6 +153,7 @@
     outTl.kill();
 
     const resultModelPath = computeResult();
+    currentResultPath = resultModelPath;
     visitedSections.markCompleted(config.sectionId, resultModelPath);
     gsap.to('.layer--bg', { filter: 'blur(12px)', duration: 0.8, ease: 'power2.inOut' });
 
@@ -150,8 +161,9 @@
       phase = 'feedback';
       isTransitioning = false;
       tick().then(() => {
-        gsap.fromTo('.feedback-text',       { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
-        gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
+        gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+        gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
+        gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.25 });
       });
     });
   }
@@ -542,8 +554,11 @@
 
     <!-- Overlay fase feedback -->
     {#if phase === 'feedback'}
-      <p class="feedback-text" style="opacity: 0">
-        Questa è la realtà,<br>plasmata dalla tua opinione
+      <div class="feedback-top" style="opacity: 0">
+        <p class="feedback-title">Fatti unici, molteplici sguardi.<br>Questa è la realtà, plasmata dalla tua opinione.</p>
+      </div>
+      <p class="feedback-subtitle" style="opacity: 0">
+        {getResultLabel(currentResultPath)}
       </p>
       <div
         class="feedback-bottom-cta"
@@ -794,7 +809,28 @@
   }
 
   /* ── Overlay feedback ────────────────────────────────────────────────── */
-  .feedback-text {
+  .feedback-top {
+    position: absolute;
+    top: 8vh;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .feedback-title {
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1.25;
+    color: #16181D;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .feedback-subtitle {
     position: absolute;
     bottom: 110px;
     left: 0;
@@ -803,9 +839,12 @@
     text-align: center;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 400;
-    font-size: 28px;
+    font-size: 24px;
+    line-height: 1.5;
     color: #16181D;
     pointer-events: none;
+    max-width: 780px;
+    margin: 0 auto;
     padding: 0 clamp(16px, 4vw, 48px);
   }
 

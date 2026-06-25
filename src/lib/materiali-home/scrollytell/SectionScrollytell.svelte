@@ -11,6 +11,7 @@
   import SectionHeroTitle from '$lib/materiali-home/SectionHeroTitle.svelte';
   import TextBlock from './TextBlock.svelte';
   import CardStack from './CardStack.svelte';
+  import type { CardStackApi } from './CardStack.svelte';
   import Scene3D from './Scene3D.svelte';
   import type { Scene3DApi } from './Scene3D.svelte';
 
@@ -134,7 +135,9 @@
     await tick();
 
     gsap.fromTo('.stage__text',  { opacity: 0, y:  8 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.inOut' });
-    gsap.fromTo('.stage__right', { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.5, ease: 'power3.inOut', delay: 0.04 });
+    gsap.fromTo('.stage__right-heading', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power3.inOut', delay: 0.04 });
+    await tick();
+    await cardStack?.animateIn();
     gsap.to('.stage__cta', { opacity: 1, duration: 0.3, delay: 0.1 });
     isTransitioning = false;
   }
@@ -146,10 +149,11 @@
     const OUT = 0.50;
     const outTl = gsap.timeline();
     outTl.to('.stage__text',  { opacity: 0, y: -8, duration: OUT, ease: 'power3.inOut' }, 0);
-    outTl.to('.stage__right', { opacity: 0, x:  8, duration: OUT, ease: 'power3.inOut' }, 0);
+    outTl.to('.stage__right-heading', { opacity: 0, duration: OUT * 0.6, ease: 'power3.inOut' }, 0);
     outTl.to('.stage__cta',   { opacity: 0, duration: OUT * 0.6, ease: 'power2.inOut' }, 0);
+    await cardStack?.animateOut();
 
-    await new Promise<void>(r => setTimeout(r, OUT * 1000));
+    await new Promise<void>(r => setTimeout(r, OUT * 200));
     outTl.kill();
 
     const resultModelPath = computeResult();
@@ -174,25 +178,19 @@
 
     scene3d?.resetPulse();
     isTransitioning = true;
-    const OUT  = 0.50;
-    const CROSS = OUT * 0.88;
+    const OUT = 0.50;
 
-    const outTl = gsap.timeline();
-    outTl.to('.stage__text',  { opacity: 0, y: -8, duration: OUT, ease: 'power3.inOut' }, 0);
-    outTl.to('.stage__right', { opacity: 0, x:  8, duration: OUT, ease: 'power3.inOut' }, 0);
-
-    await new Promise<void>(r => setTimeout(r, CROSS * 1000));
-    outTl.kill();
+    gsap.to('.stage__text', { opacity: 0, y: -8, duration: OUT, ease: 'power3.inOut' });
+    await cardStack?.animateOut();
 
     currentTopic++;
     await tick();
 
-    gsap.set('.stage__text',  { y:  8, opacity: 0 });
-    gsap.set('.stage__right', { x: -8, opacity: 0 });
+    gsap.set('.stage__text', { y: 8, opacity: 0 });
+    await cardStack?.animateIn();
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
-      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0)
-      .to('.stage__right', { opacity: 1, x: 0, duration: 0.60, ease: 'power3.inOut' }, 0.04);
+      .to('.stage__text', { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0);
   }
 
   async function goPrev() {
@@ -200,30 +198,36 @@
 
     scene3d?.resetPulse();
     isTransitioning = true;
-    const OUT  = 0.50;
-    const CROSS = OUT * 0.88;
+    const OUT = 0.50;
 
-    const outTl = gsap.timeline();
-    outTl.to('.stage__text',  { opacity: 0, y:  8, duration: OUT, ease: 'power3.inOut' }, 0);
-    outTl.to('.stage__right', { opacity: 0, x: -8, duration: OUT, ease: 'power3.inOut' }, 0);
-
-    await new Promise<void>(r => setTimeout(r, CROSS * 1000));
-    outTl.kill();
+    gsap.to('.stage__text', { opacity: 0, y: 8, duration: OUT, ease: 'power3.inOut' });
+    await cardStack?.animateOut();
 
     currentTopic--;
     await tick();
 
-    gsap.set('.stage__text',  { y: -8, opacity: 0 });
-    gsap.set('.stage__right', { x:  8, opacity: 0 });
+    gsap.set('.stage__text', { y: -8, opacity: 0 });
+    await cardStack?.animateIn();
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
-      .to('.stage__text',  { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0)
-      .to('.stage__right', { opacity: 1, x: 0, duration: 0.60, ease: 'power3.inOut' }, 0.04);
+      .to('.stage__text', { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0);
   }
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
   let sceneEl = $state<HTMLElement | null>(null);
   let scene3d = $state<Scene3DApi | undefined>(undefined);
+  let cardStack = $state<CardStackApi | undefined>(undefined);
+  let cardsIntroduced = false;
+  let cardsScrollAnimating = false;
+
+  /** Progresso scroll (0–1) in cui l'oggetto diventa particelle gradualmente. */
+  const PARTICLE_SCROLL_START = 0.58;
+  const PARTICLE_SCROLL_END   = 0.98;
+
+  function particleProgressFromScroll(scrollProgress: number): number {
+    if (scrollProgress <= PARTICLE_SCROLL_START) return 0;
+    return Math.min(1, (scrollProgress - PARTICLE_SCROLL_START) / (PARTICLE_SCROLL_END - PARTICLE_SCROLL_START));
+  }
 
   // ── Model loaded signal ───────────────────────────────────────────────────
   let resolveModelLoaded: () => void = () => {};
@@ -243,6 +247,29 @@
     phase = 'topics';
     lenisRef?.stop();
     window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
+  }
+
+  function maybeIntroduceCards() {
+    if (cardsIntroduced || cardsScrollAnimating) return;
+    cardsScrollAnimating = true;
+    cardsIntroduced = true;
+    gsap.set('.stage__right', { opacity: 1 });
+    void tick().then(async () => {
+      await cardStack?.animateIn();
+      cardsScrollAnimating = false;
+    });
+  }
+
+  function maybeResetCards() {
+    if (!cardsIntroduced || cardsScrollAnimating) return;
+    cardsScrollAnimating = true;
+    void cardStack?.animateOut().then(() => {
+      cardsIntroduced = false;
+      gsap.set('.stage__right', { opacity: 0 });
+      gsap.set('.stage__right-heading', { opacity: 0 });
+      cardStack?.resetHidden();
+      cardsScrollAnimating = false;
+    });
   }
 
   function exitTopicsMode() {
@@ -323,7 +350,8 @@
     gsap.set(titleEl,         { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
     gsap.set('.phrase',       { y: 30, autoAlpha: 0 });
     gsap.set('.stage__text',  { x: -30 });
-    gsap.set('.stage__right', { x:  30 });
+    gsap.set('.stage__right', { opacity: 0 });
+    gsap.set('.stage__right-heading', { opacity: 0 });
 
     const ctx = gsap.context(() => {
 
@@ -362,8 +390,26 @@
           start:             () => `top+=${window.innerHeight * 1.85}`,
           end:               'bottom bottom',
           scrub:             1.2,
-          onUpdate:          (self: { progress: number }) => { if (self.progress >= 0.999) { scene3d?.settle(); enterTopicsMode(); } },
-          onReverseComplete: () => { scene3d?.unsettle(); exitTopicsMode(); },
+          onUpdate:          (self: { progress: number }) => {
+            const progress = self.progress;
+            const particleT = particleProgressFromScroll(progress);
+
+            if (progress >= 0.77) maybeIntroduceCards();
+            else maybeResetCards();
+
+            scene3d?.setTransitionProgress(particleT);
+
+            if (particleT >= 1 && !topicsMode) {
+              enterTopicsMode();
+            } else if (particleT < 1 && topicsMode) {
+              exitTopicsMode();
+            }
+          },
+          onReverseComplete: () => {
+            scene3d?.setTransitionProgress(0);
+            exitTopicsMode();
+            maybeResetCards();
+          },
         } as any,
       });
 
@@ -390,9 +436,9 @@
         0.74
       );
 
-      threeTl.fromTo('.stage__right',
-        { opacity: 0, x: 30 },
-        { opacity: 1, x: 0, ease: 'power2.out', duration: 0.12 },
+      threeTl.fromTo('.stage__right-heading',
+        { opacity: 0 },
+        { opacity: 1, ease: 'power2.out', duration: 0.12 },
         0.77
       );
 
@@ -524,7 +570,7 @@
       <!-- Colonna destra: heading + card -->
       <div class="stage__right" class:no-pointer={phase === 'feedback'}>
         <p class="stage__right-heading">Metti like alle opinioni con cui sei d'accordo</p>
-        <CardStack {cards} sectionId={config.sectionId} onToggleLike={toggleLike} />
+        <CardStack bind:api={cardStack} {cards} sectionId={config.sectionId} onToggleLike={toggleLike} topicIndex={currentTopic} />
       </div>
 
     </div>
@@ -711,6 +757,23 @@
     pointer-events: none;
   }
 
+  .scene--sustainability .phrase-container {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding-top: clamp(180px, 47.25vh, 464px);
+    padding-left: clamp(24px, 5.556vw, 84px);
+    padding-right: clamp(24px, 5.556vw, 79px);
+    box-sizing: border-box;
+  }
+
+  .scene--sustainability .phrase {
+    width: 100%;
+    max-width: 1349px;
+    text-align: left;
+    font-size: clamp(28px, 4.497vw, 68px);
+    color: #161a1f;
+  }
+
   /* ── Stage ──────────────────────────────────────────────────────────── */
   .stage {
     position: absolute;
@@ -742,6 +805,7 @@
     flex-direction: column;
     gap: 14px;
     pointer-events: auto;
+    overflow: visible;
   }
 
   .stage__right.no-pointer {

@@ -9,16 +9,17 @@
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
   export interface Scene3DApi {
-    setRotationY:        (rad: number) => void;
-    setScale:            (factor: number) => void;
-    setOpacity:          (val: number) => void;
-    settle:              () => void;
-    unsettle:            () => void;
-    pulse:               () => void;
-    resetPulse:          () => void;
-    preloadResultModels: () => void;
-    morphToResult:       (path: string, onDone: () => void) => void;
-    returnToParticles:   () => void;
+    setRotationY:           (rad: number) => void;
+    setScale:               (factor: number) => void;
+    setOpacity:             (val: number) => void;
+    setTransitionProgress:  (t: number) => void;
+    settle:                 () => void;
+    unsettle:               () => void;
+    pulse:                  () => void;
+    resetPulse:             () => void;
+    preloadResultModels:    () => void;
+    morphToResult:          (path: string, onDone: () => void) => void;
+    returnToParticles:      () => void;
   }
 
   interface Props {
@@ -56,7 +57,15 @@
 
   const MODEL_FIT_FACTOR: Record<string, number> = {
     '/oggetti/ice_skate.glb': 0.72,
+    '/oggetti/sport.glb': 0.72,
   };
+
+  /** Modelli piccoli nel file GLB: crossfade sulle posizioni finali invece del volo dall'origine. */
+  const MODEL_PARTICLE_CROSSFADE = new Set([
+    '/oggetti/sostenibilita.glb',
+    '/oggetti/sport.glb',
+    '/oggetti/ice_skate.glb',
+  ]);
 
   const MODEL_DISABLE_IDLE_SPIN = new Set(['/oggetti/sostenibilita.glb']);
 
@@ -103,6 +112,8 @@
   let morphDoneCallback: (() => void) | null = null;
   let resultModelMaterials: THREE.MeshPhysicalMaterial[] = [];
   let useParticleCrossfade = false;
+  let scrollDrivenTransition = false;
+  let transitionPrepared = false;
 
   // ── Mount ──────────────────────────────────────────────────────────────────
   onMount(() => {
@@ -110,10 +121,12 @@
 
     api = {
       setRotationY: (rad) => {
-        if (modelGroup && transitionState === 'none') modelGroup.rotation.y = rad;
+        if (modelGroup && (transitionState === 'none' || scrollDrivenTransition)) {
+          modelGroup.rotation.y = rad;
+        }
       },
       setScale: (f) => {
-        if (modelGroup && transitionState === 'none') {
+        if (modelGroup && (transitionState === 'none' || scrollDrivenTransition)) {
           modelGroup.scale.setScalar(baseScale * f);
         }
       },
@@ -124,11 +137,9 @@
           m.opacity = val;
         });
       },
-      settle:       startTransition,
-      unsettle:     () => {
-        if (transitionState !== 'none') return;
-        materials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
-      },
+      setTransitionProgress,
+      settle:       () => setTransitionProgress(1),
+      unsettle:     resetToSolid,
       pulse:       triggerManualPulse,
       resetPulse:  () => {
         manualPulseActive  = false;
@@ -281,7 +292,7 @@
         });
 
         modelGroup = group;
-        useParticleCrossfade = hasSkinnedMesh;
+        useParticleCrossfade = hasSkinnedMesh || MODEL_PARTICLE_CROSSFADE.has(modelSrc) || maxDim < 1.5;
         spinner = new THREE.Group();
         spinner.add(group);
         scene.add(spinner);
@@ -343,9 +354,35 @@
 
     if (geos.length === 0) return;
 
-    const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
+    let merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
+
+    if (!merged) {
+      const samplers = geos.map((geo) => {
+        const samplerMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+        return new MeshSurfaceSampler(samplerMesh).build();
+      });
+      const weights = geos.map((geo) => geo.getAttribute('position')?.count ?? 0);
+      const total = weights.reduce((sum, w) => sum + w, 0);
+      const p = new THREE.Vector3();
+
+      for (let i = 0; i < COUNT; i++) {
+        let pick = Math.random() * total;
+        let idx = 0;
+        for (; idx < weights.length; idx++) {
+          pick -= weights[idx];
+          if (pick <= 0) break;
+        }
+        samplers[idx].sample(p);
+        particleTargets[i * 3]     = p.x;
+        particleTargets[i * 3 + 1] = p.y;
+        particleTargets[i * 3 + 2] = p.z;
+      }
+
+      geos.forEach((g) => g.dispose());
+      return;
+    }
+
     geos.forEach(g => g.dispose());
-    if (!merged) return;
 
     const samplerMesh = new THREE.Mesh(merged, new THREE.MeshBasicMaterial());
     const sampler = new MeshSurfaceSampler(samplerMesh).build();
@@ -637,17 +674,54 @@
     }
   }
 
-  function startTransition() {
-    if (transitionState !== 'none' || !particleMesh || !modelGroup) return;
-    freezeSpinnerRotation();
+  function resetToSolid() {
+    transitionState = 'none';
+    transitionProgress = 0;
+    manualPulseActive = false;
+    manualPulseElapsed = 0;
+
+    if (particleMesh) {
+      gsap.killTweensOf(particleMesh);
+      particleMesh.visible = false;
+    }
+    if (particleMat) {
+      particleMat.uniforms.uPulse.value = 0;
+      particleMat.uniforms.uBaseOpacity.value = 0;
+    }
+    if (iMatBuf) {
+      for (let i = 0; i < COUNT; i++) {
+        const b = i * 16 + 12;
+        iMatBuf[b] = iMatBuf[b + 1] = iMatBuf[b + 2] = 0;
+      }
+      particleMesh.instanceMatrix.needsUpdate = true;
+    }
+    particleCurrent.fill(0);
+
+    materials.forEach((m) => {
+      m.visible = true;
+      m.transparent = false;
+      m.opacity = 1;
+      m.needsUpdate = true;
+    });
+
+    scrollDrivenTransition = false;
+    transitionPrepared = false;
+  }
+
+  function ensureTransitionPrepared() {
+    if (transitionPrepared || !particleMesh || !modelGroup) return;
+    transitionPrepared = true;
+
     scene?.updateMatrixWorld(true);
     spinner?.updateMatrixWorld(true);
     modelGroup.updateMatrixWorld(true);
     sampleParticleTargets(modelGroup);
-    captureTopicsPose();
-    materials.forEach(m => { if (!m.transparent) { m.transparent = true; m.needsUpdate = true; } });
-    transitionState    = 'in';
-    transitionProgress = 0;
+
+    materials.forEach(m => {
+      if (!m.transparent) { m.transparent = true; m.needsUpdate = true; }
+      m.visible = true;
+    });
+
     if (useParticleCrossfade) {
       particleCurrent.set(particleTargets);
       writeParticlePositions(particleCurrent);
@@ -655,7 +729,72 @@
     } else {
       particleCurrent.fill(0);
     }
+
     particleMesh.visible = true;
+  }
+
+  function applyTransitionVisuals(p: number) {
+    if (!particleMesh || !particleMat || !iMatBuf) return;
+
+    if (useParticleCrossfade) {
+      particleMat.uniforms.uPulse.value = 0;
+      particleMat.uniforms.uBaseOpacity.value = p * 0.85;
+      materials.forEach(m => {
+        m.visible = true;
+        m.opacity = Math.max(0, 1 - p);
+      });
+    } else {
+      for (let i = 0; i < COUNT; i++) {
+        particleCurrent[i * 3]     = particleTargets[i * 3]     * p;
+        particleCurrent[i * 3 + 1] = particleTargets[i * 3 + 1] * p;
+        particleCurrent[i * 3 + 2] = particleTargets[i * 3 + 2] * p;
+        const b = i * 16 + 12;
+        iMatBuf[b]     = particleCurrent[i * 3];
+        iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
+        iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
+      }
+      particleMesh.instanceMatrix.needsUpdate = true;
+
+      particleMat.uniforms.uPulse.value = Math.sin(p * Math.PI) * 3.0;
+      particleMat.uniforms.uBaseOpacity.value = Math.min(0.85, p * 1.7 * 0.85);
+      materials.forEach(m => {
+        m.visible = true;
+        m.opacity = Math.max(0, 1 - p);
+      });
+    }
+  }
+
+  function finalizeTransition() {
+    if (!particleMesh || !particleMat) return;
+    freezeSpinnerRotation();
+    captureTopicsPose();
+    transitionState = 'done';
+    transitionProgress = 1;
+    writeParticlePositions(particleTargets);
+    particleMat.uniforms.uBaseOpacity.value = 0.85;
+    particleMat.uniforms.uPulse.value = 0;
+    materials.forEach(m => { m.opacity = 0; m.visible = false; });
+  }
+
+  function setTransitionProgress(t: number) {
+    const p = Math.max(0, Math.min(1, t));
+
+    if (p <= 0) {
+      resetToSolid();
+      return;
+    }
+
+    scrollDrivenTransition = true;
+    ensureTransitionPrepared();
+    transitionProgress = p;
+
+    if (p >= 1) {
+      finalizeTransition();
+      return;
+    }
+
+    transitionState = 'in';
+    applyTransitionVisuals(p);
   }
 
   function triggerManualPulse() {
@@ -680,12 +819,19 @@
     const dt      = clock.getDelta();
     const elapsed = clock.elapsedTime;
 
-    if (spinner && !orbitEnabled && transitionState === 'none' && !MODEL_DISABLE_IDLE_SPIN.has(modelSrc)) {
+    const idleSpinAllowed =
+      !orbitEnabled &&
+      morphState === 'none' &&
+      (transitionState === 'done' ||
+        transitionState === 'in' ||
+        (transitionState === 'none' && !MODEL_DISABLE_IDLE_SPIN.has(modelSrc)));
+
+    if (spinner && idleSpinAllowed) {
       spinner.rotation.y += IDLE_RAD_S * dt;
     }
     if (controls?.enabled) controls.update(dt);
 
-    if (transitionState === 'in' && particleMesh && particleMat && iMatBuf) {
+    if (transitionState === 'in' && !scrollDrivenTransition && particleMesh && particleMat && iMatBuf) {
       transitionProgress = Math.min(1, transitionProgress + dt / TRANSITION_DURATION);
 
       if (useParticleCrossfade) {

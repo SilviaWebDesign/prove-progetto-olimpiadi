@@ -204,7 +204,7 @@
     </section>
 
     <section
-      class="stage center-stage"
+      class="stage center-stage center-stage--viewport"
       class:stage-visible={text3Opacity > 0.02}
       style="opacity: {text3Opacity}; pointer-events: {text3Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text3Opacity < 0.05}
@@ -335,6 +335,17 @@
     margin-top: auto;
     margin-bottom: var(--hero-text-lift);
     width: 100%;
+  }
+
+  .center-stage--viewport {
+    justify-content: center;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .center-stage--viewport .split-lines-container {
+    margin-top: 0;
+    margin-bottom: 0;
   }
 
   .cards-stage {

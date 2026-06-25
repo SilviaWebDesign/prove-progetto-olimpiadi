@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { sectionList, getSectionHref } from './sections.js';
+  import { getSectionHref } from './sections.js';
 
   /** @type {{ alwaysVisible?: boolean }} */
   let { alwaysVisible = false } = $props();
@@ -9,6 +9,15 @@
   let scrolled = $state(false);
 
   const SCROLL_THRESHOLD = 8;
+
+  /** @type {{ label: string, href: string }[]} */
+  const menuItems = [
+    { label: 'home', href: '/prototypes/home' },
+    { label: 'sostenibilità', href: getSectionHref('sustainability') },
+    { label: 'sport', href: getSectionHref('sport') },
+    { label: 'infrastrutture', href: getSectionHref('infrastructure') },
+    { label: 'about', href: '/prototypes/home' },
+  ];
 
   function updateScrollState() {
     scrolled = window.scrollY > SCROLL_THRESHOLD;
@@ -48,6 +57,7 @@
   class="navbar"
   class:visible={alwaysVisible || scrolled || menuOpen}
   class:always-visible={alwaysVisible}
+  class:menu-open={menuOpen}
 >
   <div class="navbar-inner">
     <a href="/prototypes/home#sezioni" class="navbar-title">Quante facce ha una medaglia?</a>
@@ -71,15 +81,21 @@
   aria-hidden={!menuOpen}
   onclick={(e) => e.target === e.currentTarget && closeMenu()}
 >
+  <button
+    type="button"
+    class="menu-close"
+    aria-label="Chiudi menu"
+    onclick={closeMenu}
+  >
+    <img src="/icons/menu.svg" alt="" width="24" height="24" />
+  </button>
+
   <nav id="site-menu" class="menu-panel" aria-hidden={!menuOpen}>
     <ul class="menu-list">
-      <li>
-        <a href="/prototypes/home" class="menu-link" onclick={closeMenu}>Home</a>
-      </li>
-      {#each sectionList as section (section.id)}
+      {#each menuItems as item (item.label)}
         <li>
-          <a href={getSectionHref(section)} class="menu-link" onclick={closeMenu}>
-            {section.menuLabel}
+          <a href={item.href} class="menu-link" onclick={closeMenu}>
+            {item.label}
           </a>
         </li>
       {/each}
@@ -110,6 +126,11 @@
     opacity: 1;
   }
 
+  .navbar.menu-open {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   .navbar.always-visible {
     z-index: 200;
   }
@@ -122,6 +143,10 @@
     .navbar.always-visible {
       transform: translateY(0);
       opacity: 1;
+    }
+
+    .navbar.always-visible.menu-open {
+      opacity: 0;
     }
   }
 
@@ -147,7 +172,7 @@
     line-height: 1;
     height: var(--navbar-control-height);
     text-transform: uppercase;
-    color: #000000;
+    color: #161a1f;
     text-decoration: none;
     white-space: nowrap;
     display: flex;
@@ -191,8 +216,11 @@
     inset: 0;
     z-index: 9;
     display: flex;
-    justify-content: flex-end;
-    background: rgba(0, 0, 0, 0.85);
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -207,10 +235,37 @@
     pointer-events: auto;
   }
 
+  .menu-close {
+    position: absolute;
+    top: 40px;
+    right: 5.35vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  .menu-close img {
+    display: block;
+    width: 24px;
+    height: 24px;
+  }
+
+  .menu-close:focus-visible {
+    outline: 2px solid #161a1f;
+    outline-offset: 4px;
+  }
+
   .menu-panel {
-    width: min(400px, 100%);
-    height: 100%;
-    padding: 80px 40px 40px;
+    width: 100%;
+    padding: 120px 24px 40px;
     box-sizing: border-box;
   }
 
@@ -220,18 +275,23 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    align-items: center;
+    gap: 21px;
   }
 
   .menu-link {
     font-family: 'PP Formula Condensed', var(--font-title);
-    font-size: clamp(2rem, 6vw, 3.5rem);
+    font-size: 80px;
     font-weight: 900;
     font-variation-settings: 'wght' 900;
-    line-height: 1;
+    font-stretch: condensed;
+    line-height: 1.3;
+    letter-spacing: 5.6px;
     text-transform: uppercase;
-    color: #ffffff;
+    color: #161a1f;
     text-decoration: none;
+    text-align: center;
+    word-break: break-word;
   }
 
   .menu-link:hover {
@@ -239,7 +299,7 @@
   }
 
   .menu-link:focus-visible {
-    outline: 2px solid #ffffff;
+    outline: 2px solid #161a1f;
     outline-offset: 4px;
   }
 
@@ -249,9 +309,27 @@
       opacity: 1;
     }
 
+    .navbar.menu-open {
+      opacity: 0;
+    }
+
     .navbar-inner {
       --navbar-control-height: 20px;
       padding: 16px 6vw;
+    }
+
+    .menu-close {
+      top: 67px;
+      right: 28px;
+    }
+
+    .menu-list {
+      gap: 35px;
+    }
+
+    .menu-link {
+      font-size: 48px;
+      letter-spacing: 3.36px;
     }
   }
 </style>

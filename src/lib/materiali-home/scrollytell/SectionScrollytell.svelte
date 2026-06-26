@@ -679,6 +679,18 @@
     overflow: hidden;
   }
 
+  .scene--infrastructure .layer--frost::before {
+    content: '';
+    position: absolute;
+    inset: -80px;
+    z-index: 0;
+    background-image: url('/images/frost-infrastrutture.jpg');
+    background-size: cover;
+    background-position: center;
+    filter: blur(23px) brightness(1.15) saturate(0.55) contrast(1.08);
+    pointer-events: none;
+  }
+
   .layer--bg {
     z-index: 0;
     background-size: cover;

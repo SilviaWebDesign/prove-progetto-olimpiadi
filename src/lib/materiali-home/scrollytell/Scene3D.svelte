@@ -65,6 +65,7 @@
     '/oggetti/sostenibilita.glb',
     '/oggetti/sport.glb',
     '/oggetti/ice_skate.glb',
+    '/oggetti/infrastrutture.glb',
   ]);
 
   const MODEL_DISABLE_IDLE_SPIN = new Set(['/oggetti/sostenibilita.glb']);
@@ -99,7 +100,9 @@
 
   let manualPulseActive  = false;
   let manualPulseElapsed = 0;
-  const MANUAL_PULSE_DURATION = 1.5;
+  const MANUAL_PULSE_DURATION = 2.1;
+  /** Moltiplicatore su elapsed per la pulsazione idle (più basso = più lento). */
+  const IDLE_PULSE_SPEED = 0.65;
 
   // ── Result model preload + morph ───────────────────────────────────────────
   const resultModels = new Map<string, THREE.Group>();
@@ -990,7 +993,7 @@
         particleMat.uniforms.uPulse.value = Math.sin(t * Math.PI) * 0.8;
         if (t >= 1) manualPulseActive = false;
       } else {
-        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI)) * 0.04;
+        particleMat.uniforms.uPulse.value = Math.abs(Math.sin(elapsed * Math.PI * IDLE_PULSE_SPEED)) * 0.04;
       }
     }
 

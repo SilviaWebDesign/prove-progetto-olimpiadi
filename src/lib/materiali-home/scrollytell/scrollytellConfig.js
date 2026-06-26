@@ -184,6 +184,13 @@ export function getScrollytellConfig(key) {
     sport: 'spread',
   };
 
+  const visualByKey = {
+    infrastructure: {
+      frostSrc: '/images/frost-infrastrutture.jpg',
+      bgSrc: '/images/frost-infrastrutture.jpg',
+    },
+  };
+
   return {
     pageTitle: `${section.title} — Quante facce ha una medaglia?`,
     heroTitle: sectionHeroTitles.has(key) ? section.heroTitle : section.title,
@@ -192,8 +199,8 @@ export function getScrollytellConfig(key) {
     ),
     heroTitleLayout: /** @type {'center' | 'spread'} */ (heroTitleLayoutByKey[key] ?? 'center'),
     heroAriaLabel: section.title,
-    frostSrc: section.hero.background,
-    bgSrc: section.hero.background,
+    frostSrc: visualByKey[key]?.frostSrc ?? section.hero.background,
+    bgSrc: visualByKey[key]?.bgSrc ?? section.hero.background,
     phrase: phraseByKey[key] ?? section.intro,
     modelSrc: key === 'infrastructure' ? '/oggetti/infrastrutture.glb' : section.modelSrc,
     resultPaths: resultPathsByKey[key] ?? [],

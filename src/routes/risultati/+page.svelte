@@ -30,13 +30,13 @@
 
   <div class="models-row">
     <div class="model-wrap">
-      <ModelViewer src={$visitedSections.sustainability.resultModelPath} />
+      <ModelViewer src={$visitedSections.sustainability.resultModelPath} fitFactor={0.98} />
     </div>
     <div class="model-wrap">
-      <ModelViewer src={$visitedSections.sport.resultModelPath} />
+      <ModelViewer src={$visitedSections.sport.resultModelPath} fitFactor={1.12} />
     </div>
     <div class="model-wrap">
-      <ModelViewer src={$visitedSections.infrastructure.resultModelPath} />
+      <ModelViewer src={$visitedSections.infrastructure.resultModelPath} fitFactor={1.12} />
     </div>
   </div>
 
@@ -82,12 +82,6 @@
   .risultati {
     position: relative;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 96px 6vw 40px;
-    gap: 32px;
     background: #ffffff;
   }
 
@@ -104,7 +98,10 @@
   }
 
   .quote {
-    position: relative;
+    position: fixed;
+    left: 50%;
+    bottom: 108px;
+    transform: translateX(-50%);
     z-index: 1;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 500;
@@ -112,30 +109,37 @@
     line-height: 1.35;
     text-align: center;
     color: #161A1F;
-    max-width: 860px;
+    max-width: min(860px, 92vw);
+    padding: 0 16px;
   }
 
   .models-row {
-    position: relative;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     z-index: 1;
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
     gap: 24px;
-    width: 100%;
-    max-width: 1200px;
-    flex: 1;
-    min-height: 520px;
+    width: min(1200px, 92vw);
+    height: min(58vh, 640px);
+    pointer-events: none;
   }
 
   .model-wrap {
     flex: 1;
-    min-height: 460px;
-    max-height: 640px;
+    height: 100%;
+    min-width: 0;
+    pointer-events: auto;
   }
 
   .home-cta {
-    position: relative;
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%);
     z-index: 1;
     display: flex;
     flex-direction: column;

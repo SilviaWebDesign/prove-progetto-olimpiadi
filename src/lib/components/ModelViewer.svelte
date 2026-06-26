@@ -6,8 +6,8 @@
   import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-  interface Props { src: string | null }
-  let { src }: Props = $props();
+  interface Props { src: string | null; fitFactor?: number }
+  let { src, fitFactor = 0.72 }: Props = $props();
 
   let containerEl = $state<HTMLDivElement | null>(null);
   let canvasEl    = $state<HTMLCanvasElement | null>(null);
@@ -78,13 +78,18 @@
       // During Y-axis auto-rotation the worst-case horizontal extent is the XZ diagonal
       const maxHoriz = Math.hypot(size.x, size.z);
       const maxVert  = Math.max(size.y, Math.max(size.x, size.z));
-      const scaleByH = (visibleH * 0.72) / maxVert;
-      const scaleByW = (visibleW * 0.72) / maxHoriz;
+      const scaleByH = (visibleH * fitFactor) / maxVert;
+      const scaleByW = (visibleW * fitFactor) / maxHoriz;
       const scale    = Math.min(scaleByH, scaleByW);
 
       const group = new THREE.Group();
       group.add(gltf.scene);
       group.scale.setScalar(scale);
+      group.updateMatrixWorld(true);
+
+      const fittedBox = new THREE.Box3().setFromObject(group);
+      const fittedCenter = fittedBox.getCenter(new THREE.Vector3());
+      group.position.sub(fittedCenter);
 
       group.traverse((node) => {
         const mesh = node as THREE.Mesh;

@@ -19,7 +19,7 @@
     { label: 'sostenibilità', href: getSectionHref('sustainability') },
     { label: 'sport', href: getSectionHref('sport') },
     { label: 'infrastrutture', href: getSectionHref('infrastructure') },
-    { label: 'about', href: '/prototypes/home' },
+    { label: 'about', href: '/prototypes/about' },
   ];
 
   function updateScrollState() {

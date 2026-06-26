@@ -64,6 +64,100 @@ export function fitMountainModel(model) {
   return { mountainCenter, snowField, orbitRadius, topDownHeight };
 }
 
+/** Offset Y camera hero (home e about). */
+export const HOME_CAM_Y_LOW = -2.9;
+/** Z iniziale camera hero. */
+export const HOME_CAMERA_Z_START = 7.8;
+/** Zoom prospettiva hero home (scroll 0). */
+export const HOME_HERO_ZOOM = 1.2;
+/** Offset verticale del punto di inquadratura rispetto al centro montagna. */
+export const HOME_LOOK_AT_Y_OFFSET = 2.2;
+
+/**
+ * Configurazione orbita hero condivisa con la home (scroll 0).
+ *
+ * @param {THREE.Vector3} mountainCenter
+ * @param {THREE.Vector3} snowField
+ * @param {number} orbitRadius
+ * @param {number} topDownHeight
+ */
+export function buildHomeOrbitConfig(mountainCenter, snowField, orbitRadius, topDownHeight) {
+  const c = mountainCenter;
+  const startCam = new THREE.Vector3(0, HOME_CAM_Y_LOW, HOME_CAMERA_Z_START);
+  const dx = startCam.x - c.x;
+  const dz = startCam.z - c.z;
+  const startAngle = Math.atan2(dx, dz);
+  const heroRadius = Math.hypot(dx, dz);
+
+  return {
+    center: c.clone(),
+    snowField: snowField.clone(),
+    startAngle,
+    orbitY: c.y + HOME_CAM_Y_LOW + 1.1,
+    radius: Math.max(orbitRadius, heroRadius, 12) * 0.82,
+    topDownHeight
+  };
+}
+
+/**
+ * Applica la pose camera della home (inizio scroll).
+ *
+ * @param {THREE.PerspectiveCamera} camera
+ * @param {ReturnType<typeof buildHomeOrbitConfig>} orbitConfig
+ * @param {THREE.Vector3} [targetOut]
+ * @returns {THREE.Vector3}
+ */
+export function applyHomeHeroCamera(camera, orbitConfig, targetOut) {
+  const angle = orbitConfig.startAngle;
+  camera.position.set(
+    orbitConfig.center.x + Math.sin(angle) * orbitConfig.radius,
+    orbitConfig.orbitY,
+    orbitConfig.center.z + Math.cos(angle) * orbitConfig.radius
+  );
+
+  const lookAt = (targetOut ?? new THREE.Vector3())
+    .copy(orbitConfig.center)
+    .add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
+
+  camera.zoom = HOME_HERO_ZOOM;
+  camera.updateProjectionMatrix();
+  camera.up.set(0, 1, 0);
+  camera.lookAt(lookAt);
+
+  return lookAt;
+}
+
+/**
+ * Limiti zoom orbita attorno alla vista hero.
+ * @param {ReturnType<typeof buildHomeOrbitConfig>} orbitConfig
+ */
+export function homeOrbitDistanceLimits(orbitConfig) {
+  return {
+    min: orbitConfig.radius * 0.68,
+    max: orbitConfig.radius * 1.14
+  };
+}
+
+/**
+ * Materiali montagna come in home (fog + trasparenza per whiteout).
+ * @param {THREE.Object3D} object
+ */
+export function setupMountainRenderMaterials(object) {
+  object.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const mesh = o;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const cloned = materials.map((mat) => {
+      const material = mat.clone();
+      material.transparent = true;
+      /** @type {any} */ (material).fog = true;
+      material.side = THREE.FrontSide;
+      return material;
+    });
+    mesh.material = cloned.length === 1 ? cloned[0] : cloned;
+  });
+}
+
 /**
  * Attende che il container abbia dimensioni > 0 (layout post-navigazione).
  * @param {HTMLElement | undefined} el

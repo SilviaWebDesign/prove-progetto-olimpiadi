@@ -141,7 +141,8 @@
   @media (max-width: 768px) {
     .section-card-link {
       flex: 1 1 0;
-      width: min(calc(100vw - 48px), 354px);
+      width: 100%;
+      max-width: 354px;
       min-height: 0;
       max-height: 157px;
       height: auto;

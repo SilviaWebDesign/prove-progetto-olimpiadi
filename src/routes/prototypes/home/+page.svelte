@@ -1,6 +1,7 @@
 <script>
   import ThreeScene from '../../../lib/materiali-home/ThreeScene.svelte';
   import CardsStage from '../../../lib/materiali-home/CardsStage.svelte';
+  import Navbar from '../../../lib/materiali-home/Navbar.svelte';
   import { browser } from '$app/environment';
   import { onMount, tick } from 'svelte';
   import { afterNavigate } from '$app/navigation';
@@ -69,12 +70,15 @@
   let cardsOpacity = $derived(stageOpacityIn(scrollProgress, CARDS.in, CARDS.inEnd));
   let cardsInteractive = $derived(cardsOpacity > 0.05);
 
-  let snowWhiteOpacity = $derived(
-    Math.min(
-      easeOutCubic(rangeProgress(scrollProgress, HOME_SNOW_DIVE_START, SNOW_ZONE_SCROLL)),
-      1 - easeOutCubic(rangeProgress(scrollProgress, HOME_CARDS_START, HOME_CARDS_END))
-    )
-  );
+  let snowWhiteOpacity = $derived.by(() => {
+    const snowIn = easeOutCubic(
+      rangeProgress(scrollProgress, HOME_SNOW_DIVE_START, SNOW_ZONE_SCROLL)
+    );
+    const fadeBeforeCards = easeOutCubic(
+      rangeProgress(scrollProgress, HOME_CARDS_START - 0.05, HOME_CARDS_START)
+    );
+    return snowIn * (1 - fadeBeforeCards);
+  });
 
   let heroScrollFade = $derived(Math.max(0, 1 - easeOutCubic(clamp(scrollProgress * 3.8, 0, 1))));
 
@@ -229,6 +233,8 @@
   </div>
 </div>
 
+<Navbar revealAtCards />
+
 <style>
   :global(body) {
     overflow-x: hidden;
@@ -237,6 +243,8 @@
   .organimo-wrapper {
     position: relative;
     width: 100%;
+    --home-navbar-height: 64px;
+    --page-padding-x: clamp(24px, 5.23vw, 79px);
     --hero-pad-top: 110px;
     --hero-pad-bottom: 52px;
     --hero-pad-x: 20px;
@@ -352,8 +360,18 @@
     justify-content: stretch;
     align-items: stretch;
     padding: 0;
+    top: var(--home-navbar-height, 64px);
+    height: calc(100vh - var(--home-navbar-height, 64px));
     z-index: 3;
     text-align: left;
+    pointer-events: none;
+  }
+
+  .cards-stage :global(.cards-stage-inner) {
+    pointer-events: auto;
+    padding-top: calc(110px - var(--home-navbar-height, 64px));
+    padding-left: var(--page-padding-x);
+    padding-right: var(--page-padding-x);
   }
 
   .brand-tag {
@@ -496,6 +514,8 @@
       --hero-pad-bottom: 40px;
       --hero-pad-x: 16px;
       --hero-text-lift: 4.5rem;
+      --home-navbar-height: 30px;
+      --page-padding-x: 28px;
       --home-title-leading: 1;
       --home-title-tracking: 0;
       --home-title-line-gap: 0;
@@ -527,6 +547,10 @@
 
     .narrative-line {
       --home-narrative-size: 1.55rem;
+    }
+
+    .cards-stage :global(.cards-stage-inner) {
+      padding-top: 10px;
     }
   }
 </style>

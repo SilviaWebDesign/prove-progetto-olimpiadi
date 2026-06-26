@@ -115,6 +115,75 @@
   let scrollDrivenTransition = false;
   let transitionPrepared = false;
 
+  // ── Particle hover ─────────────────────────────────────────────────────────
+  const _hoverMouse = new THREE.Vector2();
+  const _hoverRay = new THREE.Raycaster();
+  const _hoverPlane = new THREE.Plane();
+  const _hoverPlaneNormal = new THREE.Vector3();
+  const _hoverHit = new THREE.Vector3();
+  const _hoverTarget = new THREE.Vector3();
+  const _hoverCenter = new THREE.Vector3();
+  let lastPointerMoveMs = 0;
+
+  function particlesHoverActive() {
+    return (
+      !!particleMesh?.visible &&
+      morphState === 'none' &&
+      !orbitEnabled &&
+      transitionState !== 'none'
+    );
+  }
+
+  function resetParticleHover() {
+    if (!particleMat) return;
+    particleMat.uniforms.uHoverStrength.value = 0;
+  }
+
+  function updateHoverPointer(clientX: number, clientY: number) {
+    if (!renderer || !camera || !particleMat || !modelGroup || !particlesHoverActive()) return;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    _hoverMouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    _hoverMouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    _hoverRay.setFromCamera(_hoverMouse, camera);
+    camera.getWorldDirection(_hoverPlaneNormal);
+    modelGroup.getWorldPosition(_hoverCenter);
+    _hoverPlane.setFromNormalAndCoplanarPoint(_hoverPlaneNormal, _hoverCenter);
+
+    if (!_hoverRay.ray.intersectPlane(_hoverPlane, _hoverHit)) return;
+
+    modelGroup.worldToLocal(_hoverHit);
+    _hoverTarget.copy(_hoverHit);
+    particleMat.uniforms.uPointer.value.lerp(_hoverTarget, 0.42);
+    particleMat.uniforms.uHoverStrength.value = THREE.MathUtils.lerp(
+      particleMat.uniforms.uHoverStrength.value,
+      1,
+      0.38,
+    );
+    lastPointerMoveMs = performance.now();
+  }
+
+  function onPointerMove(event: PointerEvent) {
+    updateHoverPointer(event.clientX, event.clientY);
+  }
+
+  function onPointerLeave() {
+    resetParticleHover();
+  }
+
+  function decayParticleHover(dt: number) {
+    if (!particleMat || !particlesHoverActive()) return;
+    if (performance.now() - lastPointerMoveMs < 120) return;
+    const decay = Math.pow(0.04, dt);
+    particleMat.uniforms.uHoverStrength.value *= decay;
+    if (particleMat.uniforms.uHoverStrength.value < 0.01) {
+      particleMat.uniforms.uHoverStrength.value = 0;
+    }
+  }
+
   // ── Mount ──────────────────────────────────────────────────────────────────
   onMount(() => {
     if (!canvasEl || !wrapperEl) return;
@@ -187,7 +256,13 @@
     }
 
     window.addEventListener('resize', onResize);
-    return () => { window.removeEventListener('resize', onResize); };
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('pointerleave', onPointerLeave);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerleave', onPointerLeave);
+    };
   });
 
   $effect(() => {
@@ -433,14 +508,29 @@
 
     particleMat = new THREE.ShaderMaterial({
       uniforms: {
-        uPulse:       { value: 0.0 },
-        uBaseOpacity: { value: 0.0 },
+        uPulse:         { value: 0.0 },
+        uBaseOpacity:   { value: 0.0 },
+        uPointer:       { value: new THREE.Vector3() },
+        uHoverRadius:   { value: 0.9 * INFRA_BS / baseScale },
+        uHoverPush:     { value: 0.75 * INFRA_BS / baseScale },
+        uHoverStrength: { value: 0.0 },
       },
       vertexShader: /* glsl */`
         attribute vec3 aDirection;
         uniform float uPulse;
+        uniform vec3 uPointer;
+        uniform float uHoverRadius;
+        uniform float uHoverPush;
+        uniform float uHoverStrength;
+
         void main() {
-          vec3 p = position + aDirection * uPulse;
+          vec3 local = position + aDirection * uPulse;
+          vec3 instPos = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+          vec3 toPart = instPos - uPointer;
+          float dist = length(toPart);
+          float infl = smoothstep(uHoverRadius, uHoverRadius * 0.28, dist) * uHoverStrength;
+          vec3 repel = dist > 0.0001 ? normalize(toPart) * infl * uHoverPush : vec3(0.0);
+          vec3 p = local + repel;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
         }
       `,
@@ -528,6 +618,7 @@
     if (particleMat) {
       particleMat.uniforms.uPulse.value = 0;
       particleMat.uniforms.uBaseOpacity.value = 0;
+      resetParticleHover();
     }
 
     centerFeedbackView(scaleMul);
@@ -713,6 +804,7 @@
     if (particleMat) {
       particleMat.uniforms.uPulse.value = 0;
       particleMat.uniforms.uBaseOpacity.value = 0;
+      resetParticleHover();
     }
     if (iMatBuf) {
       for (let i = 0; i < COUNT; i++) {
@@ -856,6 +948,8 @@
       spinner.rotation.y += IDLE_RAD_S * dt;
     }
     if (controls?.enabled) controls.update(dt);
+
+    decayParticleHover(dt);
 
     if (transitionState === 'in' && !scrollDrivenTransition && particleMesh && particleMat && iMatBuf) {
       transitionProgress = Math.min(1, transitionProgress + dt / TRANSITION_DURATION);

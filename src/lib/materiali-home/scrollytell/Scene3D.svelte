@@ -71,7 +71,7 @@
 
   /** Scala del modello in fase feedback (moltiplicatore su baseScale). */
   const MODEL_RESULT_SCALE: Record<string, number> = {
-    '/oggetti/sostenibilita.glb': 0.85,
+    '/oggetti/sostenibilita.glb': 0.5,
   };
   const DEFAULT_RESULT_SCALE = 1.33;
 
@@ -494,6 +494,32 @@
     });
   }
 
+  function centerFeedbackView(scaleMul: number) {
+    if (!modelGroup || !camera) return;
+
+    freezeSpinnerRotation();
+    if (spinner) {
+      spinner.position.set(0, 0, 0);
+      spinner.rotation.set(0, 0, 0);
+    }
+
+    modelGroup.rotation.set(0, 0, 0);
+    modelGroup.position.set(0, 0, 0);
+    modelGroup.scale.setScalar(baseScale * scaleMul);
+    modelGroup.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(modelGroup);
+    const center = box.getCenter(new THREE.Vector3());
+    modelGroup.position.sub(center);
+
+    camera.position.set(0, 0, 6);
+    camera.lookAt(0, 0, 0);
+    if (controls) {
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+  }
+
   function showEnlargedSourceModel(scaleMul: number, onDone: () => void) {
     if (!modelGroup || !particleMesh) return;
 
@@ -504,7 +530,7 @@
       particleMat.uniforms.uBaseOpacity.value = 0;
     }
 
-    modelGroup.scale.setScalar(baseScale * scaleMul);
+    centerFeedbackView(scaleMul);
     materials.forEach((m) => {
       m.opacity = 1;
       m.transparent = false;

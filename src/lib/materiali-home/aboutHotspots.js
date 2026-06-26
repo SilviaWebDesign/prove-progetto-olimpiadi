@@ -14,7 +14,7 @@ import * as THREE from 'three';
 /** Distanza minima tra marker consecutivi sul percorso (unità mondo). */
 export const MIN_HOTSPOT_SPACING = 4.8;
 
-/** Sei tappe sul percorso: azimuth e quota più distanziati per evitare cluster visivi. */
+/** Sei tappe sul percorso in senso orario (azimuth crescente = avanti nel percorso). */
 /** @type {AboutHotspot[]} */
 export const ABOUT_HOTSPOT_PATH = [
   {
@@ -65,7 +65,7 @@ export const ABOUT_HOTSPOT_PATH = [
   {
     id: 'peak',
     azimuth: 0.93,
-    elevation: 0.96,
+    elevation: 0.9,
     label: 'Vetta',
     body:
       'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.',
@@ -111,11 +111,19 @@ export const HOTSPOT_SURFACE_OFFSET = 0.28;
 export const CAMERA_SURFACE_MARGIN = 1.2;
 
 /**
+ * Angolo orizzontale in radianti attorno alla montagna (senso orario, vista dall'alto).
+ * @param {number} azimuth Frazione [0, 1) lungo il percorso
+ */
+function hotspotAzimuthRadians(azimuth) {
+  return -azimuth * Math.PI * 2;
+}
+
+/**
  * Direzione orizzontale attorno alla montagna.
  * @param {number} azimuth Frazione [0, 1)
  */
 export function hotspotHorizontalDirection(azimuth) {
-  const az = azimuth * Math.PI * 2;
+  const az = hotspotAzimuthRadians(azimuth);
   return new THREE.Vector3(Math.cos(az), 0, Math.sin(az)).normalize();
 }
 
@@ -172,10 +180,11 @@ export function hotspotSurfacePosition(worldBox, mountainModel, hotspot, raycast
   const sphere = worldBox.getBoundingSphere(new THREE.Sphere());
   const baseY = worldBox.min.y + size.y * 0.12;
   const horizontal = hotspotHorizontalDirection(hotspot.azimuth);
+  const summitY = worldBox.min.y + size.y * 0.82;
 
   const bandY = THREE.MathUtils.lerp(
     baseY + size.y * 0.04,
-    worldBox.max.y - size.y * 0.03,
+    summitY,
     hotspot.elevation
   );
 
@@ -188,7 +197,7 @@ export function hotspotSurfacePosition(worldBox, mountainModel, hotspot, raycast
   ];
 
   for (const { dist, yBias } of attempts) {
-    const sampleY = THREE.MathUtils.clamp(bandY + yBias, baseY, worldBox.max.y);
+    const sampleY = THREE.MathUtils.clamp(bandY + yBias, baseY, summitY);
     const origin = new THREE.Vector3(
       center.x + horizontal.x * dist,
       sampleY,
@@ -210,7 +219,7 @@ export function hotspotSurfacePosition(worldBox, mountainModel, hotspot, raycast
   }
 
   // Fallback: guscio sferico vicino alla montagna, poi micro-aggiustamento verso il mesh
-  const az = hotspot.azimuth * Math.PI * 2;
+  const az = hotspotAzimuthRadians(hotspot.azimuth);
   const polar = THREE.MathUtils.lerp(0.22, 0.62, hotspot.elevation);
   const shellDir = new THREE.Vector3(
     Math.cos(az) * Math.cos(polar),
@@ -270,7 +279,7 @@ export function ensureCardNearMountain(pos, worldBox, mountainModel, horizontal,
 }
 
 /**
- * Allontana posizioni troppo vicine (post-placement).
+ * Allontana posizioni troppo vicine sul piano orizzontale (Y invariato).
  *
  * @param {THREE.Vector3[]} positions
  * @param {number} [minDist]
@@ -281,8 +290,9 @@ export function enforceHotspotSeparation(positions, minDist = MIN_HOTSPOT_SPACIN
     for (let i = 0; i < positions.length; i++) {
       for (let j = i + 1; j < positions.length; j++) {
         const delta = new THREE.Vector3().subVectors(positions[i], positions[j]);
+        delta.y = 0;
         const dist = delta.length();
-        if (dist >= minDist || dist < 1e-6) continue;
+        if (dist >= minDist || dist < 1e-4) continue;
         const push = (minDist - dist) * 0.5;
         delta.normalize();
         positions[i].addScaledVector(delta, push);
@@ -292,6 +302,43 @@ export function enforceHotspotSeparation(positions, minDist = MIN_HOTSPOT_SPACIN
     }
     if (!moved) break;
   }
+}
+
+/**
+ * Riaggancia un marker alla superficie del mesh (stesso XZ).
+ *
+ * @param {THREE.Vector3} pos
+ * @param {THREE.Box3} worldBox
+ * @param {THREE.Object3D} mountainModel
+ * @param {THREE.Raycaster} raycaster
+ * @returns {THREE.Vector3}
+ */
+export function snapPositionToMountainSurface(pos, worldBox, mountainModel, raycaster) {
+  const size = worldBox.getSize(new THREE.Vector3());
+  const center = worldBox.getCenter(new THREE.Vector3());
+  const baseY = worldBox.min.y + size.y * 0.12;
+
+  const horizontal = new THREE.Vector3(pos.x - center.x, 0, pos.z - center.z);
+  if (horizontal.lengthSq() < 1e-6) {
+    horizontal.set(0, 0, 1);
+  } else {
+    horizontal.normalize();
+  }
+
+  const castFromY = worldBox.min.y + size.y * 0.92;
+  raycaster.set(new THREE.Vector3(pos.x, castFromY, pos.z), new THREE.Vector3(0, -1, 0));
+  const hits = raycaster.intersectObject(mountainModel, true);
+
+  for (const hit of hits) {
+    if (hit.point.y < baseY - 0.15) continue;
+    if (hit.face != null) {
+      const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      if (normal.y < -0.35) continue;
+    }
+    return positionOnSurface(hit, horizontal);
+  }
+
+  return pos;
 }
 
 /**

@@ -45,11 +45,7 @@
     </nav>
 
     {#key hotspot.id}
-      <FactCard
-        label={hotspot.label}
-        body={hotspot.body}
-        docked
-      />
+      <FactCard label={hotspot.label} body={hotspot.body} docked />
     {/key}
   </div>
 </div>
@@ -58,7 +54,7 @@
   .card-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 20;
+    z-index: 50;
     display: flex;
     align-items: flex-end;
     justify-content: flex-start;
@@ -71,6 +67,9 @@
   .card-wrap {
     position: relative;
     max-width: min(424px, calc(100vw - 48px));
+    --card-nav-offset: 52px;
+    --card-inset-x: 45px;
+    --card-inset-y: 40px;
     pointer-events: auto;
     animation: cardIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
@@ -138,8 +137,8 @@
 
   .close-btn {
     position: absolute;
-    top: 52px;
-    right: 12px;
+    top: calc(var(--card-nav-offset) + var(--card-inset-y) + 4px);
+    right: var(--card-inset-x);
     z-index: 2;
     width: 36px;
     height: 36px;
@@ -150,10 +149,13 @@
     background: rgba(255, 255, 255, 0.75);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     line-height: 1;
     color: #161a1f;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .close-btn:hover {

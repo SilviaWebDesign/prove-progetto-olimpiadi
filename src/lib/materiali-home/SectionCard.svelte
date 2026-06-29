@@ -41,6 +41,7 @@
   <div class="card-halo theme-{theme}" aria-hidden="true"></div>
   <article class="section-card theme-{theme}" data-theme={theme}>
     <div class="card-object" aria-hidden="true">
+      <div class="object-glow" aria-hidden="true"></div>
       <CardModel src={modelSrc} label={title} {active} {hovered} showLabel={false} />
     </div>
     <SectionCardTitle {title} {theme} />
@@ -63,7 +64,7 @@
   @media (hover: hover) {
     .section-card-link:hover,
     .section-card-link:focus-within {
-      transform: scale(1.06);
+      transform: scale(1.03);
       z-index: 2;
     }
   }
@@ -138,10 +139,43 @@
     overflow: visible;
   }
 
+  .object-glow {
+    position: absolute;
+    left: 50%;
+    top: 54%;
+    transform: translate(-50%, -50%);
+    width: 78%;
+    height: 72%;
+    border-radius: 50%;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(22, 26, 31, 0.32) 0%,
+      rgba(22, 26, 31, 0.14) 42%,
+      rgba(22, 26, 31, 0.04) 62%,
+      rgba(22, 26, 31, 0) 78%
+    );
+    filter: blur(16px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.35s ease;
+  }
+
+  .section-card-link:hover .object-glow,
+  .section-card-link:focus-within .object-glow {
+    opacity: 1;
+  }
+
+  .card-object :global(.card-model) {
+    position: relative;
+    z-index: 1;
+  }
+
   @media (max-width: 768px) {
     .section-card-link {
       flex: 1 1 0;
-      width: min(calc(100vw - 48px), 354px);
+      width: 100%;
+      max-width: 354px;
       min-height: 0;
       max-height: 157px;
       height: auto;
@@ -160,6 +194,13 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
+    }
+
+    .object-glow {
+      width: 70%;
+      height: 64%;
+      top: 46%;
+      filter: blur(12px);
     }
 
     .card-halo {

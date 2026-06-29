@@ -1,9 +1,9 @@
 <script>
-  /** @type {{ label: string, body: string, sources: string, expanded?: boolean, docked?: boolean, orbit?: boolean, class?: string }} */
+  /** @type {{ label: string, body: string, sources?: string, expanded?: boolean, docked?: boolean, orbit?: boolean, class?: string }} */
   let {
     label,
     body,
-    sources,
+    sources = '',
     expanded = false,
     docked = false,
     orbit = false,
@@ -30,10 +30,12 @@
       </div>
       <p class="fact-body">{body}</p>
     </div>
-    <footer class="fact-footer">
-      <span class="fact-sources-label">- fonti:</span>
-      <span class="fact-sources">{sources}</span>
-    </footer>
+    {#if sources}
+      <footer class="fact-footer">
+        <span class="fact-sources-label">- fonti:</span>
+        <span class="fact-sources">{sources}</span>
+      </footer>
+    {/if}
   </div>
 </article>
 
@@ -119,6 +121,15 @@
       transparent 70%
     );
     pointer-events: none;
+  }
+
+  .fact-card.docked .fact-card-glow {
+    background: radial-gradient(
+      ellipse 45% 40% at 50% 45%,
+      rgba(22, 26, 31, 0.14) 0%,
+      rgba(22, 26, 31, 0.06) 40%,
+      transparent 70%
+    );
   }
 
   .fact-card-content {

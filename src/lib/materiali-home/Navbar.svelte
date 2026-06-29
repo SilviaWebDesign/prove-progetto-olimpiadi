@@ -1,12 +1,15 @@
 <script>
   import { onMount } from 'svelte';
   import { getSectionHref } from './sections.js';
+  import { homeScrollProgress } from './homeScrollProgress.js';
+  import { HOME_CARDS_START } from './scrollStages.js';
 
-  /** @type {{ alwaysVisible?: boolean }} */
-  let { alwaysVisible = false } = $props();
+  /** @type {{ alwaysVisible?: boolean, revealAtCards?: boolean }} */
+  let { alwaysVisible = false, revealAtCards = false } = $props();
 
   let menuOpen = $state(false);
   let scrolled = $state(false);
+  let cardsPhase = $state(false);
 
   const SCROLL_THRESHOLD = 8;
 
@@ -16,12 +19,21 @@
     { label: 'sostenibilità', href: getSectionHref('sustainability') },
     { label: 'sport', href: getSectionHref('sport') },
     { label: 'infrastrutture', href: getSectionHref('infrastructure') },
-    { label: 'about', href: '/prototypes/home' },
+    { label: 'about', href: '/prototypes/about' },
   ];
 
   function updateScrollState() {
     scrolled = window.scrollY > SCROLL_THRESHOLD;
+    if (revealAtCards) {
+      cardsPhase = homeScrollProgress.value >= HOME_CARDS_START;
+    }
   }
+
+  const navbarVisible = $derived(
+    alwaysVisible ||
+    menuOpen ||
+    (revealAtCards ? cardsPhase : scrolled)
+  );
 
   function toggleMenu() {
     menuOpen = !menuOpen;
@@ -55,8 +67,9 @@
 
 <header
   class="navbar"
-  class:visible={alwaysVisible || scrolled || menuOpen}
+  class:visible={navbarVisible}
   class:always-visible={alwaysVisible}
+  class:reveal-at-cards={revealAtCards}
   class:menu-open={menuOpen}
 >
   <div class="navbar-inner">
@@ -116,6 +129,9 @@
     pointer-events: none;
     transform: translateY(-100%);
     opacity: 0;
+    --navbar-padding-x: clamp(24px, 5.23vw, 79px);
+    --navbar-padding-top: clamp(16px, 2.51vw, 38px);
+    --navbar-row-height: 26px;
     transition:
       transform 0.35s ease,
       opacity 0.35s ease;
@@ -135,7 +151,12 @@
     z-index: 200;
   }
 
-  .navbar.always-visible ~ .menu-overlay {
+  .navbar.reveal-at-cards.visible {
+    z-index: 200;
+  }
+
+  .navbar.always-visible ~ .menu-overlay,
+  .navbar.reveal-at-cards.visible ~ .menu-overlay {
     z-index: 199;
   }
 
@@ -152,12 +173,13 @@
 
   .navbar-inner {
     --navbar-control-height: 24px;
+    --navbar-title-size: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    min-height: var(--navbar-control-height);
-    padding: 16px 6vw;
+    min-height: var(--navbar-row-height);
+    padding: var(--navbar-padding-top) var(--navbar-padding-x) 0;
     box-sizing: border-box;
     pointer-events: auto;
     gap: 12px;
@@ -165,12 +187,11 @@
 
   .navbar-title {
     font-family: 'PP Formula Condensed', var(--font-title);
-    font-size: var(--navbar-control-height);
+    font-size: var(--navbar-title-size);
     font-weight: 900;
     font-variation-settings: 'wght' 900;
     font-stretch: condensed;
-    line-height: 1;
-    height: var(--navbar-control-height);
+    line-height: 1.15;
     text-transform: uppercase;
     color: #161a1f;
     text-decoration: none;
@@ -179,7 +200,6 @@
     align-items: center;
     flex: 1;
     min-width: 0;
-    overflow: hidden;
   }
 
   .navbar-title:hover {
@@ -212,6 +232,9 @@
   }
 
   .menu-overlay {
+    --navbar-padding-x: clamp(24px, 5.23vw, 79px);
+    --navbar-padding-top: clamp(16px, 2.51vw, 38px);
+    --navbar-row-height: 26px;
     position: fixed;
     inset: 0;
     z-index: 9;
@@ -237,8 +260,8 @@
 
   .menu-close {
     position: absolute;
-    top: 40px;
-    right: 5.35vw;
+    top: calc(var(--navbar-padding-top) + (var(--navbar-row-height, 26px) - 24px) / 2);
+    right: var(--navbar-padding-x);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -304,23 +327,39 @@
   }
 
   @media (max-width: 768px) {
-    .navbar {
+    .navbar.visible,
+    .navbar.always-visible {
       transform: translateY(0);
       opacity: 1;
+    }
+
+    .navbar:not(.visible):not(.always-visible) {
+      transform: translateY(-100%);
+      opacity: 0;
     }
 
     .navbar.menu-open {
       opacity: 0;
     }
 
+    .navbar {
+      --navbar-padding-x: 28px;
+      --navbar-padding-top: 4px;
+    }
+
+    .menu-overlay {
+      --navbar-padding-x: 28px;
+      --navbar-padding-top: 4px;
+    }
+
     .navbar-inner {
       --navbar-control-height: 20px;
-      padding: 16px 6vw;
+      --navbar-title-size: 20px;
+      padding: var(--navbar-padding-top) var(--navbar-padding-x) 0;
     }
 
     .menu-close {
-      top: 67px;
-      right: 28px;
+      right: var(--navbar-padding-x);
     }
 
     .menu-list {

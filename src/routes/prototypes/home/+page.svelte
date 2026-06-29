@@ -16,6 +16,7 @@
     stageMoxyOpacity
   } from '../../../lib/materiali-home/scrollStages.js';
   import { homeScrollProgress } from '../../../lib/materiali-home/homeScrollProgress.js';
+  import { overlayVisible } from '$lib/stores/pageTransition';
 
   let scrollProgress = $state(0);
   /** @type {HTMLDivElement | undefined} */
@@ -103,6 +104,11 @@
   }
 
   afterNavigate(({ to }) => {
+    if (to?.url.pathname === '/prototypes/home' || to?.url.pathname === '/prototypes/home/') {
+      overlayVisible.set(false);
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
     if (to?.url.hash === '#sezioni') scrollToSezioni();
   });
 
@@ -126,6 +132,10 @@
   });
 
   onMount(() => {
+    overlayVisible.set(false);
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+
     if (window.location.hash === '#sezioni') {
       scrollToSezioni();
     }
@@ -238,6 +248,7 @@
 <style>
   :global(body) {
     overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .organimo-wrapper {

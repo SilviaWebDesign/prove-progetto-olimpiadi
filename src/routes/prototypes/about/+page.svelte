@@ -41,6 +41,8 @@
 
     return () => {
       window.removeEventListener('wheel', onWheelDismiss);
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     };
   });
 
@@ -103,10 +105,6 @@
 <Navbar alwaysVisible />
 
 <style>
-  :global(body) {
-    overflow: hidden;
-  }
-
   .about-page {
     position: fixed;
     inset: 0;

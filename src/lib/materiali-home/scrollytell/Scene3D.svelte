@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import gsap from 'gsap';
   import * as THREE from 'three';
   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
   import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
@@ -20,6 +21,8 @@
     preloadResultModels:    () => void;
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
+    setMobileFit:           (topPx: number, bottomPx: number) => void;
+    clearMobileFit:         () => void;
   }
 
   interface Props {
@@ -79,6 +82,14 @@
   let rafId:    number | null = null;
   let spinner:  THREE.Group | null = null;
   let controls: OrbitControls | null = null;
+
+  // ── Mobile viewport fit: modello riposizionato/riscalato nello spazio libero
+  // tra testo e commenti, aggiornato via lerp continuo nel render loop ────────
+  let mobileFitActive       = false;
+  let mobileFitTargetScale  = 1;
+  let mobileFitTargetOffsetY = 0;
+  const MOBILE_FIT_LERP = 0.1;
+  const MOBILE_FIT_RATIO = 0.78;
 
   const clock      = new THREE.Clock();
   const IDLE_RAD_S = THREE.MathUtils.degToRad(7);
@@ -231,6 +242,19 @@
         }
         resultModelMaterials.forEach(m => { m.opacity = 0; m.visible = false; });
       },
+      setMobileFit: (topPx, bottomPx) => {
+        if (!camera) return;
+        mobileFitActive = true;
+        const vh        = window.innerHeight;
+        const fov       = camera.fov * (Math.PI / 180);
+        const visibleH  = 2 * Math.tan(fov / 2) * camera.position.z;
+        const gapPx     = Math.max(24, bottomPx - topPx);
+        const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
+        mobileFitTargetScale = (MOBILE_FIT_RATIO * (gapPx / vh)) / (0.9 * fitFactor);
+        const centerPx = (topPx + bottomPx) / 2;
+        mobileFitTargetOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
+      },
+      clearMobileFit: () => { mobileFitActive = false; },
     };
 
     initThree();
@@ -951,6 +975,14 @@
       spinner.rotation.y += IDLE_RAD_S * dt;
     }
     if (controls?.enabled) controls.update(dt);
+
+    if (mobileFitActive && modelGroup && spinner &&
+        (transitionState === 'none' || transitionState === 'done')) {
+      const currentScale = modelGroup.scale.x / baseScale;
+      const nextScale = currentScale + (mobileFitTargetScale - currentScale) * MOBILE_FIT_LERP;
+      modelGroup.scale.setScalar(baseScale * nextScale);
+      spinner.position.y += (mobileFitTargetOffsetY - spinner.position.y) * MOBILE_FIT_LERP;
+    }
 
     decayParticleHover(dt);
 

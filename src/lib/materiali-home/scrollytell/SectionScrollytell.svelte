@@ -141,6 +141,8 @@
     await tick();
     if (isMobile) {
       await mobileShowCards();
+      updateMobileModelFit();
+      setTimeout(updateMobileModelFit, 450);
     } else {
       await cardStack?.animateIn();
     }
@@ -165,10 +167,7 @@
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible
       mobileScrollRatio = 0;
-      // Kill any pending scale animation and reset to base before morphing
-      gsap.killTweensOf(mobileScaleProxy);
-      mobileScaleProxy.v = 0.28;
-      scene3d?.setScale(0.28);
+      scene3d?.clearMobileFit();
     }
 
     const resultModelPath = computeResult();
@@ -208,7 +207,13 @@
     await tick();
 
     gsap.set('.stage__text', { y: 8, opacity: 0 });
-    if (!isMobile) await cardStack?.animateIn();
+    if (isMobile) {
+      await mobileShowCards();
+      updateMobileModelFit();
+      setTimeout(updateMobileModelFit, 450);
+    } else {
+      await cardStack?.animateIn();
+    }
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
       .to('.stage__text', { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0);
@@ -234,7 +239,13 @@
     await tick();
 
     gsap.set('.stage__text', { y: -8, opacity: 0 });
-    if (!isMobile) await cardStack?.animateIn();
+    if (isMobile) {
+      await mobileShowCards();
+      updateMobileModelFit();
+      setTimeout(updateMobileModelFit, 450);
+    } else {
+      await cardStack?.animateIn();
+    }
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
       .to('.stage__text', { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0);
@@ -250,22 +261,23 @@
   // ── Mobile-specific state ─────────────────────────────────────────────────
   let mobileCardsVisible = $state(false);
   let cardsScrollRef = $state<HTMLElement | null>(null);
+  let stageTextEl = $state<HTMLElement | null>(null);
+  let stageRightEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
-  let touchStartY = 0;
 
-  const mobileScaleProxy = { v: 0.28 };
+  // ── Model 3D: adatta posizione/scala allo spazio libero tra testo e commenti (mobile) ──
+  const MOBILE_MODEL_MARGIN = 14;
+  const MOBILE_CTA_RESERVE  = 110;
 
-  $effect(() => {
-    if (!isMobile || phase !== 'topics' || !scene3d) return;
-    const target = mobileCardsVisible ? 0.28 : 0.42;
-    gsap.killTweensOf(mobileScaleProxy);
-    gsap.to(mobileScaleProxy, {
-      v: target,
-      duration: 0.5,
-      ease: 'power2.inOut',
-      onUpdate: () => scene3d?.setScale(mobileScaleProxy.v),
-    });
-  });
+  function updateMobileModelFit() {
+    if (!isMobile || !scene3d || !stageTextEl) return;
+    const textRect = stageTextEl.getBoundingClientRect();
+    const topPx = textRect.bottom + MOBILE_MODEL_MARGIN;
+    const bottomPx = mobileCardsVisible && stageRightEl
+      ? stageRightEl.getBoundingClientRect().top - MOBILE_MODEL_MARGIN
+      : window.innerHeight - MOBILE_CTA_RESERVE;
+    scene3d.setMobileFit(topPx, bottomPx);
+  }
 
   const PARTICLE_SCROLL_START = 0.58;
   const PARTICLE_SCROLL_END   = 0.98;
@@ -280,22 +292,15 @@
   const modelLoadedPromise = new Promise<void>(resolve => { resolveModelLoaded = resolve; });
 
   // ── Mobile cards ──────────────────────────────────────────────────────────
+  // Su mobile la navigazione è solo a bottone ("Continua"): niente swipe, che
+  // altrimenti confligge con lo scroll nativo della lista commenti.
   async function mobileShowCards() {
     if (mobileCardsVisible || cardsScrollAnimating) return;
     cardsScrollAnimating = true;
     mobileCardsVisible = true; // CSS class m-cards-visible makes container visible
     await tick();
+    updateMobileModelFit();
     await cardStack?.animateIn();
-    cardsScrollAnimating = false;
-  }
-
-  async function mobileHideCards() {
-    if (!mobileCardsVisible || cardsScrollAnimating) return;
-    cardsScrollAnimating = true;
-    await cardStack?.animateOut();
-    mobileCardsVisible = false; // CSS class removed → container back to opacity 0
-    mobileScrollRatio = 0;
-    if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     cardsScrollAnimating = false;
   }
 
@@ -306,51 +311,13 @@
     mobileScrollRatio = max > 0 ? el.scrollTop / max : 0;
   }
 
-  // ── Touch gesture detection ───────────────────────────────────────────────
-
-  // Non-passive: prevents page scroll (including iOS inertia) while in topics mode.
+  // Non-passive: prevents page scroll (including iOS inertia) while in topics/feedback mode,
+  // lasciando libero lo scroll nativo dentro la lista commenti.
   function mobilePreventScroll(e: TouchEvent) {
     if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) {
       return; // allow natural scroll inside the cards box
     }
     e.preventDefault();
-  }
-
-  function onTouchStart(e: TouchEvent) {
-    touchStartY = e.touches[0].clientY;
-  }
-
-  function onTouchEnd(e: TouchEvent) {
-    const deltaY = touchStartY - e.changedTouches[0].clientY;
-    const threshold = 40;
-    if (Math.abs(deltaY) < threshold) return;
-
-    if (phase === 'feedback') {
-      if (deltaY < 0) exitFeedbackPhase();
-      else if (!isTransitioning) {
-        if ($allSectionsCompleted) navigateToResults();
-        else goToNextSection();
-      }
-      return;
-    }
-
-    if (deltaY > 0) {
-      // swipe up → show cards, then advance
-      if (!mobileCardsVisible) {
-        mobileShowCards();
-      } else if (anyLiked && !isTransitioning) {
-        if (currentTopic === lastTopic) enterFeedbackPhase();
-        else goNext();
-      }
-    } else {
-      // swipe down → hide cards or go back
-      if (mobileCardsVisible) {
-        mobileHideCards();
-      } else if (!isTransitioning) {
-        if (currentTopic > 0) goPrev();
-        else exitTopicsMode();
-      }
-    }
   }
 
   // ── Topics-mode scroll interception ──────────────────────────────────────
@@ -367,8 +334,9 @@
     phase = 'topics';
     if (isMobile) {
       document.addEventListener('touchmove', mobilePreventScroll, { passive: false });
-      window.addEventListener('touchstart', onTouchStart, { passive: true });
-      window.addEventListener('touchend', onTouchEnd, { passive: true });
+      void mobileShowCards();
+      tick().then(updateMobileModelFit);
+      setTimeout(updateMobileModelFit, 450);
     } else {
       lenisRef?.stop();
       window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
@@ -404,8 +372,6 @@
     topicsMode = false;
     if (isMobile) {
       document.removeEventListener('touchmove', mobilePreventScroll);
-      window.removeEventListener('touchstart', onTouchStart);
-      window.removeEventListener('touchend', onTouchEnd);
     } else {
       window.removeEventListener('wheel', onTopicsWheel, { capture: true } as EventListenerOptions);
       lenisRef?.start();
@@ -484,6 +450,8 @@
       lenis.on('scroll', ScrollTrigger.update);
       lenisRaf = (t: number) => lenis!.raf(t * 1000);
       gsap.ticker.add(lenisRaf);
+    } else {
+      window.addEventListener('resize', updateMobileModelFit);
     }
 
     const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
@@ -635,6 +603,7 @@
       ctx.revert();
       if (lenisRaf) gsap.ticker.remove(lenisRaf);
       if (lenis) lenis.destroy();
+      if (isMobile) window.removeEventListener('resize', updateMobileModelFit);
     };
   });
 </script>
@@ -698,7 +667,7 @@
     <!-- Stage: testo + card -->
     <div class="stage">
 
-      <div class="stage__text" class:m-compact={isMobile && mobileCardsVisible}>
+      <div class="stage__text" bind:this={stageTextEl} class:m-compact={isMobile && mobileCardsVisible}>
         <TextBlock
           counter={topics[currentTopic].counter}
           title={topics[currentTopic].title}
@@ -711,7 +680,7 @@
       <div aria-hidden="true"></div>
 
       <!-- Cards column -->
-      <div class="stage__right" class:no-pointer={phase === 'feedback'} class:m-cards-visible={isMobile && mobileCardsVisible}>
+      <div class="stage__right" bind:this={stageRightEl} class:no-pointer={phase === 'feedback'} class:m-cards-visible={isMobile && mobileCardsVisible}>
         <p class="stage__right-heading">Metti like alle opinioni con cui sei d'accordo</p>
         <div class="stage__right-scroll" bind:this={cardsScrollRef} onscroll={onCardsScroll}>
           <CardStack bind:api={cardStack} {cards} sectionId={config.sectionId} onToggleLike={toggleLike} topicIndex={currentTopic} />

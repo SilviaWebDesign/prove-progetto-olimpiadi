@@ -565,7 +565,7 @@
     width: 100%;
     height: 100%;
     cursor: crosshair;
-    touch-action: none;
+    touch-action: pan-y;
     filter: saturate(0);
   }
 </style>

@@ -1081,6 +1081,12 @@
      ═══════════════════════════════════════════════════════════════════════ */
   @media (max-width: 768px) {
 
+    /* Titolone: alzato rispetto al fondo del viewport */
+    .hero-title--section:not(.hero-title--spread) {
+      justify-content: flex-start;
+      padding-top: 42vh;
+    }
+
     /* Stage: single column, children absolutely positioned */
     .stage {
       display: block;

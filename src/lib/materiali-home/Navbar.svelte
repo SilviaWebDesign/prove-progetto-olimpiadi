@@ -344,12 +344,12 @@
 
     .navbar {
       --navbar-padding-x: 28px;
-      --navbar-padding-top: 4px;
+      --navbar-padding-top: 26px;
     }
 
     .menu-overlay {
       --navbar-padding-x: 28px;
-      --navbar-padding-top: 4px;
+      --navbar-padding-top: 26px;
     }
 
     .navbar-inner {

@@ -2,7 +2,6 @@
   import { onMount, tick } from 'svelte';
   import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import Lenis from 'lenis';
@@ -89,7 +88,7 @@
     isTransitioning = true;
     overlayVisible.set(true);
     await new Promise<void>(r => setTimeout(r, 400));
-    goto(route);
+    window.location.href = route;
   }
 
   async function navigateToResults() {
@@ -97,7 +96,7 @@
     isTransitioning = true;
     overlayVisible.set(true);
     await new Promise<void>(r => setTimeout(r, 400));
-    goto('/risultati');
+    window.location.href = '/risultati';
   }
 
   function computeResult(): string {
@@ -166,6 +165,10 @@
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible
       mobileScrollRatio = 0;
+      // Kill any pending scale animation and reset to base before morphing
+      gsap.killTweensOf(mobileScaleProxy);
+      mobileScaleProxy.v = 0.28;
+      scene3d?.setScale(0.28);
     }
 
     const resultModelPath = computeResult();
@@ -249,6 +252,20 @@
   let cardsScrollRef = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
   let touchStartY = 0;
+
+  const mobileScaleProxy = { v: 0.28 };
+
+  $effect(() => {
+    if (!isMobile || phase !== 'topics' || !scene3d) return;
+    const target = mobileCardsVisible ? 0.28 : 0.42;
+    gsap.killTweensOf(mobileScaleProxy);
+    gsap.to(mobileScaleProxy, {
+      v: target,
+      duration: 0.5,
+      ease: 'power2.inOut',
+      onUpdate: () => scene3d?.setScale(mobileScaleProxy.v),
+    });
+  });
 
   const PARTICLE_SCROLL_START = 0.58;
   const PARTICLE_SCROLL_END   = 0.98;
@@ -1168,13 +1185,10 @@
 
     /* Scrollable cards inner container */
     .stage__right-scroll {
-      height: 230px;
+      height: 281px;
       overflow-y: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
-      /* fade bottom third to hint scrollability */
-      mask-image: linear-gradient(to bottom, black 65%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, black 65%, transparent 100%);
     }
 
     .stage__right-scroll::-webkit-scrollbar {
@@ -1185,13 +1199,18 @@
       max-width: 100%;
     }
 
+    /* Ensure cards are visible when the cards panel is open (CSS fallback in case GSAP opacity animation is delayed) */
+    .stage__right.m-cards-visible :global(.card-stack__item) {
+      opacity: 1;
+    }
+
     /* ── Mobile scroll indicator ── */
     .mobile-scroll-indicator {
       display: none;
       position: absolute;
       right: 6px;
       bottom: 80px;
-      height: 230px;
+      height: 281px;
       width: 3px;
       background: rgba(22, 26, 31, 0.12);
       border-radius: 2px;
@@ -1237,13 +1256,13 @@
 
     .feedback-subtitle {
       font-size: 15px;
-      bottom: 90px;
+      bottom: 140px;
       padding: 0 24px;
       max-width: 100%;
     }
 
     .feedback-top {
-      top: 5vh;
+      top: 12vh;
     }
   }
 </style>

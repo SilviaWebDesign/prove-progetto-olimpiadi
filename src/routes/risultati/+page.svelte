@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import Navbar from '$lib/materiali-home/Navbar.svelte';
   import ModelViewer from '$lib/components/ModelViewer.svelte';
   import { visitedSections } from '$lib/stores/visitedSections';
@@ -23,7 +22,7 @@
     overlayVisible.set(true);
     await new Promise(r => setTimeout(r, 400));
     visitedSections.reset();
-    goto('/');
+    window.location.href = '/';
   }
 
   function prevSection() {
@@ -82,9 +81,20 @@
       ontouchstart={onTouchStart}
       ontouchend={onTouchEnd}
     >
-      <div class="carousel__model">
-        <ModelViewer src={modelPaths[currentIndex]} fitFactor={1.05} />
-      </div>
+      <!-- Quote above model on mobile (3 lines) -->
+      <p class="carousel__quote">
+        La realtà non è mai unica e uguale per tutti.<br>
+        Lo stesso evento può generare visioni<br>
+        differenti e soggettive.
+      </p>
+
+      {#key currentIndex}
+        <div class="carousel__model">
+          <ModelViewer src={modelPaths[currentIndex]} fitFactor={1.05} />
+        </div>
+      {/key}
+
+      <!-- Section name below model at 50px display font -->
       <p class="carousel__label">{sectionLabels[currentIndex]}</p>
 
       <!-- Dots indicator -->
@@ -135,6 +145,14 @@
 </div>
 
 <style>
+  @font-face {
+    font-family: 'PP Formula Condensed';
+    src: url('/fonts/PPFormula-Condensed-Variable.ttf') format('truetype');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
   @font-face {
     font-family: 'Supreme Variable';
     src: url('/fonts/Supreme-Variable.ttf') format('truetype');
@@ -229,13 +247,24 @@
   }
 
   .carousel__label {
-    font-family: 'Supreme Variable', sans-serif;
+    font-family: 'PP Formula Condensed', sans-serif;
     font-weight: 700;
-    font-size: 20px;
+    font-size: 50px;
     color: #161A1F;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.02em;
     text-align: center;
+    line-height: 1;
+  }
+
+  .carousel__quote {
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 1.4;
+    text-align: center;
+    color: #161A1F;
+    padding: 0 24px;
   }
 
   .carousel__dots {
@@ -327,8 +356,16 @@
 
   @media (max-width: 768px) {
     .quote {
-      font-size: 18px;
-      bottom: 80px;
+      display: none;
+    }
+
+    .carousel__model {
+      height: min(38vh, 300px);
+    }
+
+    .carousel {
+      gap: 8px;
+      justify-content: center;
     }
   }
 </style>

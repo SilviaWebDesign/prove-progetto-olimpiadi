@@ -83,7 +83,6 @@
       <AboutSportDetail
         hotspot={selectedHotspot}
         onclose={closeHotspot}
-        onprev={goPrev}
         onnext={goNext}
       />
     {:else}

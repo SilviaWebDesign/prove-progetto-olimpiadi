@@ -23,17 +23,21 @@
     computeFocusCameraPosition,
     clampFocusCameraPosition,
     focusCameraDistance,
-    sampleOrbitFocusTransition
+    sampleOrbitFocusTransition,
+    getMarkerFocusPoint,
+    panFocusToViewportX
   } from './aboutHotspots.js';
   import {
     preloadAboutMarkerModels,
     cloneMarkerModel,
     applyMarkerMaterial,
-    disposeMarkerGeometries
+    disposeMarkerGeometries,
+    orientMarkerTowardWorldPoint
   } from './aboutMarkerModels.js';
 
   const FOCUS_CAMERA_ZOOM = 1.45;
   const CAMERA_TRANSITION_MS = 900;
+  const MARKER_SPIN_SPEED = 0.65;
 
   const smogColor = '#ffffff';
 
@@ -63,8 +67,10 @@
   /**
    * @type {{
    *   object: THREE.Group;
+   *   model: THREE.Object3D;
    *   hotspot: import('./aboutHotspots.js').AboutHotspot;
    *   baseScale: number;
+   *   spinSpeed: number;
    * }[]}
    */
   let markers = [];
@@ -74,6 +80,7 @@
   const pointer = new THREE.Vector2();
   let pointerDownX = 0;
   let pointerDownY = 0;
+  let lastAnimationTime = 0;
   /** @type {ReturnType<typeof buildHomeOrbitConfig> | null} */
   let homeOrbitConfig = null;
   const _heroLookAt = new THREE.Vector3();
@@ -151,9 +158,20 @@
   }
 
   /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
+  function getHotspotMarkerEntry(hotspot) {
+    return markers.find((m) => m.hotspot.id === hotspot?.id) ?? null;
+  }
+
+  /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
   function getHotspotMarkerPosition(hotspot) {
-    const entry = markers.find((m) => m.hotspot.id === hotspot?.id);
+    const entry = getHotspotMarkerEntry(hotspot);
     return entry?.object.position.clone() ?? null;
+  }
+
+  /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
+  function getHotspotFocusPoint(hotspot) {
+    const entry = getHotspotMarkerEntry(hotspot);
+    return entry ? getMarkerFocusPoint(entry.object) : null;
   }
 
   function startCameraTransition(hotspot) {
@@ -171,14 +189,29 @@
     const focusing = hotspot != null;
 
     if (hotspot) {
+      const entry = getHotspotMarkerEntry(hotspot);
       const markerPos = getHotspotMarkerPosition(hotspot);
-      if (!markerPos) return;
+      const focusPoint = getHotspotFocusPoint(hotspot);
+      if (!entry || !markerPos || !focusPoint) return;
 
-      toTarget = markerPos;
-      toCam = computeFocusCameraPosition(markerPos, homeOrbitConfig.center, _worldBox);
+      toTarget = focusPoint.clone();
+      toCam = computeFocusCameraPosition(markerPos, focusPoint, homeOrbitConfig.center, _worldBox);
       if (snowMountainModel) {
         toCam = clampFocusCameraPosition(markerPos, toCam, snowMountainModel, raycaster);
       }
+
+      const savedCam = camera.position.clone();
+      const savedTarget = controls.target.clone();
+      camera.position.copy(toCam);
+      controls.target.copy(toTarget);
+      camera.lookAt(toTarget);
+      panFocusToViewportX(camera, controls.target, focusPoint);
+      toCam = camera.position.clone();
+      toTarget = controls.target.clone();
+      orientMarkerTowardWorldPoint(entry.object, entry.hotspot.modelSrc, toCam);
+      camera.position.copy(savedCam);
+      controls.target.copy(savedTarget);
+
       toZoom = FOCUS_CAMERA_ZOOM;
     } else {
       const hero = getHeroCameraPose();
@@ -225,6 +258,13 @@
     camera.zoom = THREE.MathUtils.lerp(cameraTransition.fromZoom, cameraTransition.toZoom, t);
     camera.updateProjectionMatrix();
 
+    if (cameraTransition.focusing && selectedHotspot) {
+      const entry = getHotspotMarkerEntry(selectedHotspot);
+      if (entry) {
+        orientMarkerTowardWorldPoint(entry.object, entry.hotspot.modelSrc, camera.position);
+      }
+    }
+
     if (rawT >= 1) {
       const { focusing } = cameraTransition;
       cameraTransition = null;
@@ -249,13 +289,28 @@
     }
   }
 
+  /** @param {number} now */
+  function updateMarkerSpin(now) {
+    const delta = lastAnimationTime ? Math.min((now - lastAnimationTime) / 1000, 0.05) : 0;
+    lastAnimationTime = now;
+    if (delta === 0) return;
+
+    for (const entry of markers) {
+      entry.model.rotation.y += entry.spinSpeed * delta;
+    }
+  }
+
   function updateMarkerOrientations() {
     if (!camera) return;
     for (const entry of markers) {
       const pos = entry.object.position;
       const dx = camera.position.x - pos.x;
       const dz = camera.position.z - pos.z;
-      if (dx * dx + dz * dz > 1e-8) {
+      if (dx * dx + dz * dz < 1e-8) continue;
+
+      if (selectedHotspot?.id === entry.hotspot.id) {
+        orientMarkerTowardWorldPoint(entry.object, entry.hotspot.modelSrc, camera.position);
+      } else {
         entry.object.rotation.y = Math.atan2(dx, dz);
       }
     }
@@ -300,7 +355,7 @@
       root.position.copy(positions[index]);
       root.userData.hotspot = hotspot;
       markerGroup.add(root);
-      markers.push({ object: root, hotspot, baseScale: 1 });
+      markers.push({ object: root, model, hotspot, baseScale: 1, spinSpeed: MARKER_SPIN_SPEED });
     }
 
     updateMarkerOrientations();
@@ -353,12 +408,15 @@
     animationFrameId = requestAnimationFrame(animate);
     if (paused) return;
 
+    const now = performance.now();
+    updateMarkerSpin(now);
+
     if (controls && cameraReady) {
       controls.enabled = !transitionActive;
     }
 
     if (cameraTransition) {
-      updateCameraTransition(performance.now());
+      updateCameraTransition(now);
     } else {
       controls?.update();
       updateMarkerOrientations();
@@ -414,6 +472,7 @@
     cameraFloorY = null;
     cameraReady = false;
     lastSelectedHotspotId = null;
+    lastAnimationTime = 0;
     cameraTransition = null;
     transitionActive = false;
   }
@@ -444,7 +503,7 @@
       markerGroup = new THREE.Group();
       scene.add(markerGroup);
 
-      sceneFog = new THREE.FogExp2(smogColor, 0.045);
+      sceneFog = new THREE.FogExp2(smogColor, 0.028);
       scene.fog = sceneFog;
 
       const w = Math.max(container.clientWidth, 1);

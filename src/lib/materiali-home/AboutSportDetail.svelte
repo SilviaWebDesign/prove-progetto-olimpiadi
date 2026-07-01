@@ -4,13 +4,11 @@
   /** @type {{
    *   hotspot: import('./aboutHotspots.js').AboutHotspot;
    *   onclose: () => void;
-   *   onprev?: () => void;
    *   onnext?: () => void;
    * }} */
-  let { hotspot, onclose, onprev, onnext } = $props();
+  let { hotspot, onclose, onnext } = $props();
 
   const pathIndex = $derived(getHotspotPathIndex(hotspot.id));
-  const hasPrev = $derived(pathIndex > 0);
   const hasNext = $derived(pathIndex >= 0 && pathIndex < ABOUT_HOTSPOT_PATH.length - 1);
   const title = $derived(hotspot.title ?? hotspot.label);
   const paragraphs = $derived(
@@ -28,7 +26,6 @@
 
 <div class="sport-detail">
   <div class="sport-detail-gradients" aria-hidden="true">
-    <div class="grad-bottom"></div>
     <div class="grad-side"></div>
   </div>
 
@@ -44,30 +41,6 @@
       </div>
     {/key}
   </aside>
-
-  <nav class="path-nav" aria-label="Percorso sulla montagna">
-    <button
-      type="button"
-      class="path-btn"
-      disabled={!hasPrev}
-      aria-label="Tappa precedente"
-      onclick={() => onprev?.()}
-    >
-      ←
-    </button>
-    <span class="path-progress">
-      {pathIndex + 1} / {ABOUT_HOTSPOT_PATH.length}
-    </span>
-    <button
-      type="button"
-      class="path-btn"
-      disabled={!hasNext}
-      aria-label="Tappa successiva"
-      onclick={() => onnext?.()}
-    >
-      →
-    </button>
-  </nav>
 
   <button type="button" class="continue-btn" onclick={onContinue}>
     <span class="continue-label">Continua</span>
@@ -89,35 +62,26 @@
     pointer-events: none;
   }
 
-  .grad-bottom {
-    position: absolute;
-    left: -20%;
-    right: -20%;
-    bottom: 0;
-    height: 72%;
-    background: linear-gradient(to top, #f9f9fa 18.7%, rgba(249, 249, 250, 0) 78.4%);
-  }
-
   .grad-side {
     position: absolute;
     top: 0;
+    left: 49%;
     right: 0;
-    width: 62%;
     height: 100%;
     background: linear-gradient(
       to right,
       rgba(249, 249, 250, 0) 0%,
-      rgba(249, 249, 250, 0.55) 28%,
-      #f9f9fa 48%
+      rgba(249, 249, 250, 0.55) 32%,
+      #f9f9fa 52%
     );
   }
 
   .sport-panel {
     position: absolute;
-    top: 50%;
-    right: clamp(24px, 8vw, calc(33.33% - 40px));
-    transform: translateY(calc(-50% + 21px));
-    width: min(380px, calc(100vw - 48px));
+    top: calc(50% + 42px);
+    left: calc(66.67% + 14px);
+    transform: translateY(-50%);
+    width: min(380px, calc(33.33vw - 28px));
     max-height: min(72vh, 640px);
     overflow-y: auto;
     padding: 0 4px 24px;
@@ -184,58 +148,9 @@
     text-indent: 0.45em;
   }
 
-  .path-nav {
-    position: absolute;
-    left: clamp(24px, 5vw, 79px);
-    bottom: clamp(96px, 14vh, 140px);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    pointer-events: auto;
-  }
-
-  .path-btn {
-    width: 40px;
-    height: 40px;
-    margin: 0;
-    padding: 0;
-    border: 1px solid rgba(22, 26, 31, 0.2);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    font-size: 1.1rem;
-    line-height: 1;
-    color: #161a1f;
-    cursor: pointer;
-  }
-
-  .path-btn:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.98);
-  }
-
-  .path-btn:disabled {
-    opacity: 0.35;
-    cursor: default;
-  }
-
-  .path-btn:focus-visible {
-    outline: 2px solid #161a1f;
-    outline-offset: 2px;
-  }
-
-  .path-progress {
-    font-family: 'Supreme Variable', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #161a1f;
-  }
-
   .continue-btn {
     position: absolute;
-    left: 50%;
+    left: calc(45.83% + 40.5px);
     bottom: clamp(28px, 6vh, 48px);
     transform: translateX(-50%);
     display: flex;
@@ -272,11 +187,11 @@
   @keyframes panelIn {
     from {
       opacity: 0;
-      transform: translateY(calc(-50% + 21px + 18px));
+      transform: translateY(calc(-50% + 18px));
     }
     to {
       opacity: 1;
-      transform: translateY(calc(-50% + 21px));
+      transform: translateY(-50%);
     }
   }
 
@@ -313,11 +228,6 @@
       background: linear-gradient(to top, #f9f9fa 88%, rgba(249, 249, 250, 0.96));
       border-radius: 20px 20px 0 0;
       animation-name: panelInMobile;
-    }
-
-    .path-nav {
-      left: 20px;
-      bottom: calc(min(58vh, 520px) + 12px);
     }
   }
 

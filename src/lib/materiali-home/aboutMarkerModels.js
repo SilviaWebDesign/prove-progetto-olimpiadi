@@ -64,6 +64,20 @@ function fitMarkerModel(object, url) {
   object.position.y += cfg.yOffset;
 }
 
+/** @param {string} url */
+export function getMarkerFrontYawOffset(url) {
+  return getMarkerConfig(url).rotationY ?? 0;
+}
+
+/** @param {THREE.Object3D} markerRoot @param {string} modelSrc @param {THREE.Vector3} worldPoint */
+export function orientMarkerTowardWorldPoint(markerRoot, modelSrc, worldPoint) {
+  const pos = markerRoot.position;
+  const dx = worldPoint.x - pos.x;
+  const dz = worldPoint.z - pos.z;
+  if (dx * dx + dz * dz < 1e-8) return;
+  markerRoot.rotation.y = Math.atan2(dx, dz) - getMarkerFrontYawOffset(modelSrc);
+}
+
 /** @param {THREE.Object3D} object @param {boolean} active */
 export function applyMarkerMaterial(object, active = false) {
   const material = active ? MARKER_MATERIAL_ACTIVE : MARKER_MATERIAL;

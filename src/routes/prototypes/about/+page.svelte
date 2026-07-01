@@ -1,9 +1,11 @@
 <script>
   import { onMount } from 'svelte';
   import ExplorableMountainScene from '$lib/materiali-home/ExplorableMountainScene.svelte';
+  import AboutSportDetail from '$lib/materiali-home/AboutSportDetail.svelte';
   import AboutHotspotCard from '$lib/materiali-home/AboutHotspotCard.svelte';
   import Navbar from '$lib/materiali-home/Navbar.svelte';
   import { preloadMountainGltf } from '$lib/materiali-home/mountainGltf.js';
+  import { preloadAboutMarkerModels } from '$lib/materiali-home/aboutMarkerModels.js';
   import { getNextHotspot, getPrevHotspot } from '$lib/materiali-home/aboutHotspots.js';
   import { overlayVisible } from '$lib/stores/pageTransition';
   import { browser } from '$app/environment';
@@ -36,6 +38,7 @@
   onMount(() => {
     overlayVisible.set(false);
     preloadMountainGltf();
+    preloadAboutMarkerModels();
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     window.addEventListener('wheel', onWheelDismiss, { passive: true });
 
@@ -76,12 +79,21 @@
   {/if}
 
   {#if selectedHotspot && introDismissed}
-    <AboutHotspotCard
-      hotspot={selectedHotspot}
-      onclose={closeHotspot}
-      onprev={goPrev}
-      onnext={goNext}
-    />
+    {#if selectedHotspot.template === 'sport'}
+      <AboutSportDetail
+        hotspot={selectedHotspot}
+        onclose={closeHotspot}
+        onprev={goPrev}
+        onnext={goNext}
+      />
+    {:else}
+      <AboutHotspotCard
+        hotspot={selectedHotspot}
+        onclose={closeHotspot}
+        onprev={goPrev}
+        onnext={goNext}
+      />
+    {/if}
   {/if}
 
   {#if !introDismissed}

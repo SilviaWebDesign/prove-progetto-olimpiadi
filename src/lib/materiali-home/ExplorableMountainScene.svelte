@@ -17,24 +17,25 @@
   } from './mountainGltf.js';
   import {
     ABOUT_HOTSPOT_PATH,
-    hotspotSurfacePosition,
-    hotspotHorizontalDirection,
-    ensureCardNearMountain,
+    hotspotSnowPosition,
     enforceHotspotSeparation,
-    snapPositionToMountainSurface,
+    snapPositionToSnowSurface,
     computeFocusCameraPosition,
     clampFocusCameraPosition,
     focusCameraDistance,
     sampleOrbitFocusTransition
   } from './aboutHotspots.js';
+  import {
+    preloadAboutMarkerModels,
+    cloneMarkerModel,
+    applyMarkerMaterial,
+    disposeMarkerGeometries
+  } from './aboutMarkerModels.js';
 
   const FOCUS_CAMERA_ZOOM = 1.45;
   const CAMERA_TRANSITION_MS = 900;
 
   const smogColor = '#ffffff';
-  const MARKER_RADIUS = 0.36;
-  const MARKER_COLOR = 0x8a8d94;
-  const MARKER_COLOR_ACTIVE = 0x6d7078;
 
   /** @type {{ selectedHotspot?: import('./aboutHotspots.js').AboutHotspot | null }} */
   let { selectedHotspot = $bindable(null) } = $props();
@@ -61,7 +62,7 @@
 
   /**
    * @type {{
-   *   mesh: THREE.Mesh;
+   *   object: THREE.Group;
    *   hotspot: import('./aboutHotspots.js').AboutHotspot;
    *   baseScale: number;
    * }[]}
@@ -96,16 +97,14 @@
    * } | null} */
   let cameraTransition = null;
 
-  const markerGeometry = new THREE.SphereGeometry(MARKER_RADIUS, 20, 20);
-
-  /** @param {boolean} [active] */
-  function createMarkerMaterial(active = false) {
-    return new THREE.MeshStandardMaterial({
-      color: active ? MARKER_COLOR_ACTIVE : MARKER_COLOR,
-      metalness: 0.92,
-      roughness: 0.28,
-      fog: true
-    });
+  /** @param {THREE.Object3D} object */
+  function hotspotFromObject(object) {
+    let current = object;
+    while (current) {
+      if (current.userData?.hotspot) return current.userData.hotspot;
+      current = current.parent;
+    }
+    return null;
   }
 
   function applyMountainOrbitLimits() {
@@ -154,7 +153,7 @@
   /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
   function getHotspotMarkerPosition(hotspot) {
     const entry = markers.find((m) => m.hotspot.id === hotspot?.id);
-    return entry?.mesh.position.clone() ?? null;
+    return entry?.object.position.clone() ?? null;
   }
 
   function startCameraTransition(hotspot) {
@@ -245,40 +244,47 @@
   function updateMarkerSelection() {
     for (const entry of markers) {
       const active = selectedHotspot?.id === entry.hotspot.id;
-      entry.mesh.material.color.setHex(active ? MARKER_COLOR_ACTIVE : MARKER_COLOR);
-      entry.mesh.scale.setScalar(active ? entry.baseScale * 1.28 : entry.baseScale);
+      applyMarkerMaterial(entry.object, active);
+      entry.object.scale.setScalar(active ? entry.baseScale * 1.22 : entry.baseScale);
+    }
+  }
+
+  function updateMarkerOrientations() {
+    if (!camera) return;
+    for (const entry of markers) {
+      const pos = entry.object.position;
+      const dx = camera.position.x - pos.x;
+      const dz = camera.position.z - pos.z;
+      if (dx * dx + dz * dz > 1e-8) {
+        entry.object.rotation.y = Math.atan2(dx, dz);
+      }
     }
   }
 
   /** @param {THREE.Box3} worldBox */
-  function buildMarkers(worldBox) {
+  async function buildMarkers(worldBox) {
     if (!scene || !markerGroup || !snowMountainModel) return;
 
     for (const entry of markers) {
-      markerGroup.remove(entry.mesh);
-      entry.mesh.material.dispose();
+      markerGroup.remove(entry.object);
+      disposeMarkerGeometries(entry.object);
     }
     markers = [];
+
+    await preloadAboutMarkerModels();
 
     /** @type {THREE.Vector3[]} */
     const positions = [];
 
     ABOUT_HOTSPOT_PATH.forEach((hotspot) => {
-      let worldPos = hotspotSurfacePosition(worldBox, snowMountainModel, hotspot, raycaster);
-      worldPos = ensureCardNearMountain(
-        worldPos,
-        worldBox,
-        snowMountainModel,
-        hotspotHorizontalDirection(hotspot.azimuth),
-        raycaster
-      );
+      const worldPos = hotspotSnowPosition(worldBox, snowMountainModel, hotspot, raycaster);
       positions.push(worldPos);
     });
 
     enforceHotspotSeparation(positions);
 
     for (let i = 0; i < positions.length; i++) {
-      positions[i] = snapPositionToMountainSurface(
+      positions[i] = snapPositionToSnowSurface(
         positions[i],
         worldBox,
         snowMountainModel,
@@ -286,14 +292,18 @@
       );
     }
 
-    ABOUT_HOTSPOT_PATH.forEach((hotspot, index) => {
-      const mesh = new THREE.Mesh(markerGeometry, createMarkerMaterial());
-      mesh.position.copy(positions[index]);
-      mesh.userData.hotspot = hotspot;
-      markerGroup.add(mesh);
-      markers.push({ mesh, hotspot, baseScale: 1 });
-    });
+    for (let index = 0; index < ABOUT_HOTSPOT_PATH.length; index++) {
+      const hotspot = ABOUT_HOTSPOT_PATH[index];
+      const model = await cloneMarkerModel(hotspot.modelSrc);
+      const root = new THREE.Group();
+      root.add(model);
+      root.position.copy(positions[index]);
+      root.userData.hotspot = hotspot;
+      markerGroup.add(root);
+      markers.push({ object: root, hotspot, baseScale: 1 });
+    }
 
+    updateMarkerOrientations();
     updateMarkerSelection();
   }
 
@@ -316,10 +326,10 @@
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(markerGroup.children, false);
+    const hits = raycaster.intersectObjects(markerGroup.children, true);
     if (!hits.length) return;
 
-    const hotspot = hits[0].object.userData.hotspot;
+    const hotspot = hotspotFromObject(hits[0].object);
     if (hotspot) selectedHotspot = hotspot;
   }
 
@@ -351,6 +361,7 @@
       updateCameraTransition(performance.now());
     } else {
       controls?.update();
+      updateMarkerOrientations();
     }
 
     renderer.render(scene, camera);
@@ -365,11 +376,10 @@
     renderer?.domElement.removeEventListener('pointerup', onPointerClick);
 
     for (const entry of markers) {
-      markerGroup?.remove(entry.mesh);
-      entry.mesh.material.dispose();
+      markerGroup?.remove(entry.object);
+      disposeMarkerGeometries(entry.object);
     }
     markers = [];
-    markerGeometry.dispose();
 
     controls?.dispose();
     controls = undefined;
@@ -501,7 +511,7 @@
           topDownHeight
         );
         cameraFloorY = snowField.y - 0.2;
-        buildMarkers(_worldBox);
+        await buildMarkers(_worldBox);
 
         applyHomeHeroCamera(camera, homeOrbitConfig, _heroLookAt);
         controls.target.copy(_heroLookAt);

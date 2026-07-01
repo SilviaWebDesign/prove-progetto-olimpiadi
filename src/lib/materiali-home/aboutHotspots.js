@@ -6,70 +6,67 @@ import * as THREE from 'three';
  *   azimuth: number;
  *   elevation: number;
  *   label: string;
+ *   title?: string;
  *   body: string;
  *   sources: string;
+ *   modelSrc: string;
+ *   template?: 'sport' | 'card';
  * }} AboutHotspot
  */
 
 /** Distanza minima tra marker consecutivi sul percorso (unità mondo). */
 export const MIN_HOTSPOT_SPACING = 4.8;
 
-/** Sei tappe sul percorso in senso orario (azimuth crescente = avanti nel percorso). */
+/** Quattro tappe sul percorso in senso orario (azimuth crescente = avanti nel percorso). */
 /** @type {AboutHotspot[]} */
 export const ABOUT_HOTSPOT_PATH = [
   {
     id: 'start',
-    azimuth: 0.04,
-    elevation: 0.1,
+    azimuth: 0.06,
+    elevation: 0.14,
     label: 'Partenza',
+    title: 'Il progetto',
+    template: 'sport',
     body:
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Il percorso inizia dalla base della montagna.',
-    sources: 'fonte placeholder'
+      '“Quante facce ha una medaglia?” è un progetto realizzato per il Laboratorio di Web e Digital Design, del Corso di Laurea in Design della Comunicazione del Politecnico di Milano. L’obiettivo era quello di creare un’esperienza digitale in grado di raccontare le Olimpiadi Invernali di Milano-Cortina 2026 come spazio narrativo: tra aspettative, pressioni, successi e fallimenti. Atleti, istituzioni e luoghi diventano protagonisti di storie che rendono l’evento sportivo un momento memorabile.\n\n“Quante facce ha una medaglia?” nasce come provocazione di fronte al binomio buoni-cattivi, risultato di uno storytelling di intrattenimento che riduce le informazioni a dicotomie e schieramenti estremamente polarizzati. Lo scopo del sito è dimostrare che la formazione di questa polarità non è un processo oggettivo e naturale, ma dipende sempre dal contesto sociale, dalla costruzione mediatica e dal punto di vista di ogni singolo individuo: uno stesso evento può plasmare molteplici realtà, tutte contemporaneamente vere perché interpretazioni di fatti oggettivi.\n\nL’intento non è quello di chiudere il dibattito sugli “eroi” e i “cattivi” delle Olimpiadi, ma di stimolare una riflessione riguardo al processo di creazione di protagonisti e antagonisti, idoli e capri espiatori, frutto dell’approccio estremizzante della comunicazione di massa.',
+    sources: 'fonte placeholder',
+    modelSrc: '/oggetti/snowboardlady.glb'
   },
   {
     id: 'lower-slope',
-    azimuth: 0.26,
-    elevation: 0.28,
+    azimuth: 0.32,
+    elevation: 0.38,
     label: 'Pendio inferiore',
+    title: 'Lo sport',
+    template: 'sport',
     body:
-      'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.',
-    sources: 'fonte placeholder'
+      'Le discipline invernali raccontano atleti che competono sotto gli occhi del mondo, tra preparazione fisica, pressione mediatica e aspettative nazionali.\n\nOgni performance può diventare simbolo di vittoria o delusione, a seconda del racconto che la circonda e del momento in cui viene consumata.',
+    sources: 'fonte placeholder',
+    modelSrc: '/oggetti/scii.glb'
   },
   {
     id: 'west-ridge',
-    azimuth: 0.5,
-    elevation: 0.46,
+    azimuth: 0.58,
+    elevation: 0.62,
     label: 'Cresta ovest',
+    title: 'La velocità',
+    template: 'sport',
     body:
-      'Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-    sources: 'fonte placeholder'
-  },
-  {
-    id: 'east-slope',
-    azimuth: 0.68,
-    elevation: 0.64,
-    label: 'Versante est',
-    body:
-      'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
-    sources: 'fonte placeholder'
-  },
-  {
-    id: 'upper-ridge',
-    azimuth: 0.82,
-    elevation: 0.8,
-    label: 'Alta quota',
-    body:
-      'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim.',
-    sources: 'fonte placeholder'
+      'Bob e discipline a cronometro mettono in scena il corpo come macchina al limite: traiettorie, ghiaccio, rischio calcolato.\n\nLa medaglia qui non è solo talento, ma anche ingegneria, squadra e decisioni prese in frazioni di secondo.',
+    sources: 'fonte placeholder',
+    modelSrc: '/oggetti/bobsled.glb'
   },
   {
     id: 'peak',
-    azimuth: 0.93,
-    elevation: 0.9,
+    azimuth: 0.88,
+    elevation: 0.88,
     label: 'Vetta',
+    title: 'Il team',
+    template: 'sport',
     body:
-      'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.',
-    sources: 'fonte placeholder'
+      'Sul ghiaccio e sulla neve, lo sport di squadra amplifica il tema della medaglia: successo collettivo, errore condiviso, leadership e sostituzioni.\n\nOgni giocatore porta una versione diversa della stessa partita, e ogni versione può sembrare la più vera.',
+    sources: 'fonte placeholder',
+    modelSrc: '/oggetti/ice_hockey_player.glb'
   }
 ];
 
@@ -106,6 +103,9 @@ export function getPrevHotspot(id) {
 
 /** Distanza dalla superficie per appoggiare le card all'esterno del mesh. */
 export const HOTSPOT_SURFACE_OFFSET = 0.28;
+
+/** Sollevamento minimo sopra la mesh neve (evita z-fighting). */
+export const HOTSPOT_MARKER_LIFT = 0.12;
 
 /** Margine minimo tra camera e superficie della montagna. */
 export const CAMERA_SURFACE_MARGIN = 1.2;
@@ -163,6 +163,93 @@ function positionOnSurface(hit, horizontal) {
     .normalize();
 
   return hit.point.clone().addScaledVector(offsetNormal, HOTSPOT_SURFACE_OFFSET);
+}
+
+/** @param {THREE.Box3} worldBox */
+export function snowLineY(worldBox) {
+  const size = worldBox.getSize(new THREE.Vector3());
+  return worldBox.min.y + size.y * 0.16;
+}
+
+/**
+ * @param {THREE.Intersection} hit
+ * @param {number} snowY
+ */
+function isSnowSurfaceHit(hit, snowY) {
+  if (hit.point.y < snowY - 0.3) return false;
+  if (hit.face == null) return hit.point.y >= snowY - 0.15;
+
+  const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+  return normal.y >= 0.14;
+}
+
+/** @param {THREE.Intersection} hit */
+function positionOnSnowSurface(hit) {
+  return hit.point.clone().add(new THREE.Vector3(0, HOTSPOT_MARKER_LIFT, 0));
+}
+
+/**
+ * Posizione sulla neve: stesso azimuth del percorso, raycast verticale sulla calotta nevosa.
+ *
+ * @param {THREE.Box3} worldBox
+ * @param {THREE.Object3D} mountainModel
+ * @param {AboutHotspot} hotspot
+ * @param {THREE.Raycaster} raycaster
+ * @returns {THREE.Vector3}
+ */
+export function hotspotSnowPosition(worldBox, mountainModel, hotspot, raycaster) {
+  const center = worldBox.getCenter(new THREE.Vector3());
+  const size = worldBox.getSize(new THREE.Vector3());
+  const sphere = worldBox.getBoundingSphere(new THREE.Sphere());
+  const snowY = snowLineY(worldBox);
+  const horizontal = hotspotHorizontalDirection(hotspot.azimuth);
+  const castFromY = worldBox.min.y + size.y * 0.96;
+
+  /** @type {number[]} */
+  const shellRadii = [
+    THREE.MathUtils.lerp(sphere.radius * 0.94, sphere.radius * 0.58, hotspot.elevation),
+    THREE.MathUtils.lerp(sphere.radius * 0.88, sphere.radius * 0.64, hotspot.elevation),
+    THREE.MathUtils.lerp(sphere.radius * 0.82, sphere.radius * 0.7, hotspot.elevation)
+  ];
+
+  for (const shellRadius of shellRadii) {
+    const x = center.x + horizontal.x * shellRadius;
+    const z = center.z + horizontal.z * shellRadius;
+    raycaster.set(new THREE.Vector3(x, castFromY, z), new THREE.Vector3(0, -1, 0));
+    const hits = raycaster.intersectObject(mountainModel, true);
+
+    for (const hit of hits) {
+      if (!isSnowSurfaceHit(hit, snowY)) continue;
+      return positionOnSnowSurface(hit);
+    }
+  }
+
+  return hotspotSurfacePosition(worldBox, mountainModel, hotspot, raycaster);
+}
+
+/**
+ * Riaggancia un marker sulla neve (stesso XZ).
+ *
+ * @param {THREE.Vector3} pos
+ * @param {THREE.Box3} worldBox
+ * @param {THREE.Object3D} mountainModel
+ * @param {THREE.Raycaster} raycaster
+ * @returns {THREE.Vector3}
+ */
+export function snapPositionToSnowSurface(pos, worldBox, mountainModel, raycaster) {
+  const size = worldBox.getSize(new THREE.Vector3());
+  const snowY = snowLineY(worldBox);
+  const castFromY = worldBox.min.y + size.y * 0.96;
+
+  raycaster.set(new THREE.Vector3(pos.x, castFromY, pos.z), new THREE.Vector3(0, -1, 0));
+  const hits = raycaster.intersectObject(mountainModel, true);
+
+  for (const hit of hits) {
+    if (!isSnowSurfaceHit(hit, snowY)) continue;
+    return positionOnSnowSurface(hit);
+  }
+
+  return pos;
 }
 
 /**

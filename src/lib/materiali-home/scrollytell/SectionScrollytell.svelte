@@ -14,10 +14,15 @@
   import type { CardStackApi } from './CardStack.svelte';
   import Scene3D from './Scene3D.svelte';
   import type { Scene3DApi } from './Scene3D.svelte';
+  import SectionScrollytellMobile from './SectionScrollytellMobile.svelte';
 
   import './tokens.css';
   import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
   import { overlayVisible } from '$lib/stores/pageTransition';
+
+  // ── Mobile detection ───────────────────────────────────────────────────────
+  let isMobile = $state(false);
+  let deviceChecked = $state(false);
 
   interface CardData { id: number; body: string; liked: boolean; }
   interface TopicData { counter: string; title: string; body: string; source?: string; comments: string[]; }
@@ -327,6 +332,11 @@
 
   // ── Setup ────────────────────────────────────────────────────────────────
   onMount(() => {
+    isMobile = window.innerWidth < 768;
+    deviceChecked = true;
+
+    if (isMobile) return;
+
     if (!browser || !sceneEl) return;
 
     if ($overlayVisible) setTimeout(() => overlayVisible.set(false), 60);
@@ -500,6 +510,10 @@
   <title>{config.pageTitle}</title>
 </svelte:head>
 
+{#if deviceChecked && isMobile}
+  <SectionScrollytellMobile {config} />
+{:else if !isMobile}
+
 <section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
   <div class="scene__viewport">
 
@@ -628,6 +642,8 @@
 
   </div>
 </section>
+
+{/if}
 
 <style>
   @font-face {

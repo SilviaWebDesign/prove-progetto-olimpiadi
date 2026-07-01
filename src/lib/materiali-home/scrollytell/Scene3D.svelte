@@ -198,7 +198,7 @@
         }
       },
       setScale: (f) => {
-        if (modelGroup && (transitionState === 'none' || scrollDrivenTransition)) {
+        if (modelGroup && (transitionState === 'none' || transitionState === 'done' || scrollDrivenTransition)) {
           modelGroup.scale.setScalar(baseScale * f);
         }
       },

@@ -464,14 +464,15 @@ export function safeOrbitRadius(worldBox) {
 }
 
 /**
- * Posizione camera per inquadrare una card frontalmente.
+ * Posizione camera per inquadrare un marker frontalmente (asse orizzontale verso il centro montagna).
  *
- * @param {THREE.Vector3} cardPos
+ * @param {THREE.Vector3} markerPos
+ * @param {THREE.Vector3} focusPoint
  * @param {THREE.Vector3} mountainCenter
  * @param {THREE.Box3} worldBox
  */
-export function computeFocusCameraPosition(cardPos, mountainCenter, worldBox) {
-  const outward = new THREE.Vector3().subVectors(cardPos, mountainCenter);
+export function computeFocusCameraPosition(markerPos, focusPoint, mountainCenter, worldBox) {
+  const outward = new THREE.Vector3().subVectors(markerPos, mountainCenter);
   outward.y = 0;
   if (outward.lengthSq() < 1e-6) outward.set(0, 0, 1);
   outward.normalize();
@@ -479,9 +480,9 @@ export function computeFocusCameraPosition(cardPos, mountainCenter, worldBox) {
   const dist = focusCameraDistance(worldBox);
 
   return new THREE.Vector3(
-    cardPos.x + outward.x * dist,
-    cardPos.y,
-    cardPos.z + outward.z * dist
+    focusPoint.x + outward.x * dist,
+    focusPoint.y,
+    focusPoint.z + outward.z * dist
   );
 }
 
@@ -621,4 +622,51 @@ export function clampFocusCameraPosition(surfacePoint, desiredCamPos, mountainMo
     out.copy(surfacePoint).addScaledVector(toCam, minDist);
   }
   return out;
+}
+
+/** Frazione viewport (0–1) dove inquadrare il marker in focus — lato sinistro, come Figma. */
+export const FOCUS_VIEWPORT_X = 0.44;
+
+const _focusProj = new THREE.Vector3();
+const _focusFwd = new THREE.Vector3();
+const _focusRight = new THREE.Vector3();
+
+/**
+ * Centro visivo del marker (bbox world) per il framing camera.
+ * @param {THREE.Object3D} markerRoot
+ */
+export function getMarkerFocusPoint(markerRoot) {
+  const box = new THREE.Box3().setFromObject(markerRoot);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  return center;
+}
+
+/**
+ * Pan parallelo di camera + target per portare `worldPoint` sul lato sinistro del viewport.
+ * @param {THREE.PerspectiveCamera} camera
+ * @param {THREE.Vector3} target
+ * @param {THREE.Vector3} worldPoint
+ * @param {number} [viewportX]
+ */
+export function panFocusToViewportX(camera, target, worldPoint, viewportX = FOCUS_VIEWPORT_X) {
+  const desiredNdcX = viewportX * 2 - 1;
+
+  camera.lookAt(target);
+
+  for (let i = 0; i < 6; i++) {
+    _focusProj.copy(worldPoint).project(camera);
+    const delta = desiredNdcX - _focusProj.x;
+    if (Math.abs(delta) < 0.008) break;
+
+    const dist = camera.position.distanceTo(target);
+    const shift = delta * dist * Math.tan((camera.fov * Math.PI) / 360) * camera.aspect;
+
+    camera.getWorldDirection(_focusFwd);
+    _focusRight.crossVectors(camera.up, _focusFwd).normalize();
+
+    camera.position.addScaledVector(_focusRight, shift);
+    target.addScaledVector(_focusRight, shift);
+    camera.lookAt(target);
+  }
 }

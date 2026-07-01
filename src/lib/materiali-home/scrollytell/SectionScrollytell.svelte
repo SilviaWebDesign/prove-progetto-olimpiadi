@@ -14,7 +14,6 @@
   import type { CardStackApi } from './CardStack.svelte';
   import Scene3D from './Scene3D.svelte';
   import type { Scene3DApi } from './Scene3D.svelte';
-  import SectionScrollytellMobile from './SectionScrollytellMobile.svelte';
 
   import './tokens.css';
   import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
@@ -22,7 +21,6 @@
 
   // ── Mobile detection ───────────────────────────────────────────────────────
   let isMobile = $state(false);
-  let deviceChecked = $state(false);
 
   interface CardData { id: number; body: string; liked: boolean; }
   interface TopicData { counter: string; title: string; body: string; source?: string; comments: string[]; }
@@ -142,7 +140,11 @@
     gsap.fromTo('.stage__text',  { opacity: 0, y:  8 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.inOut' });
     gsap.fromTo('.stage__right-heading', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power3.inOut', delay: 0.04 });
     await tick();
-    await cardStack?.animateIn();
+    if (isMobile) {
+      await mobileShowCards();
+    } else {
+      await cardStack?.animateIn();
+    }
     gsap.to('.stage__cta', { opacity: 1, duration: 0.3, delay: 0.1 });
     isTransitioning = false;
   }
@@ -160,6 +162,11 @@
 
     await new Promise<void>(r => setTimeout(r, OUT * 200));
     outTl.kill();
+
+    if (isMobile) {
+      mobileCardsVisible = false; // CSS removes m-cards-visible
+      mobileScrollRatio = 0;
+    }
 
     const resultModelPath = computeResult();
     currentResultPath = resultModelPath;
@@ -185,6 +192,12 @@
     isTransitioning = true;
     const OUT = 0.50;
 
+    if (isMobile) {
+      mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
+      mobileScrollRatio = 0;
+      if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
+    }
+
     gsap.to('.stage__text', { opacity: 0, y: -8, duration: OUT, ease: 'power3.inOut' });
     await cardStack?.animateOut();
 
@@ -192,7 +205,7 @@
     await tick();
 
     gsap.set('.stage__text', { y: 8, opacity: 0 });
-    await cardStack?.animateIn();
+    if (!isMobile) await cardStack?.animateIn();
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
       .to('.stage__text', { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0);
@@ -205,6 +218,12 @@
     isTransitioning = true;
     const OUT = 0.50;
 
+    if (isMobile) {
+      mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
+      mobileScrollRatio = 0;
+      if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
+    }
+
     gsap.to('.stage__text', { opacity: 0, y: 8, duration: OUT, ease: 'power3.inOut' });
     await cardStack?.animateOut();
 
@@ -212,7 +231,7 @@
     await tick();
 
     gsap.set('.stage__text', { y: -8, opacity: 0 });
-    await cardStack?.animateIn();
+    if (!isMobile) await cardStack?.animateIn();
 
     gsap.timeline({ onComplete: () => { isTransitioning = false; } })
       .to('.stage__text', { opacity: 1, y: 0, duration: 0.60, ease: 'power3.inOut' }, 0);
@@ -225,7 +244,12 @@
   let cardsIntroduced = false;
   let cardsScrollAnimating = false;
 
-  /** Progresso scroll (0–1) in cui l'oggetto diventa particelle gradualmente. */
+  // ── Mobile-specific state ─────────────────────────────────────────────────
+  let mobileCardsVisible = $state(false);
+  let cardsScrollRef = $state<HTMLElement | null>(null);
+  let mobileScrollRatio = $state(0);
+  let touchStartY = 0;
+
   const PARTICLE_SCROLL_START = 0.58;
   const PARTICLE_SCROLL_END   = 0.98;
 
@@ -237,6 +261,80 @@
   // ── Model loaded signal ───────────────────────────────────────────────────
   let resolveModelLoaded: () => void = () => {};
   const modelLoadedPromise = new Promise<void>(resolve => { resolveModelLoaded = resolve; });
+
+  // ── Mobile cards ──────────────────────────────────────────────────────────
+  async function mobileShowCards() {
+    if (mobileCardsVisible || cardsScrollAnimating) return;
+    cardsScrollAnimating = true;
+    mobileCardsVisible = true; // CSS class m-cards-visible makes container visible
+    await tick();
+    await cardStack?.animateIn();
+    cardsScrollAnimating = false;
+  }
+
+  async function mobileHideCards() {
+    if (!mobileCardsVisible || cardsScrollAnimating) return;
+    cardsScrollAnimating = true;
+    await cardStack?.animateOut();
+    mobileCardsVisible = false; // CSS class removed → container back to opacity 0
+    mobileScrollRatio = 0;
+    if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
+    cardsScrollAnimating = false;
+  }
+
+  function onCardsScroll() {
+    const el = cardsScrollRef;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    mobileScrollRatio = max > 0 ? el.scrollTop / max : 0;
+  }
+
+  // ── Touch gesture detection ───────────────────────────────────────────────
+
+  // Non-passive: prevents page scroll (including iOS inertia) while in topics mode.
+  function mobilePreventScroll(e: TouchEvent) {
+    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) {
+      return; // allow natural scroll inside the cards box
+    }
+    e.preventDefault();
+  }
+
+  function onTouchStart(e: TouchEvent) {
+    touchStartY = e.touches[0].clientY;
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    const deltaY = touchStartY - e.changedTouches[0].clientY;
+    const threshold = 40;
+    if (Math.abs(deltaY) < threshold) return;
+
+    if (phase === 'feedback') {
+      if (deltaY < 0) exitFeedbackPhase();
+      else if (!isTransitioning) {
+        if ($allSectionsCompleted) navigateToResults();
+        else goToNextSection();
+      }
+      return;
+    }
+
+    if (deltaY > 0) {
+      // swipe up → show cards, then advance
+      if (!mobileCardsVisible) {
+        mobileShowCards();
+      } else if (anyLiked && !isTransitioning) {
+        if (currentTopic === lastTopic) enterFeedbackPhase();
+        else goNext();
+      }
+    } else {
+      // swipe down → hide cards or go back
+      if (mobileCardsVisible) {
+        mobileHideCards();
+      } else if (!isTransitioning) {
+        if (currentTopic > 0) goPrev();
+        else exitTopicsMode();
+      }
+    }
+  }
 
   // ── Topics-mode scroll interception ──────────────────────────────────────
   let topicsMode = false;
@@ -250,11 +348,18 @@
     if (topicsMode) return;
     topicsMode = true;
     phase = 'topics';
-    lenisRef?.stop();
-    window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
+    if (isMobile) {
+      document.addEventListener('touchmove', mobilePreventScroll, { passive: false });
+      window.addEventListener('touchstart', onTouchStart, { passive: true });
+      window.addEventListener('touchend', onTouchEnd, { passive: true });
+    } else {
+      lenisRef?.stop();
+      window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
+    }
   }
 
   function maybeIntroduceCards() {
+    if (isMobile) return;
     if (cardsIntroduced || cardsScrollAnimating) return;
     cardsScrollAnimating = true;
     cardsIntroduced = true;
@@ -280,8 +385,14 @@
   function exitTopicsMode() {
     if (!topicsMode) return;
     topicsMode = false;
-    window.removeEventListener('wheel', onTopicsWheel, { capture: true } as EventListenerOptions);
-    lenisRef?.start();
+    if (isMobile) {
+      document.removeEventListener('touchmove', mobilePreventScroll);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchend', onTouchEnd);
+    } else {
+      window.removeEventListener('wheel', onTopicsWheel, { capture: true } as EventListenerOptions);
+      lenisRef?.start();
+    }
   }
 
   function clearFeedbackScroll() {
@@ -333,9 +444,6 @@
   // ── Setup ────────────────────────────────────────────────────────────────
   onMount(() => {
     isMobile = window.innerWidth < 768;
-    deviceChecked = true;
-
-    if (isMobile) return;
 
     if (!browser || !sceneEl) return;
 
@@ -346,13 +454,20 @@
 
     gsap.registerPlugin(ScrollTrigger);
 
-    const lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
-    lenis.scrollTo(0, { immediate: true });
-    lenisRef = lenis;
-    lenis.on('scroll', ScrollTrigger.update);
-    const lenisRaf = (t: number) => lenis.raf(t * 1000);
-    gsap.ticker.add(lenisRaf);
+    // Lenis only on desktop (mobile has native touch scroll for GSAP)
+    let lenis: Lenis | null = null;
+    let lenisRaf: ((t: number) => void) | null = null;
+
     gsap.ticker.lagSmoothing(0);
+
+    if (!isMobile) {
+      lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
+      lenis.scrollTo(0, { immediate: true });
+      lenisRef = lenis;
+      lenis.on('scroll', ScrollTrigger.update);
+      lenisRaf = (t: number) => lenis!.raf(t * 1000);
+      gsap.ticker.add(lenisRaf);
+    }
 
     const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
     const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
@@ -360,7 +475,8 @@
     gsap.set(titleEl,         { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
     gsap.set('.phrase',       { y: 30, autoAlpha: 0 });
     gsap.set('.stage__text',  { x: -30 });
-    gsap.set('.stage__right', { opacity: 0 });
+    // On mobile, CSS class controls .stage__right opacity (no GSAP inline style so CSS class can win)
+    if (!isMobile) gsap.set('.stage__right', { opacity: 0 });
     gsap.set('.stage__right-heading', { opacity: 0 });
 
     const ctx = gsap.context(() => {
@@ -436,7 +552,7 @@
       }
 
       threeTl.to(proxy, {
-        scale: 0.56, ease: 'power2.inOut', duration: 0.28,
+        scale: isMobile ? 0.28 : 0.56, ease: 'power2.inOut', duration: 0.28,
         onUpdate: () => scene3d?.setScale(proxy.scale),
       }, 0.46);
 
@@ -500,8 +616,8 @@
       exitTopicsMode();
       lenisRef = null;
       ctx.revert();
-      gsap.ticker.remove(lenisRaf);
-      lenis.destroy();
+      if (lenisRaf) gsap.ticker.remove(lenisRaf);
+      if (lenis) lenis.destroy();
     };
   });
 </script>
@@ -509,10 +625,6 @@
 <svelte:head>
   <title>{config.pageTitle}</title>
 </svelte:head>
-
-{#if deviceChecked && isMobile}
-  <SectionScrollytellMobile {config} />
-{:else if !isMobile}
 
 <section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
   <div class="scene__viewport">
@@ -566,10 +678,10 @@
       orbitEnabled={phase === 'feedback'}
     />
 
-    <!-- Stage: testo a sx + card a dx -->
+    <!-- Stage: testo + card -->
     <div class="stage">
 
-      <div class="stage__text">
+      <div class="stage__text" class:m-compact={isMobile && mobileCardsVisible}>
         <TextBlock
           counter={topics[currentTopic].counter}
           title={topics[currentTopic].title}
@@ -578,13 +690,15 @@
         />
       </div>
 
-      <!-- colonna centrale vuota: spazio visivo per il modello 3D -->
+      <!-- colonna centrale vuota: spazio visivo per il modello 3D (desktop) -->
       <div aria-hidden="true"></div>
 
-      <!-- Colonna destra: heading + card -->
-      <div class="stage__right" class:no-pointer={phase === 'feedback'}>
+      <!-- Cards column -->
+      <div class="stage__right" class:no-pointer={phase === 'feedback'} class:m-cards-visible={isMobile && mobileCardsVisible}>
         <p class="stage__right-heading">Metti like alle opinioni con cui sei d'accordo</p>
-        <CardStack bind:api={cardStack} {cards} sectionId={config.sectionId} onToggleLike={toggleLike} topicIndex={currentTopic} />
+        <div class="stage__right-scroll" bind:this={cardsScrollRef} onscroll={onCardsScroll}>
+          <CardStack bind:api={cardStack} {cards} sectionId={config.sectionId} onToggleLike={toggleLike} topicIndex={currentTopic} />
+        </div>
       </div>
 
     </div>
@@ -614,6 +728,14 @@
       </div>
     </div>
 
+    <!-- Mobile scroll indicator -->
+    <div
+      class="mobile-scroll-indicator"
+      class:visible={isMobile && mobileCardsVisible}
+      aria-hidden="true"
+      style="--scroll-ratio: {mobileScrollRatio}"
+    ></div>
+
     <!-- Overlay fase feedback -->
     {#if phase === 'feedback'}
       <div class="feedback-top" style="opacity: 0">
@@ -642,8 +764,6 @@
 
   </div>
 </section>
-
-{/if}
 
 <style>
   @font-face {
@@ -849,6 +969,10 @@
     white-space: nowrap;
   }
 
+  .stage__right-scroll {
+    overflow: visible;
+  }
+
   /* ── CTA ─────────────────────────────────────────────────────────────── */
   .stage__cta {
     position: absolute;
@@ -900,6 +1024,11 @@
   @keyframes chevron-bounce {
     0%, 100% { transform: translateY(0); }
     50%       { transform: translateY(5px); }
+  }
+
+  /* ── Mobile scroll indicator (hidden on desktop) ─────────────────────── */
+  .mobile-scroll-indicator {
+    display: none;
   }
 
   /* ── Overlay feedback ────────────────────────────────────────────────── */
@@ -959,5 +1088,162 @@
 
   .feedback-bottom-cta .cta-chevron {
     animation: chevron-bounce 1.4s ease-in-out infinite;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     MOBILE RESPONSIVE — same GSAP animations, adapted layout
+     ═══════════════════════════════════════════════════════════════════════ */
+  @media (max-width: 768px) {
+
+    /* Stage: single column, children absolutely positioned */
+    .stage {
+      display: block;
+      padding: 0;
+    }
+
+    /* ── Text block: top of viewport — 18px padding → 354px on 390px iPhone ── */
+    .stage__text {
+      position: absolute;
+      top: 56px;
+      left: 18px;
+      right: 18px;
+      width: auto;
+      z-index: 5;
+    }
+
+    /* Topic title font size transition */
+    .stage__text :global(.section-fact-block) {
+      width: 100%;
+      gap: 16px;
+    }
+
+    .stage__text :global(.section-fact-block__title) {
+      font-size: 36px;
+      transition: font-size 0.4s ease;
+    }
+
+    .stage__text.m-compact :global(.section-fact-block__title) {
+      font-size: 24px;
+    }
+
+    .stage__text :global(.section-fact-block__body) {
+      font-size: 20px;
+      transition: font-size 0.4s ease;
+    }
+
+    .stage__text.m-compact :global(.section-fact-block__body) {
+      font-size: 15px;
+    }
+
+    .stage__text :global(.section-fact-block__source) {
+      font-size: 12px;
+    }
+
+    /* ── Cards column: bottom of viewport ── */
+    .stage__right {
+      position: absolute;
+      bottom: 80px;
+      left: 0;
+      right: 0;
+      padding: 0 20px;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      flex-direction: column;
+      gap: 8px;
+      justify-self: unset;
+      z-index: 5;
+    }
+
+    .stage__right.m-cards-visible {
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    .stage__right-heading {
+      white-space: normal;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+
+    /* Scrollable cards inner container */
+    .stage__right-scroll {
+      height: 230px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      /* fade bottom third to hint scrollability */
+      mask-image: linear-gradient(to bottom, black 65%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 65%, transparent 100%);
+    }
+
+    .stage__right-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .stage__right :global(.comment-card-glass) {
+      max-width: 100%;
+    }
+
+    /* ── Mobile scroll indicator ── */
+    .mobile-scroll-indicator {
+      display: none;
+      position: absolute;
+      right: 6px;
+      bottom: 80px;
+      height: 230px;
+      width: 3px;
+      background: rgba(22, 26, 31, 0.12);
+      border-radius: 2px;
+      z-index: 20;
+      overflow: hidden;
+    }
+
+    .mobile-scroll-indicator.visible {
+      display: block;
+    }
+
+    .mobile-scroll-indicator::after {
+      content: '';
+      position: absolute;
+      top: calc(var(--scroll-ratio, 0) * (100% - 44px));
+      left: 0;
+      right: 0;
+      height: 44px;
+      background: rgba(22, 26, 31, 0.4);
+      border-radius: 2px;
+      transition: top 0.12s ease;
+    }
+
+    /* ── Phrase smaller on mobile ── */
+    .phrase {
+      font-size: clamp(22px, 6vw, 34px);
+      width: calc(100% - 48px);
+    }
+
+    .scene--sustainability .phrase {
+      font-size: clamp(18px, 5.5vw, 34px);
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+
+    /* ── Feedback overlay adapted ── */
+    .feedback-title {
+      font-size: 22px;
+      white-space: normal;
+      text-align: center;
+      padding: 0 24px;
+    }
+
+    .feedback-subtitle {
+      font-size: 15px;
+      bottom: 90px;
+      padding: 0 24px;
+      max-width: 100%;
+    }
+
+    .feedback-top {
+      top: 5vh;
+    }
   }
 </style>

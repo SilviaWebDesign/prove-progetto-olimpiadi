@@ -570,6 +570,12 @@
         const svgH = svgW * capH / bb.width;
         titleEl.setAttribute('height', String(Math.ceil(svgH)));
         titleEl.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${capH}`);
+
+        // Mobile: titolo centrato verticalmente sullo schermo (invece di ancorato al fondo)
+        if (isMobile) {
+          titleEl.style.bottom = 'auto';
+          titleEl.style.top = `${Math.max(0, (window.innerHeight - svgH) / 2)}px`;
+        }
       }
       if (window.scrollY < window.innerHeight * 0.15) {
         gsap.to(titleEl, { opacity: 1, duration: 0.12, ease: 'none' });
@@ -1081,10 +1087,9 @@
      ═══════════════════════════════════════════════════════════════════════ */
   @media (max-width: 768px) {
 
-    /* Titolone: alzato rispetto al fondo del viewport */
-    .hero-title--section:not(.hero-title--spread) {
-      justify-content: flex-start;
-      padding-top: 42vh;
+    /* Titolone: centrato verticalmente sullo schermo (entrambe le varianti: center e spread) */
+    .hero-title--section {
+      justify-content: center;
     }
 
     /* Stage: single column, children absolutely positioned */

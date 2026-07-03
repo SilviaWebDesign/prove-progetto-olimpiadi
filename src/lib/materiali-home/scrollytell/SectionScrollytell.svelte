@@ -166,6 +166,7 @@
 
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible
+      mobileTextCompactOverride = null;
       mobileScrollRatio = 0;
       scene3d?.clearMobileFit();
     }
@@ -196,6 +197,7 @@
 
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
+      mobileTextCompactOverride = null;
       mobileScrollRatio = 0;
       if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     }
@@ -228,6 +230,7 @@
 
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
+      mobileTextCompactOverride = null;
       mobileScrollRatio = 0;
       if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     }
@@ -265,6 +268,22 @@
   let stageRightEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
 
+  // Tap sul testo argomento: alterna manualmente ampia/compatta, in aggiunta
+  // al comportamento automatico legato alla comparsa delle card. L'override
+  // viene azzerato ad ogni cambio di stato automatico (nuovo argomento,
+  // ingresso/uscita feedback) così ogni argomento riparte dal default.
+  let mobileTextCompactOverride = $state<boolean | null>(null);
+  const mobileTextCompact = $derived(
+    isMobile && (mobileTextCompactOverride ?? mobileCardsVisible)
+  );
+
+  function toggleMobileTextSize() {
+    if (!isMobile) return;
+    mobileTextCompactOverride = !mobileTextCompact;
+    tick().then(updateMobileModelFit);
+    setTimeout(updateMobileModelFit, 450);
+  }
+
   // ── Model 3D: adatta posizione/scala allo spazio libero tra testo e commenti (mobile) ──
   const MOBILE_MODEL_MARGIN = 14;
   const MOBILE_CTA_RESERVE  = 110;
@@ -298,6 +317,7 @@
     if (mobileCardsVisible || cardsScrollAnimating) return;
     cardsScrollAnimating = true;
     mobileCardsVisible = true; // CSS class m-cards-visible makes container visible
+    mobileTextCompactOverride = null;
     await tick();
     updateMobileModelFit();
     await cardStack?.animateIn();
@@ -673,7 +693,16 @@
     <!-- Stage: testo + card -->
     <div class="stage">
 
-      <div class="stage__text" bind:this={stageTextEl} class:m-compact={isMobile && mobileCardsVisible}>
+      <div
+        class="stage__text"
+        bind:this={stageTextEl}
+        class:m-compact={mobileTextCompact}
+        class:m-tappable={isMobile}
+        role="button"
+        tabindex={isMobile ? 0 : -1}
+        onclick={toggleMobileTextSize}
+        onkeydown={(e) => { if (isMobile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileTextSize(); } }}
+      >
         <TextBlock
           counter={topics[currentTopic].counter}
           title={topics[currentTopic].title}
@@ -1106,6 +1135,11 @@
       right: 18px;
       width: auto;
       z-index: 5;
+    }
+
+    .stage__text.m-tappable {
+      cursor: pointer;
+      pointer-events: auto;
     }
 
     /* Topic title font size transition */

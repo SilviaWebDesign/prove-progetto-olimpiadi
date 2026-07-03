@@ -140,7 +140,8 @@
     gsap.fromTo('.stage__right-heading', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power3.inOut', delay: 0.04 });
     await tick();
     if (isMobile) {
-      await mobileShowCards();
+      // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
+      // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
       updateMobileModelFit();
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -208,7 +209,8 @@
 
     gsap.set('.stage__text', { y: 8, opacity: 0 });
     if (isMobile) {
-      await mobileShowCards();
+      // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
+      // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
       updateMobileModelFit();
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -240,7 +242,8 @@
 
     gsap.set('.stage__text', { y: -8, opacity: 0 });
     if (isMobile) {
-      await mobileShowCards();
+      // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
+      // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
       updateMobileModelFit();
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -292,8 +295,10 @@
   const modelLoadedPromise = new Promise<void>(resolve => { resolveModelLoaded = resolve; });
 
   // ── Mobile cards ──────────────────────────────────────────────────────────
-  // Su mobile la navigazione è solo a bottone ("Continua"): niente swipe, che
-  // altrimenti confligge con lo scroll nativo della lista commenti.
+  // Su mobile l'avanzamento tra argomenti è solo a bottone ("Continua"): niente swipe per
+  // quello, che confliggerebbe con lo scroll nativo della lista commenti. Il toggle
+  // esteso/compatto del topic corrente invece è disponibile via tap o scroll gesture
+  // (mobilePreventScroll), perché non tocca mai lo scroll/la posizione della pagina.
   async function mobileShowCards() {
     if (mobileCardsVisible || cardsScrollAnimating) return;
     cardsScrollAnimating = true;
@@ -333,6 +338,19 @@
     mobileScrollRatio = max > 0 ? el.scrollTop / max : 0;
   }
 
+  // Scroll gesture (touch) per alternare argomento esteso/compatto, in aggiunta al tap
+  // su .stage__text (toggleMobileCardsPanel): dito verso l'alto (scroll giù) → compatto,
+  // dito verso il basso (scroll su) → esteso. Non avanza mai tra argomenti.
+  let touchStartY = 0;
+  let mobileSwipeHandled = false;
+  const MOBILE_SWIPE_THRESHOLD = 40;
+
+  function mobileTouchStart(e: TouchEvent) {
+    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) return;
+    touchStartY = e.touches[0].clientY;
+    mobileSwipeHandled = false;
+  }
+
   // Non-passive: prevents page scroll (including iOS inertia) while in topics/feedback mode,
   // lasciando libero lo scroll nativo dentro la lista commenti.
   // NB: un blocco via `position:fixed` sul body (position + scrollTo) è stato provato e
@@ -344,6 +362,16 @@
       return; // allow natural scroll inside the cards box
     }
     e.preventDefault();
+
+    if (mobileSwipeHandled || phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
+    const deltaY = e.touches[0].clientY - touchStartY;
+    if (deltaY <= -MOBILE_SWIPE_THRESHOLD) {
+      mobileSwipeHandled = true;
+      if (!mobileCardsVisible) mobileShowCards().then(() => setTimeout(updateMobileModelFit, 450));
+    } else if (deltaY >= MOBILE_SWIPE_THRESHOLD) {
+      mobileSwipeHandled = true;
+      if (mobileCardsVisible) mobileHideCards().then(() => setTimeout(updateMobileModelFit, 450));
+    }
   }
 
   // ── Topics-mode scroll interception ──────────────────────────────────────
@@ -359,8 +387,8 @@
     topicsMode = true;
     phase = 'topics';
     if (isMobile) {
+      document.addEventListener('touchstart', mobileTouchStart, { passive: true });
       document.addEventListener('touchmove', mobilePreventScroll, { passive: false });
-      void mobileShowCards();
       tick().then(updateMobileModelFit);
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -397,6 +425,7 @@
     if (!topicsMode) return;
     topicsMode = false;
     if (isMobile) {
+      document.removeEventListener('touchstart', mobileTouchStart);
       document.removeEventListener('touchmove', mobilePreventScroll);
     } else {
       window.removeEventListener('wheel', onTopicsWheel, { capture: true } as EventListenerOptions);
@@ -1254,22 +1283,25 @@
       transition: top 0.12s ease;
     }
 
-    /* ── Phrase: full-width box, bold 36px, fixed 20px side margins ── */
-    .phrase {
-      font-size: 36px;
-      width: calc(100% - 40px);
-    }
-
-    .scene--sustainability .phrase-container {
+    /* ── Phrase: left-aligned intro text, positioned high enough to avoid clipping ── */
+    .phrase-container {
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding-top: 100px;
       padding-left: 20px;
       padding-right: 20px;
     }
 
-    .scene--sustainability .phrase {
+    .phrase {
+      text-align: left;
       font-size: 36px;
       width: 100%;
-      padding-left: 0;
-      padding-right: 0;
+    }
+
+    .scene--sustainability .phrase-container {
+      padding-top: 100px;
+      padding-left: 20px;
+      padding-right: 20px;
     }
 
     /* ── Feedback overlay adapted ── */

@@ -608,7 +608,13 @@
       }
     });
 
-    // ── Tutte le risorse → refresh ScrollTrigger + preload result models ──
+    // ── Tutte le risorse → refresh ScrollTrigger ──
+    // NB: niente preload eager dei modelli risultato (rimosso 2026-07-03): per infrastrutture
+    // e sport erano 5 varianti da 14-21MB ciascuna (fino a ~90MB scaricati e decodificati in
+    // background per niente, dato che ne serve solo una) — su mobile causava pressione di
+    // memoria sufficiente a far ricaricare la scheda da sola (Safari, "reload infinito" su
+    // sport). Il modello di risultato viene ora caricato on-demand in `morphToResult`, che
+    // gestisce già correttamente l'attesa e gli eventuali errori (vedi Scene3D.svelte).
     const bgImg = new Image();
     bgImg.src = config.bgSrc;
     const bgLoaded = new Promise<void>(resolve => {
@@ -621,12 +627,6 @@
     Promise.all([bgLoaded, windowLoaded, modelLoadedPromise]).then(() => {
       ScrollTrigger.refresh();
       requestAnimationFrame(() => requestAnimationFrame(() => ScrollTrigger.refresh()));
-      if ('requestIdleCallback' in window) {
-        (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
-          .requestIdleCallback(() => scene3d?.preloadResultModels(), { timeout: 1000 });
-      } else {
-        setTimeout(() => scene3d?.preloadResultModels(), 2000);
-      }
     });
 
     return () => {
@@ -691,7 +691,6 @@
     <Scene3D
       bind:api={scene3d}
       modelSrc={config.modelSrc}
-      resultPaths={config.resultPaths}
       onModelLoaded={() => resolveModelLoaded()}
       orbitEnabled={phase === 'feedback'}
     />

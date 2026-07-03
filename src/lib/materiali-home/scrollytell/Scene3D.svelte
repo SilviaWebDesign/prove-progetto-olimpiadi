@@ -18,7 +18,6 @@
     unsettle:               () => void;
     pulse:                  () => void;
     resetPulse:             () => void;
-    preloadResultModels:    () => void;
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
     setMobileFit:           (topPx: number, bottomPx: number) => void;
@@ -28,14 +27,12 @@
   interface Props {
     api?: Scene3DApi;
     modelSrc: string;
-    resultPaths?: string[];
     onModelLoaded?: () => void;
     orbitEnabled?: boolean;
   }
   let {
     api = $bindable(),
     modelSrc,
-    resultPaths = [],
     onModelLoaded,
     orbitEnabled = false,
   }: Props = $props();
@@ -108,6 +105,9 @@
   let transitionState: TState = 'none';
   let transitionProgress = 0;
   const TRANSITION_DURATION = 2.0;
+
+  /** Alterna a true/false ad ogni frame di morph: usato per dimezzare gli upload GPU. */
+  let morphFrameParity = false;
 
   let manualPulseActive  = false;
   let manualPulseElapsed = 0;
@@ -229,7 +229,6 @@
         manualPulseElapsed = 0;
         if (particleMat) particleMat.uniforms.uPulse.value = 0;
       },
-      preloadResultModels,
       morphToResult,
       returnToParticles: () => {
         if (controls) controls.enabled = false;
@@ -593,27 +592,6 @@
     root.add(particleMesh);
   }
 
-  function preloadResultModels() {
-    const uniquePaths = [...new Set(resultPaths)];
-    if (uniquePaths.length === 0) return;
-    const draco = new DRACOLoader();
-    draco.setDecoderPath('/draco/');
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
-    let remaining = uniquePaths.length;
-    uniquePaths.forEach(path => {
-      loader.load(path, (gltf) => {
-        resultModels.set(path, gltf.scene);
-        remaining--;
-        if (remaining === 0) draco.dispose();
-      }, undefined, (err) => {
-        console.warn('[Scene3D] preload error:', path, err);
-        remaining--;
-        if (remaining === 0) draco.dispose();
-      });
-    });
-  }
-
   function centerFeedbackView(scaleMul: number) {
     if (!modelGroup || !camera) return;
 
@@ -757,6 +735,7 @@
 
     morphState        = 'morphing';
     morphElapsed      = 0;
+    morphFrameParity  = false;
     morphDoneCallback = onDone;
   }
 
@@ -1046,7 +1025,12 @@
         iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
         iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
       }
-      particleMesh.instanceMatrix.needsUpdate = true;
+      // Il calcolo CPU resta ad ogni frame (mantiene invariati i tempi di convergenza),
+      // ma l'upload del buffer instanceMatrix alla GPU (~1.3MB) avviene ogni 2 frame:
+      // dimezza il carico di fill-rate durante il morph, impercettibile per un effetto
+      // di particelle in convergenza. Pesante soprattutto su GPU mobile più deboli.
+      morphFrameParity = !morphFrameParity;
+      if (morphFrameParity || t >= 1) particleMesh.instanceMatrix.needsUpdate = true;
 
       if (t >= 0.8) {
         const fadeT = (t - 0.8) / 0.2;

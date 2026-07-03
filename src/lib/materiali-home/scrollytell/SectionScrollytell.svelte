@@ -166,7 +166,6 @@
 
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible
-      mobileTextCompactOverride = null;
       mobileScrollRatio = 0;
       scene3d?.clearMobileFit();
     }
@@ -197,7 +196,6 @@
 
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
-      mobileTextCompactOverride = null;
       mobileScrollRatio = 0;
       if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     }
@@ -230,7 +228,6 @@
 
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
-      mobileTextCompactOverride = null;
       mobileScrollRatio = 0;
       if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     }
@@ -268,22 +265,6 @@
   let stageRightEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
 
-  // Tap sul testo argomento: alterna manualmente ampia/compatta, in aggiunta
-  // al comportamento automatico legato alla comparsa delle card. L'override
-  // viene azzerato ad ogni cambio di stato automatico (nuovo argomento,
-  // ingresso/uscita feedback) così ogni argomento riparte dal default.
-  let mobileTextCompactOverride = $state<boolean | null>(null);
-  const mobileTextCompact = $derived(
-    isMobile && (mobileTextCompactOverride ?? mobileCardsVisible)
-  );
-
-  function toggleMobileTextSize() {
-    if (!isMobile) return;
-    mobileTextCompactOverride = !mobileTextCompact;
-    tick().then(updateMobileModelFit);
-    setTimeout(updateMobileModelFit, 450);
-  }
-
   // ── Model 3D: adatta posizione/scala allo spazio libero tra testo e commenti (mobile) ──
   const MOBILE_MODEL_MARGIN = 14;
   const MOBILE_CTA_RESERVE  = 110;
@@ -317,11 +298,32 @@
     if (mobileCardsVisible || cardsScrollAnimating) return;
     cardsScrollAnimating = true;
     mobileCardsVisible = true; // CSS class m-cards-visible makes container visible
-    mobileTextCompactOverride = null;
     await tick();
     updateMobileModelFit();
     await cardStack?.animateIn();
     cardsScrollAnimating = false;
+  }
+
+  // Reverse of mobileShowCards: torna alla modalità "solo modello" con testo
+  // ampio, nascondendo il pannello commenti (senza avanzare argomento).
+  async function mobileHideCards() {
+    if (!mobileCardsVisible || cardsScrollAnimating) return;
+    cardsScrollAnimating = true;
+    await cardStack?.animateOut();
+    mobileCardsVisible = false; // CSS removes m-cards-visible
+    mobileScrollRatio = 0;
+    if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
+    await tick();
+    updateMobileModelFit();
+    cardsScrollAnimating = false;
+  }
+
+  // Tap sul testo argomento: alterna la modalità testo ampio/solo-modello ↔
+  // testo compatto/commenti visibili (m-compact segue mobileCardsVisible).
+  function toggleMobileCardsPanel() {
+    if (!isMobile || phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
+    const action = mobileCardsVisible ? mobileHideCards() : mobileShowCards();
+    action.then(() => setTimeout(updateMobileModelFit, 450));
   }
 
   function onCardsScroll() {
@@ -333,6 +335,10 @@
 
   // Non-passive: prevents page scroll (including iOS inertia) while in topics/feedback mode,
   // lasciando libero lo scroll nativo dentro la lista commenti.
+  // NB: un blocco via `position:fixed` sul body (position + scrollTo) è stato provato e
+  // scartato: cambia la posizione di scroll reale della finestra, che è ciò che ScrollTrigger
+  // usa per calcolare il progress — il risultato era un loop enterTopicsMode/exitTopicsMode
+  // continuo che resettava `phase` in modo intermittente (bug "mai portato al feedback").
   function mobilePreventScroll(e: TouchEvent) {
     if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) {
       return; // allow natural scroll inside the cards box
@@ -696,12 +702,12 @@
       <div
         class="stage__text"
         bind:this={stageTextEl}
-        class:m-compact={mobileTextCompact}
-        class:m-tappable={isMobile}
+        class:m-compact={isMobile && mobileCardsVisible}
+        class:m-tappable={isMobile && phase === 'topics'}
         role="button"
-        tabindex={isMobile ? 0 : -1}
-        onclick={toggleMobileTextSize}
-        onkeydown={(e) => { if (isMobile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileTextSize(); } }}
+        tabindex={isMobile && phase === 'topics' ? 0 : -1}
+        onclick={toggleMobileCardsPanel}
+        onkeydown={(e) => { if (isMobile && phase === 'topics' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileCardsPanel(); } }}
       >
         <TextBlock
           counter={topics[currentTopic].counter}
@@ -1127,12 +1133,12 @@
       padding: 0;
     }
 
-    /* ── Text block: top of viewport — 18px padding → 354px on 390px iPhone ── */
+    /* ── Text block: top of viewport — 20px padding → 350px on 390px iPhone ── */
     .stage__text {
       position: absolute;
       top: 56px;
-      left: 18px;
-      right: 18px;
+      left: 20px;
+      right: 20px;
       width: auto;
       z-index: 5;
     }
@@ -1203,6 +1209,7 @@
       overflow-y: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
 
     .stage__right-scroll::-webkit-scrollbar {
@@ -1248,16 +1255,22 @@
       transition: top 0.12s ease;
     }
 
-    /* ── Phrase smaller on mobile ── */
+    /* ── Phrase: full-width box, bold 36px, fixed 20px side margins ── */
     .phrase {
-      font-size: clamp(22px, 6vw, 34px);
-      width: calc(100% - 48px);
+      font-size: 36px;
+      width: calc(100% - 40px);
+    }
+
+    .scene--sustainability .phrase-container {
+      padding-left: 20px;
+      padding-right: 20px;
     }
 
     .scene--sustainability .phrase {
-      font-size: clamp(18px, 5.5vw, 34px);
-      padding-left: 24px;
-      padding-right: 24px;
+      font-size: 36px;
+      width: 100%;
+      padding-left: 0;
+      padding-right: 0;
     }
 
     /* ── Feedback overlay adapted ── */
@@ -1265,13 +1278,13 @@
       font-size: 22px;
       white-space: normal;
       text-align: center;
-      padding: 0 24px;
+      padding: 0 20px;
     }
 
     .feedback-subtitle {
       font-size: 15px;
       bottom: 140px;
-      padding: 0 24px;
+      padding: 0 20px;
       max-width: 100%;
     }
 

@@ -318,7 +318,10 @@
     if (!canvasEl || !wrapperEl) return;
 
     renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // DPR più basso su mobile: riduce il carico di fill-rate su GPU più deboli,
+    // percepibile durante le animazioni scroll-driven e il morph in fase feedback.
+    const maxDpr = window.innerWidth < 768 ? 1.5 : 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     renderer.outputColorSpace    = THREE.SRGBColorSpace;
     renderer.toneMapping         = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
@@ -660,7 +663,7 @@
   }
 
   function doMorph(source: THREE.Group, onDone: () => void) {
-    if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) return;
+    if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) { onDone(); return; }
 
     const resultGroup = source.clone();
 
@@ -733,10 +736,10 @@
       geos.push(deindexed);
     });
 
-    if (geos.length === 0) { spinner.remove(resultGroup); return; }
+    if (geos.length === 0) { spinner.remove(resultGroup); onDone(); return; }
     const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
     geos.forEach(g => g.dispose());
-    if (!merged) { spinner.remove(resultGroup); return; }
+    if (!merged) { spinner.remove(resultGroup); onDone(); return; }
 
     const samplerMesh = new THREE.Mesh(merged, new THREE.MeshBasicMaterial());
     const sampler = new MeshSurfaceSampler(samplerMesh).build();
@@ -778,6 +781,7 @@
     }, undefined, (err) => {
       console.error('[Scene3D] on-demand load error:', path, err);
       draco.dispose();
+      onDone();
     });
   }
 

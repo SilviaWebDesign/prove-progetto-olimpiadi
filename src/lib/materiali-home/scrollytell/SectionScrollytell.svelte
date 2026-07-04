@@ -1231,9 +1231,15 @@
       line-height: 1.3;
     }
 
-    /* Scrollable cards inner container */
+    /* Scrollable cards inner container.
+       overflow-y: auto forces the browser to also clip overflow-x (spec rule:
+       an axis can't stay 'visible' once the other is scrollable), which cut the
+       cards' box-shadow/outline at the edges. Padding + matching negative margin
+       gives that glow room to bleed without shifting the cards' visual position. */
     .stage__right-scroll {
       height: 281px;
+      padding: 0 16px;
+      margin: 0 -16px;
       overflow-y: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;

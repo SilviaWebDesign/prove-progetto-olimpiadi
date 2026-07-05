@@ -306,6 +306,7 @@ export function getScrollytellConfig(key) {
 
   const heroTitleLayoutByKey = {
     sport: 'spread',
+    sustainability: 'spread',
   };
 
   const visualByKey = {

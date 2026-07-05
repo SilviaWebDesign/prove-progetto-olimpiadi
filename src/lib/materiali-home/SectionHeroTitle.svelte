@@ -62,7 +62,8 @@
     align-items: flex-end;
     width: 100%;
     max-width: 100%;
-    padding: 0.12em 0 0;
+    padding: 0.12em clamp(0px, 0.3vw, 1.5px) 0;
+    box-sizing: border-box;
     letter-spacing: 0;
     text-align: initial;
     white-space: nowrap;
@@ -76,7 +77,7 @@
   @media (max-width: 900px) {
     .section-hero-title--spread {
       font-size: min(10rem, 18vw);
-      padding: 0.1em 0 0;
+      padding: 0.1em 1px 0;
     }
   }
 </style>

@@ -12,7 +12,7 @@
   import CardStack from './CardStack.svelte';
   import type { CardStackApi } from './CardStack.svelte';
   import Scene3D from './Scene3D.svelte';
-  import type { Scene3DApi } from './Scene3D.svelte';
+  import type { Scene3DApi, MobileFitOptions } from './Scene3D.svelte';
 
   import './tokens.css';
   import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
@@ -323,6 +323,8 @@
   const TOPICS_FIT_CENTER_BIAS = 0.5;
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
   const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.02;
+  /** Offset verticale pianta con pannello commenti visibile (positivo = più in alto). */
+  const PLANT_CARDS_Y_OFFSET_VH = 0.03;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
   /** Altezza viewport scroll commenti: 2 card visibili per volta. */
   const MOBILE_CARD_AVG_HEIGHT = 96;
@@ -337,19 +339,92 @@
   /** Scala fissa del modello in fase argomenti (stessa per tutte le sezioni). */
   const TOPICS_SCALE_DESKTOP = 0.56;
   const TOPICS_SCALE_MOBILE = 0.44;
-  /** Più piccolo quando i commenti sono visibili (meno spazio verticale). */
-  const TOPICS_SCALE_MOBILE_CARDS = 0.26;
+  /** Stesso rapporto del titolo compatto mobile (36px → 24px in m-compact). */
+  const MOBILE_TOPIC_COMPACT_RATIO = 24 / 36;
+  const MOBILE_TEXT_SCALE_DURATION = 0.4;
+  /** Riduzione extra pianta con pannello commenti visibile. */
+  const PLANT_CARDS_SCALE_MUL = 0.92;
+  /** Riduzione extra pattini con pannello commenti visibile. */
+  const SPORT_CARDS_SCALE_MUL = 0.74;
+  /** Con commenti visibili: centro dello spazio bianco tra testo e card. */
+  const MOBILE_CARDS_FIT_CENTER_BIAS = 0.51;
+  const SPORT_CARDS_Y_OFFSET_VH = 0.01;
+  const MOBILE_CARDS_TOP_MARGIN = 8;
+  const topicsScaleTween = { value: TOPICS_SCALE_MOBILE };
 
   function topicsScaleMul(cardsMode = false): number {
     if (!isMobile) return TOPICS_SCALE_DESKTOP;
-    return cardsMode ? TOPICS_SCALE_MOBILE_CARDS : TOPICS_SCALE_MOBILE;
+    let scale = TOPICS_SCALE_MOBILE;
+    if (cardsMode) {
+      scale *= MOBILE_TOPIC_COMPACT_RATIO;
+      if (
+        config.modelSrc === '/oggetti/sport.glb' ||
+        config.modelSrc === '/oggetti/ice_skate.glb'
+      ) {
+        scale *= SPORT_CARDS_SCALE_MUL;
+      }
+      if (config.modelSrc === '/oggetti/pianta.glb') {
+        scale *= PLANT_CARDS_SCALE_MUL;
+      }
+    }
+    return scale;
+  }
+
+  function applyTopicsScale(animate = false) {
+    if (!scene3d || phase === 'feedback') return;
+    const target = topicsScaleMul(isMobile && mobileCardsVisible);
+    gsap.killTweensOf(topicsScaleTween);
+    if (animate && isMobile && phase === 'topics') {
+      gsap.to(topicsScaleTween, {
+        value: target,
+        duration: MOBILE_TEXT_SCALE_DURATION,
+        ease: 'power2.inOut',
+        onUpdate: () => {
+          scene3d?.setScale(topicsScaleTween.value);
+          updateTopicsModelFit({ skipScale: true });
+          scene3d?.snapMobileFit();
+        },
+        onComplete: () => {
+          updateTopicsModelFit({ skipScale: true });
+          scene3d?.snapMobileFit();
+        },
+      });
+    } else {
+      topicsScaleTween.value = target;
+      scene3d.setScale(target);
+    }
   }
 
   function topicsCardsActive(): boolean {
     return isMobile ? mobileCardsVisible : cardsIntroduced;
   }
 
-  function updateTopicsModelFit() {
+  function plantTopicsYOffset(cardsActive: boolean): number {
+    if (config.modelSrc !== '/oggetti/pianta.glb' || phase !== 'topics') return 0;
+    return cardsActive ? PLANT_CARDS_Y_OFFSET_VH : PLANT_THEME_TEXT_Y_OFFSET_VH;
+  }
+
+  function isSportModel(): boolean {
+    return config.modelSrc === '/oggetti/sport.glb' || config.modelSrc === '/oggetti/ice_skate.glb';
+  }
+
+  function sportTopicsYOffset(cardsActive: boolean): number {
+    if (phase !== 'topics' || !cardsActive || !isMobile || !isSportModel()) return 0;
+    return SPORT_CARDS_Y_OFFSET_VH;
+  }
+
+  function topicsModelYOffset(cardsActive: boolean): number {
+    return plantTopicsYOffset(cardsActive) + sportTopicsYOffset(cardsActive);
+  }
+
+  function topicsFitOptions(cardsActive: boolean): MobileFitOptions {
+    if (!isMobile || !cardsActive || !isSportModel()) {
+      return { centerBias: TOPICS_FIT_CENTER_BIAS };
+    }
+    return { centerBias: MOBILE_CARDS_FIT_CENTER_BIAS };
+  }
+
+  function updateTopicsModelFit(options: { skipScale?: boolean } = {}) {
     if (!scene3d || !stageTextEl || phase === 'feedback') return;
 
     const textRect = stageTextEl.getBoundingClientRect();
@@ -359,10 +434,16 @@
     let bottomPx: number;
 
     if (isMobile) {
-      const bottomBoundPx = cardsActive && cardsRect
+      let bottomBoundPx = cardsActive && cardsRect
         ? cardsRect.top
         : window.innerHeight - TOPICS_CTA_RESERVE;
-      topPx = textRect.bottom + TOPICS_MODEL_MARGIN;
+      if (cardsActive && isSportModel() && stageRightEl) {
+        const headingEl = stageRightEl.querySelector<HTMLElement>('.stage__right-heading');
+        const headingRect = headingEl?.getBoundingClientRect();
+        if (headingRect) bottomBoundPx = headingRect.top;
+      }
+      const topMargin = TOPICS_MODEL_MARGIN + (cardsActive && isSportModel() ? MOBILE_CARDS_TOP_MARGIN : 0);
+      topPx = textRect.bottom + topMargin;
       bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
     } else if (cardsActive && cardsRect && cardsRect.height > 0) {
       const overlapTop = Math.max(textRect.top, cardsRect.top);
@@ -380,23 +461,17 @@
     }
 
     if (bottomPx - topPx < 48) {
-      scene3d.setModelBaseYOffset(0);
-      return;
+      if (!cardsActive) {
+        scene3d.setModelBaseYOffset(0);
+        return;
+      }
+      bottomPx = topPx + 48;
     }
 
-    scene3d.setModelBaseYOffset(
-      config.modelSrc === '/oggetti/pianta.glb' && phase === 'topics' && !cardsActive
-        ? PLANT_THEME_TEXT_Y_OFFSET_VH
-        : 0,
-    );
-    scene3d.setMobileFit(topPx, bottomPx, { centerBias: TOPICS_FIT_CENTER_BIAS });
-    scene3d.setScale(topicsScaleMul(isMobile && mobileCardsVisible));
-    if (
-      (isMobile && (mobileCardsVisible || mobileTopicsScrollComplete)) ||
-      (!isMobile && cardsIntroduced)
-    ) {
-      scene3d.setMobileLayoutBlend(1);
-    }
+    scene3d.setModelBaseYOffset(topicsModelYOffset(cardsActive));
+    scene3d.setMobileFit(topPx, bottomPx, topicsFitOptions(cardsActive));
+    if (!options.skipScale) applyTopicsScale(false);
+    syncTopicsMobileLayout(1);
   }
 
   $effect(() => {
@@ -440,10 +515,22 @@
     return Math.min(1, (particleT - MOBILE_LAYOUT_START) / (1 - MOBILE_LAYOUT_START));
   }
 
+  function currentTopicsLayoutBlend(particleT: number): number {
+    if (isMobile && (mobileCardsVisible || mobileTopicsScrollComplete)) return 1;
+    if (!isMobile && cardsIntroduced) return 1;
+    return topicsLayoutBlendFromParticleT(particleT);
+  }
+
+  function syncTopicsMobileLayout(particleT = 1) {
+    if (!scene3d) return;
+    scene3d.setMobileLayoutBlend(currentTopicsLayoutBlend(particleT));
+    scene3d.snapMobileFit();
+  }
+
   function updateTopicsScrollLayout(particleT: number) {
     if (!scene3d) return;
     updateTopicsModelFit();
-    scene3d.setMobileLayoutBlend(topicsLayoutBlendFromParticleT(particleT));
+    syncTopicsMobileLayout(particleT);
   }
 
   function updateMobileCardsFromScroll(progress: number) {
@@ -474,7 +561,8 @@
     cardsScrollAnimating = true;
     mobileCardsVisible = true; // CSS class m-cards-visible makes container visible
     await tick();
-    updateTopicsModelFit();
+    applyTopicsScale(true);
+    updateTopicsModelFit({ skipScale: true });
     await cardStack?.animateIn();
     cardsScrollAnimating = false;
   }
@@ -489,7 +577,8 @@
     mobileScrollRatio = 0;
     if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     await tick();
-    updateTopicsModelFit();
+    applyTopicsScale(true);
+    updateTopicsModelFit({ skipScale: true });
     cardsScrollAnimating = false;
   }
 
@@ -814,7 +903,7 @@
         appear: 1, duration: 0.12,
         onUpdate: () => {
           scene3d?.setOpacity(proxy.appear);
-          scene3d?.setScale(proxy.scale);
+          scene3d?.setScale(topicsScaleMul(isMobile && mobileCardsVisible));
         },
       }, 0);
 
@@ -1408,9 +1497,8 @@
     left: 0;
     right: 0;
     display: flex;
-    justify-content: flex-start;
-    padding-left: clamp(24px, 5.556vw, 84px);
-    padding-right: clamp(24px, 5.556vw, 79px);
+    justify-content: center;
+    padding: 0 clamp(24px, 5.556vw, 84px);
     pointer-events: none;
   }
 
@@ -1420,7 +1508,7 @@
     font-size: 36px;
     line-height: 1.25;
     color: #16181D;
-    text-align: left;
+    text-align: center;
     white-space: nowrap;
     text-wrap: balance;
   }
@@ -1664,12 +1752,14 @@
     .feedback-top {
       top: 16vh;
       padding: 0 20px;
+      justify-content: center;
     }
 
     .feedback-title {
       font-size: 22px;
       white-space: normal;
-      text-align: left;
+      text-align: center;
+      width: 100%;
     }
 
     .feedback-subtitle {

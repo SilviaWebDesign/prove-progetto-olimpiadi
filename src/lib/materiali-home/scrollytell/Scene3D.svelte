@@ -27,6 +27,7 @@
     setMobileFit:           (topPx: number, bottomPx: number, options?: MobileFitOptions) => void;
     setMobileLayoutBlend:   (t: number) => void;
     setModelBaseYOffset:    (vh: number) => void;
+    snapMobileFit:          () => void;
     clearMobileFit:         () => void;
     realignFeedback:        () => void;
   }
@@ -395,6 +396,11 @@
       },
       setModelBaseYOffset: (vh) => {
         modelBaseYOffsetVh = vh;
+      },
+      snapMobileFit: () => {
+        if (!spinner || !mobileFitActive) return;
+        const targetY = mobileFitFinalOffsetY * mobileLayoutBlend + getModelBaseYOffset();
+        spinner.position.y = targetY;
       },
       clearMobileFit: () => {
         prepareForFeedback();

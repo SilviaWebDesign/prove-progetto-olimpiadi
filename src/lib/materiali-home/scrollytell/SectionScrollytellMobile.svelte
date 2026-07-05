@@ -29,6 +29,7 @@
     frostSrc: string;
     bgSrc: string;
     phrase: string;
+    phraseMobileLines?: string[];
     modelSrc: string;
     resultPaths: string[];
     sectionId: 'infrastructure' | 'sport' | 'sustainability';
@@ -152,7 +153,13 @@
 
   <!-- ── Frase intro ────────────────────────────────────────────────────────── -->
   <div class="mobile-phrase">
-    <p class="mobile-phrase__text">{config.phrase}</p>
+    {#if config.phraseMobileLines?.length}
+      {#each config.phraseMobileLines as line}
+        <p class="mobile-phrase__line">{line}</p>
+      {/each}
+    {:else}
+      <p class="mobile-phrase__text">{config.phrase}</p>
+    {/if}
   </div>
 
   <!-- ── Contenuto principale ───────────────────────────────────────────────── -->
@@ -327,6 +334,16 @@
     overflow: hidden;
   }
 
+  .mobile-hero__title :global(.section-hero-title),
+  .mobile-hero__title :global(.section-hero-title--spread) {
+    font-size: 68px;
+    letter-spacing: 4.76px;
+    line-height: 1.3;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+  }
+
   .mobile-hero__scroll-hint {
     position: relative;
     z-index: 2;
@@ -340,18 +357,28 @@
     50%       { transform: translateY(6px); }
   }
 
-  /* ── Frase ───────────────────────────────────────────────────────────────── */
+  /* ── Frase — Figma 875:6669 ── */
   .mobile-phrase {
-    padding: 52px 28px 40px;
+    display: flex;
+    justify-content: center;
+    padding: 52px 18px 40px;
     background: #ffffff;
   }
 
-  .mobile-phrase__text {
+  .mobile-phrase__text,
+  .mobile-phrase__line {
+    width: min(354px, calc(100% - 36px));
+    margin: 0;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: clamp(22px, 6vw, 32px);
-    line-height: 1.2;
+    font-size: 36px;
+    line-height: 1.1;
     color: #161a1f;
+    text-align: left;
+  }
+
+  .mobile-phrase__line + .mobile-phrase__line {
+    margin-top: 0;
   }
 
   /* ── Main content ────────────────────────────────────────────────────────── */
@@ -368,9 +395,33 @@
     gap: 0;
   }
 
-  /* Text block */
+  /* Text block — Figma 875:6920 */
   .mobile-topic__text {
-    padding: 0 28px 40px;
+    padding: 0 22px 40px;
+  }
+
+  .mobile-topic__text :global(.section-fact-block) {
+    width: 100%;
+    gap: 30px;
+  }
+
+  .mobile-topic__text :global(.section-fact-block__counter) {
+    font-size: 14px;
+  }
+
+  .mobile-topic__text :global(.section-fact-block__title) {
+    font-size: 36px;
+    font-weight: 800;
+  }
+
+  .mobile-topic__text :global(.section-fact-block__body) {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .mobile-topic__text :global(.section-fact-block__source) {
+    font-size: 18px;
+    font-weight: 700;
   }
 
   /* 3D Model */
@@ -389,9 +440,9 @@
   .mobile-topic__cards-heading {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: 14px;
-    line-height: 1.3;
-    color: #161a1f;
+    font-size: 11px;
+    line-height: 1.1;
+    color: #333333;
     margin-bottom: 16px;
   }
 
@@ -489,11 +540,6 @@
 
   .mobile-cta-btn--active .mobile-cta-btn__chevron {
     animation: bounce 1.4s ease-in-out infinite;
-  }
-
-  /* Override SectionFactBlock width on mobile */
-  .mobile-topic__text :global(.section-fact-block) {
-    width: 100%;
   }
 
   /* ── Hero background variants ─────────────────────────────────────────────── */

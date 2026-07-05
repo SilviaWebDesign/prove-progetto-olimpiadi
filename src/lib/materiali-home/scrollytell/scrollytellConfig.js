@@ -180,6 +180,10 @@ export function getScrollytellConfig(key) {
       'Le Olimpiadi prendono forma attraverso cantieri, impianti e collegamenti tra territori. Queste opere possono essere lette come investimenti utili o come interventi costosi, il cui valore dipende da cosa resterà dopo l\'evento.',
   };
 
+  const phraseMobileLinesByKey = {
+    sustainability: sections.sustainability.phraseMobileLines,
+  };
+
   const heroTitleLayoutByKey = {
     sport: 'spread',
   };
@@ -202,6 +206,7 @@ export function getScrollytellConfig(key) {
     frostSrc: visualByKey[key]?.frostSrc ?? section.hero.background,
     bgSrc: visualByKey[key]?.bgSrc ?? section.hero.background,
     phrase: phraseByKey[key] ?? section.intro,
+    phraseMobileLines: phraseMobileLinesByKey[key] ?? undefined,
     modelSrc: key === 'infrastructure' ? '/oggetti/infrastrutture.glb' : section.modelSrc,
     resultPaths: resultPathsByKey[key] ?? [],
     sectionId: /** @type {'infrastructure' | 'sport' | 'sustainability'} */ (section.id),

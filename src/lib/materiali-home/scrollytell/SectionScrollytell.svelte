@@ -33,6 +33,7 @@
     frostSrc: string;
     bgSrc: string;
     phrase: string;
+    phraseMobileLines?: string[];
     modelSrc: string;
     resultPaths: string[];
     sectionId: 'infrastructure' | 'sport' | 'sustainability';
@@ -322,18 +323,112 @@
 
   // ── Topics-mode scroll interception ──────────────────────────────────────
   let topicsMode = false;
-  let lenisRef: { stop: () => void; start: () => void } | null = null;
+  let lenisRef: Lenis | null = null;
+  /** Blocca ri-ingresso topics finché lo scroll non scende sotto TOPICS_REENTER_BELOW. */
+  let topicsExitLock = false;
+  let topicsWheelAccum = 0;
+  let topicsWheelResetTimer: ReturnType<typeof setTimeout> | null = null;
+  const TOPICS_WHEEL_THRESHOLD = 100;
+  const TOPICS_WHEEL_RESET_MS  = 450;
+  const TOPICS_REENTER_BELOW   = 0.94;
+  const TOUCH_SWIPE_THRESHOLD  = 55;
+
+  let touchStartY = 0;
+  let touchStartX = 0;
+  let touchStartedInCards = false;
+
   let feedbackScrollAccum = 0;
   let feedbackScrollResetTimer: ReturnType<typeof setTimeout> | null = null;
   const FEEDBACK_SCROLL_THRESHOLD = 450;
   const FEEDBACK_SCROLL_RESET_MS  = 700;
 
+  function clearTopicsWheel() {
+    topicsWheelAccum = 0;
+    if (topicsWheelResetTimer) {
+      clearTimeout(topicsWheelResetTimer);
+      topicsWheelResetTimer = null;
+    }
+  }
+
+  function resetTopicsScrollState() {
+    if (phase === 'feedback') return;
+    currentTopic = 0;
+    phase = 'intro';
+    mobileCardsVisible = false;
+    mobileScrollRatio = 0;
+    if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
+    clearTopicsWheel();
+    cardStack?.resetHidden();
+  }
+
+  function releaseTopicsToScroll() {
+    topicsExitLock = true;
+    resetTopicsScrollState();
+    exitTopicsMode();
+    requestAnimationFrame(() => {
+      const target = Math.max(0, window.scrollY - window.innerHeight * 0.22);
+      if (lenisRef) {
+        lenisRef.scrollTo(target, { immediate: false });
+      } else {
+        window.scrollTo({ top: target, behavior: 'auto' });
+      }
+    });
+  }
+
+  function handleTopicsBackward() {
+    if (isTransitioning) return;
+    if (phase === 'feedback') {
+      clearFeedbackScroll();
+      exitFeedbackPhase();
+      return;
+    }
+    if (currentTopic === 0) {
+      releaseTopicsToScroll();
+    } else {
+      goPrev();
+    }
+  }
+
+  function handleTopicsForward() {
+    if (isTransitioning || phase === 'feedback' || !anyLiked) return;
+    if (currentTopic === lastTopic) {
+      enterFeedbackPhase();
+    } else {
+      goNext();
+    }
+  }
+
+  function onTopicsTouchStart(e: TouchEvent) {
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+    touchStartedInCards = !!(mobileCardsVisible && cardsScrollRef?.contains(e.target as Node));
+  }
+
+  function onTopicsTouchEnd(e: TouchEvent) {
+    if (touchStartedInCards || isTransitioning) return;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > Math.abs(dy) || Math.abs(dy) < TOUCH_SWIPE_THRESHOLD) return;
+
+    if (dy > 0) {
+      handleTopicsBackward();
+    } else if (phase === 'feedback') {
+      if ($allSectionsCompleted) navigateToResults();
+      else goToNextSection();
+    } else {
+      handleTopicsForward();
+    }
+  }
+
   function enterTopicsMode() {
-    if (topicsMode) return;
+    if (topicsMode || topicsExitLock) return;
     topicsMode = true;
     phase = 'topics';
+    clearTopicsWheel();
     if (isMobile) {
       document.addEventListener('touchmove', mobilePreventScroll, { passive: false });
+      document.addEventListener('touchstart', onTopicsTouchStart, { passive: true });
+      document.addEventListener('touchend', onTopicsTouchEnd, { passive: true });
       void mobileShowCards();
       tick().then(updateMobileModelFit);
       setTimeout(updateMobileModelFit, 450);
@@ -367,14 +462,19 @@
     });
   }
 
-  function exitTopicsMode() {
+  function exitTopicsMode(opts?: { fromScroll?: boolean }) {
     if (!topicsMode) return;
     topicsMode = false;
     if (isMobile) {
       document.removeEventListener('touchmove', mobilePreventScroll);
+      document.removeEventListener('touchstart', onTopicsTouchStart);
+      document.removeEventListener('touchend', onTopicsTouchEnd);
     } else {
       window.removeEventListener('wheel', onTopicsWheel, { capture: true } as EventListenerOptions);
       lenisRef?.start();
+    }
+    if (opts?.fromScroll) {
+      resetTopicsScrollState();
     }
   }
 
@@ -405,22 +505,28 @@
 
     const goingDown = e.deltaY > 0;
 
-    if (!goingDown && currentTopic === 0) {
-      exitTopicsMode();
+    if (!goingDown && currentTopic === 0 && phase !== 'feedback') {
+      releaseTopicsToScroll();
       return;
     }
 
     e.preventDefault();
     if (isTransitioning) return;
 
+    topicsWheelAccum += e.deltaY;
+    if (topicsWheelResetTimer) clearTimeout(topicsWheelResetTimer);
+    topicsWheelResetTimer = setTimeout(() => {
+      topicsWheelAccum = 0;
+      topicsWheelResetTimer = null;
+    }, TOPICS_WHEEL_RESET_MS);
+
+    if (Math.abs(topicsWheelAccum) < TOPICS_WHEEL_THRESHOLD) return;
+
+    topicsWheelAccum = 0;
     if (goingDown) {
-      if (currentTopic === lastTopic) {
-        if (anyLiked) enterFeedbackPhase();
-      } else if (anyLiked) {
-        goNext();
-      }
+      handleTopicsForward();
     } else {
-      goPrev();
+      handleTopicsBackward();
     }
   }
 
@@ -505,19 +611,25 @@
             const progress = self.progress;
             const particleT = particleProgressFromScroll(progress);
 
+            if (particleT < TOPICS_REENTER_BELOW) {
+              topicsExitLock = false;
+            }
+
             if (progress >= 0.77) maybeIntroduceCards();
             else maybeResetCards();
 
             scene3d?.setTransitionProgress(particleT);
 
-            if (particleT >= 1 && !topicsMode) {
+            if (particleT >= 1 && !topicsMode && !topicsExitLock) {
               enterTopicsMode();
-            } else if (particleT < 1 && topicsMode) {
-              exitTopicsMode();
+            } else if (particleT < 0.98 && topicsMode) {
+              exitTopicsMode({ fromScroll: true });
             }
           },
           onReverseComplete: () => {
             scene3d?.setTransitionProgress(0);
+            topicsExitLock = false;
+            resetTopicsScrollState();
             exitTopicsMode();
             maybeResetCards();
           },
@@ -652,17 +764,30 @@
 
     <!-- Frase -->
     <div class="phrase-container">
-      <p class="phrase">{config.phrase}</p>
+      {#if config.phraseMobileLines?.length}
+        <div class="phrase">
+          <p class="phrase__single phrase__single--desktop">{config.phrase}</p>
+          <div class="phrase__lines phrase__lines--mobile">
+            {#each config.phraseMobileLines as line}
+              <p class="phrase__line">{line}</p>
+            {/each}
+          </div>
+        </div>
+      {:else}
+        <p class="phrase">{config.phrase}</p>
+      {/if}
     </div>
 
     <!-- Layer 3D: canvas full-viewport, dietro la griglia -->
-    <Scene3D
-      bind:api={scene3d}
-      modelSrc={config.modelSrc}
-      resultPaths={config.resultPaths}
-      onModelLoaded={() => resolveModelLoaded()}
-      orbitEnabled={phase === 'feedback'}
-    />
+    <div class="scene-3d-layer" class:hidden-on-mobile-topics={isMobile && mobileCardsVisible && phase === 'topics'}>
+      <Scene3D
+        bind:api={scene3d}
+        modelSrc={config.modelSrc}
+        resultPaths={config.resultPaths}
+        onModelLoaded={() => resolveModelLoaded()}
+        orbitEnabled={phase === 'feedback'}
+      />
+    </div>
 
     <!-- Stage: testo + card -->
     <div class="stage">
@@ -821,6 +946,15 @@
     pointer-events: none;
   }
 
+  .scene-3d-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    opacity: 1;
+    transition: opacity 240ms ease;
+    pointer-events: none;
+  }
+
   .scene--sustainability .layer--bg {
     opacity: 0.16;
   }
@@ -889,6 +1023,27 @@
     color: var(--color-text-primary, #000000);
     opacity: 0;
     pointer-events: none;
+  }
+
+  .phrase__single--desktop {
+    margin: 0;
+    width: 100%;
+    text-align: inherit;
+    font: inherit;
+    color: inherit;
+    line-height: inherit;
+  }
+
+  .phrase__lines--mobile {
+    display: none;
+  }
+
+  .phrase__line {
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    line-height: inherit;
+    text-align: left;
   }
 
   .scene--sustainability .phrase-container {
@@ -1081,48 +1236,138 @@
      ═══════════════════════════════════════════════════════════════════════ */
   @media (max-width: 768px) {
 
+    /* ── Titolone centrato in basso (invariato) ── */
+    .hero-title--section {
+      justify-content: flex-end;
+      align-items: center;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .hero-title--section :global(.section-hero-title),
+    .hero-title--section :global(.section-hero-title--spread) {
+      font-size: 68px;
+      letter-spacing: 4.76px;
+      line-height: 1.3;
+      text-align: center;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hero-title--section :global(.section-hero-title:not(.section-hero-title--spread)) {
+      white-space: nowrap;
+    }
+
+    /* ── Frase intro — Figma 875:6669: box 354px centrato, testo allineato a sinistra ── */
+    .phrase-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      box-sizing: border-box;
+    }
+
+    .phrase,
+    .phrase__single--desktop,
+    .phrase__lines--mobile {
+      width: min(354px, calc(100% - 36px));
+      max-width: 354px;
+      margin: 0;
+      font-family: 'Supreme Variable', sans-serif;
+      font-weight: 700;
+      font-size: 36px;
+      line-height: 1.1;
+      color: #161a1f;
+      text-align: left;
+    }
+
+    .phrase__single--desktop {
+      display: none;
+    }
+
+    .phrase__lines--mobile {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .scene--sustainability .phrase-container,
+    .scene--sport .phrase-container,
+    .scene--infrastructure .phrase-container {
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+    }
+
+    .scene--sustainability .phrase,
+    .scene--sport .phrase,
+    .scene--infrastructure .phrase,
+    .scene--sustainability .phrase__single--desktop,
+    .scene--sport .phrase__single--desktop,
+    .scene--infrastructure .phrase__single--desktop,
+    .scene--sustainability .phrase__lines--mobile,
+    .scene--sport .phrase__lines--mobile,
+    .scene--infrastructure .phrase__lines--mobile {
+      width: min(354px, calc(100% - 36px));
+      max-width: 354px;
+      font-size: 36px;
+      line-height: 1.1;
+      color: #161a1f;
+      text-align: left;
+      padding: 0;
+    }
+
     /* Stage: single column, children absolutely positioned */
     .stage {
       display: block;
       padding: 0;
     }
 
-    /* ── Text block: top of viewport — 18px padding → 354px on 390px iPhone ── */
+    .scene-3d-layer.hidden-on-mobile-topics {
+      opacity: 0;
+    }
+
+    /* ── Topic text — Figma 875:6920: left 22px, width 354px ── */
     .stage__text {
       position: absolute;
       top: 56px;
-      left: 18px;
-      right: 18px;
-      width: auto;
+      left: 22px;
+      right: auto;
+      width: min(354px, calc(100% - 44px));
       z-index: 5;
     }
 
-    /* Topic title font size transition */
     .stage__text :global(.section-fact-block) {
       width: 100%;
-      gap: 16px;
+      gap: 30px;
+    }
+
+    .stage__text :global(.section-fact-block__counter) {
+      font-size: 14px;
     }
 
     .stage__text :global(.section-fact-block__title) {
       font-size: 36px;
+      font-weight: 800;
       transition: font-size 0.4s ease;
     }
 
     .stage__text.m-compact :global(.section-fact-block__title) {
-      font-size: 24px;
+      font-size: 28px;
     }
 
     .stage__text :global(.section-fact-block__body) {
       font-size: 20px;
+      font-weight: 700;
       transition: font-size 0.4s ease;
     }
 
     .stage__text.m-compact :global(.section-fact-block__body) {
-      font-size: 15px;
+      font-size: 16px;
     }
 
     .stage__text :global(.section-fact-block__source) {
-      font-size: 12px;
+      font-size: 18px;
+      font-weight: 700;
     }
 
     /* ── Cards column: bottom of viewport ── */
@@ -1131,7 +1376,7 @@
       bottom: 80px;
       left: 0;
       right: 0;
-      padding: 0 20px;
+      padding: 0 22px;
       width: 100%;
       height: auto;
       overflow: visible;
@@ -1148,8 +1393,9 @@
 
     .stage__right-heading {
       white-space: normal;
-      font-size: 13px;
-      line-height: 1.3;
+      font-size: 11px;
+      line-height: 1.1;
+      color: #333333;
     }
 
     /* Scrollable cards inner container */
@@ -1203,17 +1449,7 @@
       transition: top 0.12s ease;
     }
 
-    /* ── Phrase smaller on mobile ── */
-    .phrase {
-      font-size: clamp(22px, 6vw, 34px);
-      width: calc(100% - 48px);
-    }
-
-    .scene--sustainability .phrase {
-      font-size: clamp(18px, 5.5vw, 34px);
-      padding-left: 24px;
-      padding-right: 24px;
-    }
+    /* ── Phrase smaller on mobile — overridden above with Figma specs ── */
 
     /* ── Feedback overlay adapted ── */
     .feedback-title {

@@ -41,7 +41,7 @@
   const TEXT2 = { in: 0.28, inEnd: 0.33, out: 0.35, outEnd: 0.40 };
   /** Compare solo dopo sfondo bianco pieno (SNOW_ZONE_SCROLL ≈ 0.54) */
   const TEXT3 = { in: 0.58, inEnd: 0.68, out: 0.70, outEnd: 0.80 };
-  const CARDS = { in: 0.90, inEnd: 0.95 };
+  const CARDS = { in: 0.82, inEnd: 0.88 };
 
   const TEXT1_LINES = [
     'La realtà non è unica e oggettiva,',
@@ -56,6 +56,26 @@
   const TEXT3_LINES = [
     'Le tue scelte plasmeranno gli eroi',
     'e i cattivi di Milano-Cortina 2026.'
+  ];
+
+  /** A capo mobile — Figma node 315:2402 (come reso visivo a 390px) */
+  const TEXT1_LINES_MOBILE = [
+    'La realtà non è unica',
+    'e oggettiva, dipende',
+    'dai fatti che osservi e dal',
+    'punto di vista che scegli.'
+  ];
+  const TEXT2_LINES_MOBILE = [
+    'Attraversa il percorso,',
+    'tra sostenibilità, sport',
+    'e infrastrutture, e prendi',
+    'posizione davanti',
+    'alle informazioni.'
+  ];
+  const TEXT3_LINES_MOBILE = [
+    'Le tue scelte',
+    'plasmeranno la realtà di',
+    'Milano-Cortina 2026.'
   ];
 
   let text1Opacity = $derived(
@@ -197,8 +217,13 @@
       style="opacity: {text1Opacity}; pointer-events: {text1Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text1Opacity < 0.05}
     >
-      <div class="split-lines-container">
+      <div class="split-lines-container split-lines-container--desktop">
         {#each TEXT1_LINES as line}
+          <h2 class="narrative-line">{line}</h2>
+        {/each}
+      </div>
+      <div class="split-lines-container split-lines-container--mobile split-lines-container--text1">
+        {#each TEXT1_LINES_MOBILE as line}
           <h2 class="narrative-line">{line}</h2>
         {/each}
       </div>
@@ -210,8 +235,13 @@
       style="opacity: {text2Opacity}; pointer-events: {text2Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text2Opacity < 0.05}
     >
-      <div class="split-lines-container">
+      <div class="split-lines-container split-lines-container--desktop">
         {#each TEXT2_LINES as line}
+          <h3 class="narrative-line">{line}</h3>
+        {/each}
+      </div>
+      <div class="split-lines-container split-lines-container--mobile split-lines-container--text2">
+        {#each TEXT2_LINES_MOBILE as line}
           <h3 class="narrative-line">{line}</h3>
         {/each}
       </div>
@@ -223,8 +253,13 @@
       style="opacity: {text3Opacity}; pointer-events: {text3Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text3Opacity < 0.05}
     >
-      <div class="split-lines-container">
+      <div class="split-lines-container split-lines-container--desktop">
         {#each TEXT3_LINES as line}
+          <h3 class="narrative-line">{line}</h3>
+        {/each}
+      </div>
+      <div class="split-lines-container split-lines-container--mobile split-lines-container--text3">
+        {#each TEXT3_LINES_MOBILE as line}
           <h3 class="narrative-line">{line}</h3>
         {/each}
       </div>
@@ -469,6 +504,10 @@
     text-transform: none;
   }
 
+  .split-lines-container--mobile {
+    display: none;
+  }
+
   .narrative-line {
     font-family: 'Supreme Variable', sans-serif;
     font-size: var(--home-narrative-size);
@@ -549,15 +588,36 @@
     }
 
     .brand-tag {
-      font-size: 1.1rem;
+      font-size: 20px;
     }
 
     .main-title {
-      --home-title-size: 3.85rem;
+      --home-title-size: 56px;
+      max-width: 335px;
     }
 
     .narrative-line {
-      --home-narrative-size: 1.55rem;
+      --home-narrative-size: 24px;
+    }
+
+    .split-lines-container--desktop {
+      display: none;
+    }
+
+    .split-lines-container--mobile {
+      display: flex;
+    }
+
+    .split-lines-container--text1 {
+      max-width: 278px;
+    }
+
+    .split-lines-container--text2 {
+      max-width: 276px;
+    }
+
+    .split-lines-container--text3 {
+      max-width: 277px;
     }
 
     .cards-stage :global(.cards-stage-inner) {

@@ -95,22 +95,26 @@
     );
   }
 
-  .comment-card-glass:hover::before {
-    opacity: 1;
-  }
-
   .comment-card-glass[data-liked='true']::before {
     opacity: 0;
   }
 
-  .comment-card-glass[data-liked='true']:hover::before {
-    opacity: 1;
-  }
+  /* Hover state only for devices with real hover (mouse/trackpad) — keeps touch
+     devices to just default/selected, avoiding a hover state stuck after tap. */
+  @media (hover: hover) and (pointer: fine) {
+    .comment-card-glass:hover::before {
+      opacity: 1;
+    }
 
-  .comment-card-glass:hover {
-    transform: translateY(-0.5px);
-    border-color: rgba(22, 24, 29, 0.8);
-    outline-color: rgba(22, 24, 29, 0.8);
+    .comment-card-glass[data-liked='true']:hover::before {
+      opacity: 1;
+    }
+
+    .comment-card-glass:hover {
+      transform: translateY(-0.5px);
+      border-color: rgba(22, 24, 29, 0.8);
+      outline-color: rgba(22, 24, 29, 0.8);
+    }
   }
 
   .comment-card-glass[data-liked='true'] {

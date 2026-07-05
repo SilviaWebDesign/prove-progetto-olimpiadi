@@ -141,7 +141,8 @@
     gsap.fromTo('.stage__right-heading', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power3.inOut', delay: 0.04 });
     await tick();
     if (isMobile) {
-      await mobileShowCards();
+      // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
+      // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
       updateMobileModelFit();
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -209,7 +210,8 @@
 
     gsap.set('.stage__text', { y: 8, opacity: 0 });
     if (isMobile) {
-      await mobileShowCards();
+      // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
+      // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
       updateMobileModelFit();
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -241,7 +243,8 @@
 
     gsap.set('.stage__text', { y: -8, opacity: 0 });
     if (isMobile) {
-      await mobileShowCards();
+      // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
+      // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
       updateMobileModelFit();
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -319,8 +322,10 @@
   const modelLoadedPromise = new Promise<void>(resolve => { resolveModelLoaded = resolve; });
 
   // ── Mobile cards ──────────────────────────────────────────────────────────
-  // Su mobile la navigazione è solo a bottone ("Continua"): niente swipe, che
-  // altrimenti confligge con lo scroll nativo della lista commenti.
+  // Su mobile l'avanzamento tra argomenti è solo a bottone ("Continua"): niente swipe per
+  // quello, che confliggerebbe con lo scroll nativo della lista commenti. Il toggle
+  // esteso/compatto del topic corrente invece è disponibile via tap o scroll gesture
+  // (mobilePreventScroll), perché non tocca mai lo scroll/la posizione della pagina.
   async function mobileShowCards() {
     if (mobileCardsVisible || cardsScrollAnimating) return;
     cardsScrollAnimating = true;
@@ -331,6 +336,28 @@
     cardsScrollAnimating = false;
   }
 
+  // Reverse of mobileShowCards: torna alla modalità "solo modello" con testo
+  // ampio, nascondendo il pannello commenti (senza avanzare argomento).
+  async function mobileHideCards() {
+    if (!mobileCardsVisible || cardsScrollAnimating) return;
+    cardsScrollAnimating = true;
+    await cardStack?.animateOut();
+    mobileCardsVisible = false; // CSS removes m-cards-visible
+    mobileScrollRatio = 0;
+    if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
+    await tick();
+    updateMobileModelFit();
+    cardsScrollAnimating = false;
+  }
+
+  // Tap sul testo argomento: alterna la modalità testo ampio/solo-modello ↔
+  // testo compatto/commenti visibili (m-compact segue mobileCardsVisible).
+  function toggleMobileCardsPanel() {
+    if (!isMobile || phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
+    const action = mobileCardsVisible ? mobileHideCards() : mobileShowCards();
+    action.then(() => setTimeout(updateMobileModelFit, 450));
+  }
+
   function onCardsScroll() {
     const el = cardsScrollRef;
     if (!el) return;
@@ -338,13 +365,42 @@
     mobileScrollRatio = max > 0 ? el.scrollTop / max : 0;
   }
 
+  // Scroll gesture (touch) per alternare argomento esteso/compatto, in aggiunta al tap
+  // su .stage__text (toggleMobileCardsPanel): dito verso l'alto (scroll giù) → compatto,
+  // dito verso il basso (scroll su) → esteso. Non avanza mai tra argomenti.
+  let touchStartY = 0;
+  let touchStartX = 0;
+  let touchStartedInCards = false;
+  let mobileSwipeHandled = false;
+  const MOBILE_SWIPE_THRESHOLD = 40;
+
+  function mobileTouchStart(e: TouchEvent) {
+    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) return;
+    touchStartY = e.touches[0].clientY;
+    mobileSwipeHandled = false;
+  }
+
   // Non-passive: prevents page scroll (including iOS inertia) while in topics/feedback mode,
   // lasciando libero lo scroll nativo dentro la lista commenti.
+  // NB: un blocco via `position:fixed` sul body (position + scrollTo) è stato provato e
+  // scartato: cambia la posizione di scroll reale della finestra, che è ciò che ScrollTrigger
+  // usa per calcolare il progress — il risultato era un loop enterTopicsMode/exitTopicsMode
+  // continuo che resettava `phase` in modo intermittente (bug "mai portato al feedback").
   function mobilePreventScroll(e: TouchEvent) {
     if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) {
       return; // allow natural scroll inside the cards box
     }
     e.preventDefault();
+
+    if (mobileSwipeHandled || phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
+    const deltaY = e.touches[0].clientY - touchStartY;
+    if (deltaY <= -MOBILE_SWIPE_THRESHOLD) {
+      mobileSwipeHandled = true;
+      if (!mobileCardsVisible) mobileShowCards().then(() => setTimeout(updateMobileModelFit, 450));
+    } else if (deltaY >= MOBILE_SWIPE_THRESHOLD) {
+      mobileSwipeHandled = true;
+      if (mobileCardsVisible) mobileHideCards().then(() => setTimeout(updateMobileModelFit, 450));
+    }
   }
 
   // ── Topics-mode scroll interception ──────────────────────────────────────
@@ -358,10 +414,6 @@
   const TOPICS_WHEEL_RESET_MS  = 450;
   const TOPICS_REENTER_BELOW   = 0.94;
   const TOUCH_SWIPE_THRESHOLD  = 55;
-
-  let touchStartY = 0;
-  let touchStartX = 0;
-  let touchStartedInCards = false;
 
   let feedbackScrollAccum = 0;
   let feedbackScrollResetTimer: ReturnType<typeof setTimeout> | null = null;
@@ -452,6 +504,7 @@
     phase = 'topics';
     clearTopicsWheel();
     if (isMobile) {
+      document.addEventListener('touchstart', mobileTouchStart, { passive: true });
       document.addEventListener('touchmove', mobilePreventScroll, { passive: false });
       document.addEventListener('touchstart', onTopicsTouchStart, { passive: true });
       document.addEventListener('touchend', onTopicsTouchEnd, { passive: true });
@@ -492,6 +545,7 @@
     if (!topicsMode) return;
     topicsMode = false;
     if (isMobile) {
+      document.removeEventListener('touchstart', mobileTouchStart);
       document.removeEventListener('touchmove', mobilePreventScroll);
       document.removeEventListener('touchstart', onTopicsTouchStart);
       document.removeEventListener('touchend', onTopicsTouchEnd);
@@ -708,13 +762,25 @@
         const svgH = svgW * capH / bb.width;
         titleEl.setAttribute('height', String(Math.ceil(svgH)));
         titleEl.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${capH}`);
+
+        // Mobile: titolo centrato verticalmente sullo schermo (invece di ancorato al fondo)
+        if (isMobile) {
+          titleEl.style.bottom = 'auto';
+          titleEl.style.top = `${Math.max(0, (window.innerHeight - svgH) / 2)}px`;
+        }
       }
       if (window.scrollY < window.innerHeight * 0.15) {
         gsap.to(titleEl, { opacity: 1, duration: 0.12, ease: 'none' });
       }
     });
 
-    // ── Tutte le risorse → refresh ScrollTrigger + preload result models ──
+    // ── Tutte le risorse → refresh ScrollTrigger ──
+    // NB: niente preload eager dei modelli risultato (rimosso 2026-07-03): per infrastrutture
+    // e sport erano 5 varianti da 14-21MB ciascuna (fino a ~90MB scaricati e decodificati in
+    // background per niente, dato che ne serve solo una) — su mobile causava pressione di
+    // memoria sufficiente a far ricaricare la scheda da sola (Safari, "reload infinito" su
+    // sport). Il modello di risultato viene ora caricato on-demand in `morphToResult`, che
+    // gestisce già correttamente l'attesa e gli eventuali errori (vedi Scene3D.svelte).
     const bgImg = new Image();
     bgImg.src = config.bgSrc;
     const bgLoaded = new Promise<void>(resolve => {
@@ -727,12 +793,6 @@
     Promise.all([bgLoaded, windowLoaded, modelLoadedPromise]).then(() => {
       ScrollTrigger.refresh();
       requestAnimationFrame(() => requestAnimationFrame(() => ScrollTrigger.refresh()));
-      if ('requestIdleCallback' in window) {
-        (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
-          .requestIdleCallback(() => scene3d?.preloadResultModels(), { timeout: 1000 });
-      } else {
-        setTimeout(() => scene3d?.preloadResultModels(), 2000);
-      }
     });
 
     return () => {
@@ -818,7 +878,16 @@
     <!-- Stage: testo + card -->
     <div class="stage">
 
-      <div class="stage__text" bind:this={stageTextEl} class:m-compact={isMobile && mobileCardsVisible}>
+      <div
+        class="stage__text"
+        bind:this={stageTextEl}
+        class:m-compact={isMobile && mobileCardsVisible}
+        class:m-tappable={isMobile && phase === 'topics'}
+        role="button"
+        tabindex={isMobile && phase === 'topics' ? 0 : -1}
+        onclick={toggleMobileCardsPanel}
+        onkeydown={(e) => { if (isMobile && phase === 'topics' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileCardsPanel(); } }}
+      >
         <TextBlock
           counter={topics[currentTopic].counter}
           title={topics[currentTopic].title}
@@ -1358,6 +1427,11 @@
       z-index: 5;
     }
 
+    .stage__text.m-tappable {
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
     .stage__text :global(.section-fact-block) {
       width: 100%;
       gap: 30px;
@@ -1436,12 +1510,19 @@
       text-align: center;
     }
 
-    /* Scrollable cards inner container */
+    /* Scrollable cards inner container.
+       overflow-y: auto forces the browser to also clip overflow-x (spec rule:
+       an axis can't stay 'visible' once the other is scrollable), which cut the
+       cards' box-shadow/outline at the edges. Padding + matching negative margin
+       gives that glow room to bleed without shifting the cards' visual position. */
     .stage__right-scroll {
       height: 281px;
+      padding: 0 16px;
+      margin: 0 -16px;
       overflow-y: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
 
     .stage__right-scroll::-webkit-scrollbar {
@@ -1498,13 +1579,13 @@
       font-size: 22px;
       white-space: normal;
       text-align: center;
-      padding: 0 24px;
+      padding: 0 20px;
     }
 
     .feedback-subtitle {
       font-size: 15px;
       bottom: 140px;
-      padding: 0 24px;
+      padding: 0 20px;
       max-width: 100%;
     }
 

@@ -343,8 +343,8 @@
     }
 
     .navbar {
-      --navbar-padding-x: 28px;
-      --navbar-padding-top: 26px;
+      --navbar-padding-x: 20px;
+      --navbar-padding-top: 24px;
     }
 
     .navbar.always-visible {
@@ -352,8 +352,8 @@
     }
 
     .menu-overlay {
-      --navbar-padding-x: 28px;
-      --navbar-padding-top: 26px;
+      --navbar-padding-x: 20px;
+      --navbar-padding-top: 24px;
     }
 
     .navbar.always-visible ~ .menu-overlay {
@@ -377,6 +377,10 @@
     .menu-link {
       font-size: 48px;
       letter-spacing: 3.36px;
+    }
+
+    .menu-panel {
+      padding: 120px 20px 40px;
     }
   }
 </style>

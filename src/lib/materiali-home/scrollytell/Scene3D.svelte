@@ -18,7 +18,6 @@
     unsettle:               () => void;
     pulse:                  () => void;
     resetPulse:             () => void;
-    preloadResultModels:    () => void;
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
     setMobileFit:           (topPx: number, bottomPx: number, scaleBoost?: number, anchor?: 'center' | 'top' | 'bottom') => void;
@@ -28,14 +27,12 @@
   interface Props {
     api?: Scene3DApi;
     modelSrc: string;
-    resultPaths?: string[];
     onModelLoaded?: () => void;
     orbitEnabled?: boolean;
   }
   let {
     api = $bindable(),
     modelSrc,
-    resultPaths = [],
     onModelLoaded,
     orbitEnabled = false,
   }: Props = $props();
@@ -108,6 +105,9 @@
   let transitionState: TState = 'none';
   let transitionProgress = 0;
   const TRANSITION_DURATION = 2.0;
+
+  /** Alterna a true/false ad ogni frame di morph: usato per dimezzare gli upload GPU. */
+  let morphFrameParity = false;
 
   let manualPulseActive  = false;
   let manualPulseElapsed = 0;
@@ -229,7 +229,6 @@
         manualPulseElapsed = 0;
         if (particleMat) particleMat.uniforms.uPulse.value = 0;
       },
-      preloadResultModels,
       morphToResult,
       returnToParticles: () => {
         if (controls) controls.enabled = false;
@@ -324,7 +323,10 @@
     if (!canvasEl || !wrapperEl) return;
 
     renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // DPR più basso su mobile: riduce il carico di fill-rate su GPU più deboli,
+    // percepibile durante le animazioni scroll-driven e il morph in fase feedback.
+    const maxDpr = window.innerWidth < 768 ? 1.5 : 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     renderer.outputColorSpace    = THREE.SRGBColorSpace;
     renderer.toneMapping         = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
@@ -596,27 +598,6 @@
     root.add(particleMesh);
   }
 
-  function preloadResultModels() {
-    const uniquePaths = [...new Set(resultPaths)];
-    if (uniquePaths.length === 0) return;
-    const draco = new DRACOLoader();
-    draco.setDecoderPath('/draco/');
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
-    let remaining = uniquePaths.length;
-    uniquePaths.forEach(path => {
-      loader.load(path, (gltf) => {
-        resultModels.set(path, gltf.scene);
-        remaining--;
-        if (remaining === 0) draco.dispose();
-      }, undefined, (err) => {
-        console.warn('[Scene3D] preload error:', path, err);
-        remaining--;
-        if (remaining === 0) draco.dispose();
-      });
-    });
-  }
-
   function centerFeedbackView(scaleMul: number) {
     if (!modelGroup || !camera) return;
 
@@ -666,7 +647,7 @@
   }
 
   function doMorph(source: THREE.Group, onDone: () => void) {
-    if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) return;
+    if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) { onDone(); return; }
 
     const resultGroup = source.clone();
 
@@ -739,10 +720,10 @@
       geos.push(deindexed);
     });
 
-    if (geos.length === 0) { spinner.remove(resultGroup); return; }
+    if (geos.length === 0) { spinner.remove(resultGroup); onDone(); return; }
     const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
     geos.forEach(g => g.dispose());
-    if (!merged) { spinner.remove(resultGroup); return; }
+    if (!merged) { spinner.remove(resultGroup); onDone(); return; }
 
     const samplerMesh = new THREE.Mesh(merged, new THREE.MeshBasicMaterial());
     const sampler = new MeshSurfaceSampler(samplerMesh).build();
@@ -760,6 +741,7 @@
 
     morphState        = 'morphing';
     morphElapsed      = 0;
+    morphFrameParity  = false;
     morphDoneCallback = onDone;
   }
 
@@ -784,6 +766,7 @@
     }, undefined, (err) => {
       console.error('[Scene3D] on-demand load error:', path, err);
       draco.dispose();
+      onDone();
     });
   }
 
@@ -1048,7 +1031,12 @@
         iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
         iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
       }
-      particleMesh.instanceMatrix.needsUpdate = true;
+      // Il calcolo CPU resta ad ogni frame (mantiene invariati i tempi di convergenza),
+      // ma l'upload del buffer instanceMatrix alla GPU (~1.3MB) avviene ogni 2 frame:
+      // dimezza il carico di fill-rate durante il morph, impercettibile per un effetto
+      // di particelle in convergenza. Pesante soprattutto su GPU mobile più deboli.
+      morphFrameParity = !morphFrameParity;
+      if (morphFrameParity || t >= 1) particleMesh.instanceMatrix.needsUpdate = true;
 
       if (t >= 0.8) {
         const fadeT = (t - 0.8) / 0.2;

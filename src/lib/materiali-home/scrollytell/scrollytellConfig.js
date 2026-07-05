@@ -313,6 +313,10 @@ export function getScrollytellConfig(key) {
       frostSrc: '/images/frost-infrastrutture.jpg',
       bgSrc: '/images/frost-infrastrutture.jpg',
     },
+    sport: {
+      /** Alysa è a destra nell’asset — ancora a destra per inquadrare viso e figura */
+      bgPosition: '84% 12%',
+    },
   };
 
   return {
@@ -325,6 +329,7 @@ export function getScrollytellConfig(key) {
     heroAriaLabel: section.title,
     frostSrc: visualByKey[key]?.frostSrc ?? section.hero.background,
     bgSrc: visualByKey[key]?.bgSrc ?? section.hero.background,
+    bgPosition: visualByKey[key]?.bgPosition,
     phrase: phraseByKey[key] ?? section.intro,
     phraseLines:
       key === 'sustainability'

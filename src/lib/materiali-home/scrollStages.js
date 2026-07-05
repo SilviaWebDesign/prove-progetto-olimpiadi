@@ -8,6 +8,25 @@ export const SNOW_ZONE_SCROLL = 0.62;
 export const HOME_CARDS_START = 0.9;
 export const HOME_CARDS_END = 0.95;
 
+/** Range scroll per lo zoom sfondo in fase cards (più ampio = zoom più lento) */
+export const HOME_CARDS_ZOOM_START = HOME_CARDS_START;
+export const HOME_CARDS_ZOOM_END = 1;
+
+/** > 1 rallenta la curva di zoom rispetto allo scroll */
+export const HOME_CARDS_ZOOM_EASE_POWER = 1.2;
+
+/** > 1 rallenta lo zoom durante l’immersione neve */
+export const HOME_SNOW_ZOOM_EASE_POWER = 1.15;
+
+/** Lambda per lo smoothing scroll → camera (più basso = più morbido) */
+export const HOME_SCROLL_DAMP_LAMBDA = 5.5;
+
+/** Secondo blocco narrativo home — "Attraversa il percorso…" */
+export const HOME_TEXT2 = { in: 0.28, inEnd: 0.33, out: 0.35, outEnd: 0.40 };
+
+/** Peso scroll orbita durante HOME_TEXT2 (< 1 = montagna più lenta) */
+export const HOME_ORBIT_TEXT2_SLOW_WEIGHT = 0.34;
+
 /** @param {number} progress @param {number} start @param {number} end */
 export function rangeProgress(progress, start, end) {
   if (progress <= start) return 0;
@@ -61,6 +80,12 @@ export function smoothstep(t) {
 export function easeOutCubic(t) {
   const x = clamp(t, 0, 1);
   return 1 - Math.pow(1 - x, 3);
+}
+
+/** Ease-in-out morbido per transizioni camera/zoom */
+export function easeInOutQuint(t) {
+  const x = clamp(t, 0, 1);
+  return x < 0.5 ? 16 * x * x * x * x * x : 1 - Math.pow(-2 * x + 2, 5) / 2;
 }
 
 /**
@@ -141,4 +166,53 @@ export function smoothRangeProgress(progress, start, end) {
 export function damp(current, target, deltaSec, lambda = 7) {
   const factor = 1 - Math.exp(-deltaSec * lambda);
   return current + (target - current) * factor;
+}
+
+/**
+ * Rallenta l’orbita della montagna mentre è visibile il secondo testo narrativo.
+ * @param {number} pageScroll progresso scroll pagina 0→1
+ */
+export function remapMountainScroll(pageScroll) {
+  const p = clamp(pageScroll, 0, 1);
+  if (p <= 0) return 0;
+  if (p >= HOME_SNOW_DIVE_START) return p;
+
+  const slowStart = HOME_TEXT2.in;
+  const slowEnd = HOME_TEXT2.outEnd;
+  const slowWeight = HOME_ORBIT_TEXT2_SLOW_WEIGHT;
+
+  const segments = [
+    { start: 0, end: slowStart, weight: 1 },
+    { start: slowStart, end: slowEnd, weight: slowWeight },
+    { start: slowEnd, end: HOME_SNOW_DIVE_START, weight: 1 }
+  ];
+
+  const totalWeight = segments.reduce(
+    (sum, seg) => sum + (seg.end - seg.start) * seg.weight,
+    0
+  );
+
+  let accumulated = 0;
+  for (const seg of segments) {
+    if (p <= seg.start) break;
+    const len = seg.end - seg.start;
+    if (p >= seg.end) {
+      accumulated += len * seg.weight;
+    } else {
+      accumulated += (p - seg.start) * seg.weight;
+      break;
+    }
+  }
+
+  return (accumulated / totalWeight) * HOME_SNOW_DIVE_START;
+}
+
+/**
+ * Progresso zoom sfondo nella fase cards — curva morbida fino a fine pagina.
+ * @param {number} pageScroll
+ */
+export function cardsZoomProgress(pageScroll) {
+  const t = rangeProgress(pageScroll, HOME_CARDS_ZOOM_START, HOME_CARDS_ZOOM_END);
+  const eased = smoothstep(t);
+  return Math.pow(eased, HOME_CARDS_ZOOM_EASE_POWER);
 }

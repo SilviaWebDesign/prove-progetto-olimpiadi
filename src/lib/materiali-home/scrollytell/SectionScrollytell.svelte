@@ -39,6 +39,7 @@
     heroAriaLabel: string;
     frostSrc: string;
     bgSrc: string;
+    bgPosition?: string;
     phrase: string;
     phraseLines?: string[];
     modelSrc: string;
@@ -871,13 +872,13 @@
 
     <!-- Layer frost -->
     <div class="layer layer--frost">
-      <FrostCanvas src={config.frostSrc} />
+      <FrostCanvas src={config.frostSrc} objectPosition={config.bgPosition} />
     </div>
 
     <!-- Layer bg -->
     <div
       class="layer layer--bg"
-      style="background-image: url('{config.bgSrc}')"
+      style="background-image: url('{config.bgSrc}'); background-position: {config.bgPosition ?? 'center'}"
       aria-hidden="true"
     ></div>
 
@@ -979,8 +980,8 @@
             {ctaLabel}
           </span>
         {/key}
-        <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
-          <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
+        <svg class="cta-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
+          <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
                 stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
@@ -1015,8 +1016,8 @@
           <span class="cta-label">
             {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
           </span>
-          <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
-            <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
+          <svg class="cta-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
+            <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
                   stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
@@ -1289,7 +1290,7 @@
   /* ── CTA ─────────────────────────────────────────────────────────────── */
   .stage__cta {
     position: absolute;
-    bottom: 28px;
+    bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
@@ -1301,7 +1302,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
+    padding: 0 14px;
     opacity: 0.35;
     pointer-events: none;
     cursor: default;
@@ -1317,17 +1319,16 @@
   .cta-label {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: 12px;
+    line-height: 1.1;
     color: #161A1F;
     white-space: nowrap;
   }
 
   .cta-chevron {
     display: block;
-    width: 38px;
-    height: 19px;
+    width: 21px;
+    height: 9px;
   }
 
   .stage__cta-content.active .cta-chevron {
@@ -1391,13 +1392,14 @@
 
   .feedback-bottom-cta {
     position: absolute;
-    bottom: 24px;
+    bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
+    padding: 0 14px;
     cursor: pointer;
     pointer-events: auto;
     white-space: nowrap;
@@ -1639,6 +1641,14 @@
       bottom: 128px;
       padding: 0 20px;
       max-width: 100%;
+    }
+
+    .stage__cta {
+      bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    }
+
+    .feedback-bottom-cta {
+      bottom: max(12px, env(safe-area-inset-bottom, 0px));
     }
   }
 </style>

@@ -34,6 +34,7 @@
     heroAriaLabel: string;
     frostSrc: string;
     bgSrc: string;
+    bgPosition?: string;
     phrase: string;
     phraseLines?: string[];
     modelSrc: string;
@@ -125,7 +126,7 @@
   <div class="mobile-hero">
     <div
       class="mobile-hero__bg"
-      style="background-image: url('{config.bgSrc}')"
+      style="background-image: url('{config.bgSrc}'); background-position: {config.bgPosition ?? 'center'}"
       aria-hidden="true"
     ></div>
     <div class="mobile-hero__frost" aria-hidden="true"></div>

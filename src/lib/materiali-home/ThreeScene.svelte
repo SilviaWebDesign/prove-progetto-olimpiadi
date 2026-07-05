@@ -12,7 +12,13 @@
     HOME_SNOW_DIVE_START,
     HOME_CARDS_START,
     HOME_CARDS_END,
-    SNOW_ZONE_SCROLL
+    SNOW_ZONE_SCROLL,
+    HOME_SNOW_ZOOM_EASE_POWER,
+    HOME_SCROLL_DAMP_LAMBDA,
+    damp,
+    easeInOutQuint,
+    remapMountainScroll,
+    cardsZoomProgress
   } from './scrollStages.js';
   import { homeScrollProgress } from './homeScrollProgress.js';
 
@@ -61,6 +67,11 @@
   /** @type {{ material: THREE.Material, originalColor: THREE.Color }[]} */
   let mountainMaterials = [];
 
+  let smoothedProgress = 0;
+  let lastFrameTime = 0;
+  let smoothedZoom = 1.2;
+  let smoothedCanvasOpacity = 1;
+
   /** @param {number} value @param {number} min @param {number} max */
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -82,11 +93,6 @@
     return t * t * (3 - 2 * t);
   }
 
-  /** @param {number} t */
-  function easeInOutQuint(t) {
-    return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
-  }
-
   /** Più alto = rotazione più lenta nelle fasi centrali dello scroll */
   const ORBIT_EASE_POWER = 1.45;
 
@@ -98,8 +104,9 @@
     const orbitU = clamp(scroll / Math.max(HOME_ORBIT_END, 0.01), 0, 1);
     const orbitZoom = easeInOutCubic(orbitU) * 0.85;
     const snowU = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
-    const snowZoom = easeInOutCubic(snowU) * 2.15;
-    const deepSnowBoost = easeInOutCubic(smoothstep(0.55, 1, snowU)) * 0.85;
+    const snowZoomT = Math.pow(snowU, HOME_SNOW_ZOOM_EASE_POWER);
+    const snowZoom = easeInOutCubic(snowZoomT) * 2.15;
+    const deepSnowBoost = easeInOutCubic(smoothstep(0.55, 1, snowZoomT)) * 0.85;
     return 1.2 + orbitZoom + snowZoom + deepSnowBoost;
   }
 
@@ -168,11 +175,11 @@
     _snowLookAt.y -= 0.2;
 
     const snowT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
-    const eased = easeInOutCubic(snowT);
+    const eased = easeInOutQuint(snowT);
 
     if (eased < 0.34) {
       const t = eased / 0.34;
-      const te = easeInOutCubic(t);
+      const te = easeInOutQuint(t);
       _camPos.lerpVectors(_orbitEndPos, _snowApproachPos, te);
       _lookAt.lerpVectors(_orbitEndLookAt, _snowApproachLookAt, te);
     } else {
@@ -211,7 +218,7 @@
     const cfg = orbitConfig;
     if (!cfg) return false;
 
-    const eased = easeInOutCubic(clamp(cardsT, 0, 1));
+    const eased = easeInOutQuint(clamp(cardsT, 0, 1));
     const height = cfg.topDownHeight * lerp(1.12, 1, eased);
 
     _camPos.set(cfg.center.x, cfg.center.y + height, cfg.center.z);
@@ -290,12 +297,17 @@
     renderer.setSize(w, h);
   }
 
-  function animate() {
+  function animate(now) {
     if (!renderer || !scene || !camera) return;
 
     animationFrameId = requestAnimationFrame(animate);
 
-    const progress = homeScrollProgress.value;
+    const dt = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.05) : 0;
+    lastFrameTime = now;
+
+    const targetProgress = homeScrollProgress.value;
+    smoothedProgress = damp(smoothedProgress, targetProgress, dt, HOME_SCROLL_DAMP_LAMBDA);
+    const progress = smoothedProgress;
     const inSnowGap = progress >= snowZoneAt && progress < HOME_CARDS_START;
     const inCardsPhase = progress >= HOME_CARDS_START;
 
@@ -312,26 +324,31 @@
     }
 
     if (inCardsPhase) {
-      const cardsT = smoothstep(HOME_CARDS_START, HOME_CARDS_END, progress);
+      const cardsFadeT = smoothstep(HOME_CARDS_START, HOME_CARDS_END, progress);
+      const cardsZoomT = cardsZoomProgress(progress);
+      const targetCanvasOpacity = cardsFadeT;
+      smoothedCanvasOpacity = damp(smoothedCanvasOpacity, targetCanvasOpacity, dt, 9);
 
       if (renderer.domElement) {
         renderer.domElement.style.visibility = 'visible';
-        renderer.domElement.style.opacity = String(cardsT);
+        renderer.domElement.style.opacity = String(smoothedCanvasOpacity);
       }
 
       setMountainVisible(true);
 
-      if (sampleTopDownCamera(cardsT)) {
+      if (sampleTopDownCamera(cardsZoomT)) {
         camera.position.copy(_camPos);
         camera.up.set(Math.cos(TOP_DOWN_YAW), 0, Math.sin(TOP_DOWN_YAW));
         camera.lookAt(_lookAt);
       }
 
-      camera.zoom = lerp(1.05, 1.28, easeInOutCubic(cardsT));
+      const targetZoom = lerp(1.05, 1.28, cardsZoomT);
+      smoothedZoom = damp(smoothedZoom, targetZoom, dt, 8);
+      camera.zoom = smoothedZoom;
       camera.updateProjectionMatrix();
 
       if (sceneFog) {
-        sceneFog.density = lerp(0.03, 0.022, cardsT);
+        sceneFog.density = lerp(0.03, 0.022, cardsZoomT);
         sceneFog.color.setRGB(1, 1, 1);
       }
 
@@ -342,10 +359,11 @@
 
     if (renderer.domElement) {
       renderer.domElement.style.visibility = 'visible';
-      renderer.domElement.style.opacity = '1';
+      smoothedCanvasOpacity = damp(smoothedCanvasOpacity, 1, dt, 9);
+      renderer.domElement.style.opacity = String(smoothedCanvasOpacity);
     }
 
-    const scroll = clamp(progress, 0, snowZoneAt);
+    const scroll = remapMountainScroll(clamp(progress, 0, snowZoneAt));
 
     if (sampleCameraAt(scroll)) {
       camera.position.copy(_camPos);
@@ -357,7 +375,9 @@
       camera.lookAt(0, 0, 0);
     }
 
-    camera.zoom = zoomAt(scroll);
+    const targetZoom = zoomAt(scroll);
+    smoothedZoom = damp(smoothedZoom, targetZoom, dt, 8);
+    camera.zoom = smoothedZoom;
     camera.updateProjectionMatrix();
 
     const whiteT = smoothstep(HOME_SNOW_DIVE_START, snowZoneAt, scroll);
@@ -438,6 +458,10 @@
 
       animate();
       window.addEventListener('resize', resizeRenderer);
+
+      smoothedProgress = homeScrollProgress.value;
+      smoothedZoom = zoomAt(remapMountainScroll(clamp(smoothedProgress, 0, snowZoneAt)));
+      smoothedCanvasOpacity = smoothedProgress >= HOME_CARDS_START ? 1 : 1;
 
       try {
         const gltf = await preloadMountainGltf();

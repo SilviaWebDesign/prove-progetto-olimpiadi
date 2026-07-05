@@ -1,7 +1,27 @@
 <script lang="ts">
   // ─── Props ───────────────────────────────────────────────────────────────
-  interface Props { src: string; }
-  let { src }: Props = $props();
+  interface Props {
+    src: string;
+    objectPosition?: string;
+  }
+  let { src, objectPosition = 'center' }: Props = $props();
+
+  function parseObjectPosition(pos: string): [number, number] {
+    const parts = pos.trim().split(/\s+/);
+    const parseAxis = (value: string, fallback: number) => {
+      if (value.endsWith('%')) return parseFloat(value) / 100;
+      if (value === 'left' || value === 'top') return 0;
+      if (value === 'right' || value === 'bottom') return 1;
+      if (value === 'center') return 0.5;
+      return fallback;
+    };
+    return [
+      parseAxis(parts[0] ?? 'center', 0.5),
+      parseAxis(parts[1] ?? parts[0] ?? 'center', 0.5),
+    ];
+  }
+
+  const [focusX, focusY] = $derived(parseObjectPosition(objectPosition));
 
   // ─── Config — identico al prototipo frost-reveal ─────────────────────────
   const FROST_OPACITY            = 1.0;
@@ -109,7 +129,7 @@
     renderCurrentState();
   }
 
-  /** Allinea il disegno canvas a object-fit: cover + object-position: center dell'img .sharp */
+  /** Allinea il disegno canvas a object-fit: cover + object-position dell'img .sharp */
   function drawImageCover(img: HTMLImageElement, w: number, h: number, bleed = 0) {
     const iw = img.naturalWidth;
     const ih = img.naturalHeight;
@@ -118,8 +138,8 @@
     const scale = Math.max(w / iw, h / ih);
     const dw = iw * scale;
     const dh = ih * scale;
-    const dx = (w - dw) / 2 - bleed;
-    const dy = (h - dh) / 2 - bleed;
+    const dx = (w - dw) * focusX - bleed;
+    const dy = (h - dh) * focusY - bleed;
 
     ctx!.drawImage(img, dx, dy, dw + bleed * 2, dh + bleed * 2);
   }
@@ -525,7 +545,7 @@
     2. canvas  — frost dipinto sopra; destination-out rivela la foto
 -->
 <div class="frost-wrap" class:ready bind:this={wrapper} aria-hidden="true">
-  <img class="sharp" {src} alt="" draggable="false" />
+  <img class="sharp" {src} alt="" draggable="false" style:object-position={objectPosition} />
   <canvas
     bind:this={canvas}
     onpointermove={onPointerMove}

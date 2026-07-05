@@ -13,6 +13,7 @@
     SNOW_ZONE_SCROLL,
     HOME_CARDS_START,
     HOME_CARDS_END,
+    HOME_TEXT2,
     stageMoxyOpacity
   } from '../../../lib/materiali-home/scrollStages.js';
   import { homeScrollProgress } from '../../../lib/materiali-home/homeScrollProgress.js';
@@ -38,7 +39,7 @@
    * Ogni blocco: fade in → visibile → fade out → scroll vuoto prima del successivo.
    */
   const TEXT1 = { in: 0.06, inEnd: 0.11, out: 0.13, outEnd: 0.18 };
-  const TEXT2 = { in: 0.28, inEnd: 0.33, out: 0.35, outEnd: 0.40 };
+  const TEXT2 = HOME_TEXT2;
   /** Compare solo dopo sfondo bianco pieno (SNOW_ZONE_SCROLL ≈ 0.54) */
   const TEXT3 = { in: 0.58, inEnd: 0.68, out: 0.70, outEnd: 0.80 };
   const CARDS = { in: 0.90, inEnd: 0.95 };

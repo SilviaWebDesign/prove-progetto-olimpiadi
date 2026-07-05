@@ -1376,7 +1376,7 @@
 
   .feedback-top {
     position: absolute;
-    top: 10vh;
+    top: 14vh;
     left: 0;
     right: 0;
     display: flex;
@@ -1396,7 +1396,7 @@
 
   .feedback-subtitle {
     position: absolute;
-    bottom: 88px;
+    bottom: 120px;
     left: 0;
     right: 0;
     text-align: center;
@@ -1660,7 +1660,7 @@
 
     /* ── Feedback overlay adapted ── */
     .feedback-top {
-      top: 12vh;
+      top: 16vh;
       padding: 0 20px;
     }
 
@@ -1671,7 +1671,7 @@
 
     .feedback-subtitle {
       font-size: 15px;
-      bottom: 96px;
+      bottom: 128px;
       padding: 0 20px;
       max-width: 100%;
     }

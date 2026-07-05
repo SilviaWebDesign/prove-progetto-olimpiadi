@@ -311,12 +311,12 @@ export function getScrollytellConfig(key) {
 
   const visualByKey = {
     infrastructure: {
-      frostSrc: '/images/frost-infrastrutture.jpg',
-      bgSrc: '/images/frost-infrastrutture.jpg',
+      frostSrc: '/images/frost-infrastructure.png',
+      bgSrc: '/images/frost-infrastructure.png',
     },
     sport: {
       /** Alysa è a destra nell’asset — ancora a destra per inquadrare viso e figura */
-      bgPosition: '84% 12%',
+      bgPosition: '75% 26%',
     },
   };
 

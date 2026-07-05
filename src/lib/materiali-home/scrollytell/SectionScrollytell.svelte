@@ -1082,7 +1082,7 @@
     position: absolute;
     inset: -80px;
     z-index: 0;
-    background-image: url('/images/frost-infrastrutture.jpg');
+    background-image: url('/images/frost-infrastructure.png');
     background-size: cover;
     background-position: center;
     filter: blur(23px) brightness(1.15) saturate(0.55) contrast(1.08);

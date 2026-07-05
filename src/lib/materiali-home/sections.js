@@ -98,7 +98,7 @@ export const sections = {
     accent: '#3eaf3f',
     modelSrc: '/oggetti/pianta.glb',
     hero: {
-      background: '/images/foresta.png'
+      background: '/images/frost-sustainability.png'
     },
     introClaim: SUSTAINABILITY_INTRO_CLAIM,
     facts: [
@@ -268,7 +268,7 @@ export const sections = {
     accent: '#422ccb',
     modelSrc: '/oggetti/sport.glb',
     hero: {
-      background: '/images/alysasfondo.png'
+      background: '/images/frost-sport.png'
     },
     intro: INTRO,
     introPhrase: SPORT_INTRO_PHRASE,
@@ -294,7 +294,7 @@ export const sections = {
     accent: '#ff783c',
     modelSrc: '/oggetti/excavator.glb',
     hero: {
-      background: '/images/villaggio.png'
+      background: '/images/frost-infrastructure.png'
     },
     intro: INTRO,
     introClaim: INFRASTRUCTURE_INTRO_CLAIM,

@@ -287,11 +287,11 @@
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
 
   const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
-    sport: { ratio: 0.74, centerBias: 0.42 },
+    sport: { ratio: 0.80, centerBias: 0.50 },
   };
 
   const MOBILE_SCROLL_SCALE_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], number>> = {
-    sport: 0.30,
+    sport: 0.33,
   };
 
   function updateMobileModelFit() {
@@ -659,7 +659,7 @@
 
       threeTl.to(proxy, {
         scale: isMobile
-          ? (MOBILE_SCROLL_SCALE_BY_SECTION[config.sectionId] ?? 0.40)
+          ? (MOBILE_SCROLL_SCALE_BY_SECTION[config.sectionId] ?? 0.44)
           : 0.56,
         ease: 'power2.inOut', duration: 0.28,
         onUpdate: () => scene3d?.setScale(proxy.scale),
@@ -1043,7 +1043,7 @@
   .scene--sustainability .phrase-container {
     align-items: flex-start;
     justify-content: flex-start;
-    padding-top: clamp(180px, 47.25vh, 464px);
+    padding-top: clamp(200px, 52vh, 500px);
     padding-left: clamp(24px, 5.556vw, 84px);
     padding-right: clamp(24px, 5.556vw, 79px);
     box-sizing: border-box;
@@ -1060,7 +1060,7 @@
   .scene--sport .phrase-container {
     align-items: flex-start;
     justify-content: flex-start;
-    padding-top: clamp(180px, 47.25vh, 464px);
+    padding-top: clamp(200px, 52vh, 500px);
     padding-left: 18px;
     padding-right: clamp(24px, 5.556vw, 79px);
     box-sizing: border-box;
@@ -1079,7 +1079,7 @@
   .scene--infrastructure .phrase-container {
     align-items: flex-start;
     justify-content: flex-start;
-    padding-top: clamp(180px, 47.25vh, 464px);
+    padding-top: clamp(200px, 52vh, 500px);
     padding-left: 18px;
     padding-right: clamp(24px, 5.556vw, 79px);
     box-sizing: border-box;
@@ -1281,6 +1281,8 @@
 
     .scene__viewport {
       touch-action: pan-y;
+      --mobile-text-top: 108px;
+      --mobile-phrase-top: 148px;
     }
 
     .scene__viewport.m-cards-mode :global(.scene-wrapper) {
@@ -1304,10 +1306,10 @@
       padding: 0;
     }
 
-    /* ── Text block: top of viewport — 20px padding → 350px on 390px iPhone ── */
+    /* ── Text block: top of viewport ── */
     .stage__text {
       position: absolute;
-      top: 56px;
+      top: var(--mobile-text-top);
       left: 20px;
       right: 20px;
       width: auto;
@@ -1457,11 +1459,11 @@
       transition: top 0.12s ease;
     }
 
-    /* ── Phrase: left-aligned intro text, positioned high enough to avoid clipping ── */
+    /* ── Phrase: left-aligned intro text ── */
     .phrase-container {
       align-items: flex-start;
       justify-content: flex-start;
-      padding-top: 100px;
+      padding-top: var(--mobile-phrase-top);
       padding-left: 20px;
       padding-right: 20px;
     }
@@ -1490,14 +1492,14 @@
     }
 
     .scene--sustainability .phrase-container {
-      padding-top: 100px;
+      padding-top: var(--mobile-phrase-top);
       padding-left: 20px;
       padding-right: 20px;
     }
 
     .scene--sport .phrase-container,
     .scene--infrastructure .phrase-container {
-      padding-top: 100px;
+      padding-top: var(--mobile-phrase-top);
       padding-left: 18px;
       padding-right: 18px;
     }

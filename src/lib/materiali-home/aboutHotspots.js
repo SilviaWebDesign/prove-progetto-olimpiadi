@@ -15,7 +15,51 @@ import * as THREE from 'three';
  */
 
 /** Distanza minima tra marker consecutivi sul percorso (unità mondo). */
-export const MIN_HOTSPOT_SPACING = 4.8;
+export const MIN_HOTSPOT_SPACING = 7;
+
+/** Posizioni desktop: distribuite attorno al perimetro della montagna. */
+const DESKTOP_HOTSPOT_PLACEMENTS = [
+  { azimuth: 0.06, elevation: 0.18 },
+  { azimuth: 0.3, elevation: 0.34 },
+  { azimuth: 0.54, elevation: 0.48 },
+  { azimuth: 0.78, elevation: 0.56 }
+];
+
+/** Posizioni mobile: stesso giro attorno alla montagna, quote più alte. */
+const MOBILE_HOTSPOT_PLACEMENTS = [
+  { azimuth: 0.08, elevation: 0.26 },
+  { azimuth: 0.32, elevation: 0.38 },
+  { azimuth: 0.56, elevation: 0.48 },
+  { azimuth: 0.78, elevation: 0.56 }
+];
+/** Breakpoint allineato al layout about mobile (pannello in basso). */
+export const ABOUT_MOBILE_BREAKPOINT = 768;
+
+export function isAboutMobileLayout() {
+  return typeof window !== 'undefined' && window.innerWidth < ABOUT_MOBILE_BREAKPOINT;
+}
+
+/**
+ * Posiziona gli hotspot attorno alla montagna, distanziati sul percorso
+ * in senso orario così restano raggiungibili ruotando la scena.
+ *
+ * @param {AboutHotspot} hotspot
+ * @param {boolean} [mobile]
+ */
+export function getHotspotPlacement(hotspot, mobile = isAboutMobileLayout()) {
+  const index = getHotspotPathIndex(hotspot.id);
+  if (index < 0) {
+    return { azimuth: hotspot.azimuth, elevation: hotspot.elevation };
+  }
+
+  const table = mobile ? MOBILE_HOTSPOT_PLACEMENTS : DESKTOP_HOTSPOT_PLACEMENTS;
+  return table[index] ?? { azimuth: hotspot.azimuth, elevation: hotspot.elevation };
+}
+
+/** @deprecated Usa getHotspotPlacement */
+export function getMobileHotspotPlacement(hotspot) {
+  return getHotspotPlacement(hotspot, true);
+}
 
 /** Quattro tappe sul percorso in senso orario (azimuth crescente = avanti nel percorso). */
 /** @type {AboutHotspot[]} */
@@ -23,48 +67,64 @@ export const ABOUT_HOTSPOT_PATH = [
   {
     id: 'start',
     azimuth: 0.06,
-    elevation: 0.14,
+    elevation: 0.18,
     label: 'Partenza',
     title: 'Il progetto',
     template: 'sport',
-    body:
-      '“Quante facce ha una medaglia?” è un progetto realizzato per il Laboratorio di Web e Digital Design, del Corso di Laurea in Design della Comunicazione del Politecnico di Milano. L’obiettivo era quello di creare un’esperienza digitale in grado di raccontare le Olimpiadi Invernali di Milano-Cortina 2026 come spazio narrativo: tra aspettative, pressioni, successi e fallimenti. Atleti, istituzioni e luoghi diventano protagonisti di storie che rendono l’evento sportivo un momento memorabile.\n\n“Quante facce ha una medaglia?” nasce come provocazione di fronte al binomio buoni-cattivi, risultato di uno storytelling di intrattenimento che riduce le informazioni a dicotomie e schieramenti estremamente polarizzati. Lo scopo del sito è dimostrare che la formazione di questa polarità non è un processo oggettivo e naturale, ma dipende sempre dal contesto sociale, dalla costruzione mediatica e dal punto di vista di ogni singolo individuo: uno stesso evento può plasmare molteplici realtà, tutte contemporaneamente vere perché interpretazioni di fatti oggettivi.\n\nL’intento non è quello di chiudere il dibattito sugli “eroi” e i “cattivi” delle Olimpiadi, ma di stimolare una riflessione riguardo al processo di creazione di protagonisti e antagonisti, idoli e capri espiatori, frutto dell’approccio estremizzante della comunicazione di massa.',
+    body: `“Quante facce ha una medaglia?” è un progetto realizzato per il Laboratorio di Web e Digital Design, del Corso di Laurea in Design della Comunicazione del Politecnico di Milano. L’obiettivo è quello di creare un’esperienza digitale in grado di raccontare le Olimpiadi Invernali di Milano-Cortina 2026 come spazio narrativo: tra aspettative, pressioni, successi e fallimenti. Atleti, istituzioni e luoghi diventano protagonisti di storie che rendono l’evento sportivo un momento memorabile.
+
+“Quante facce ha una medaglia?” nasce come provocazione di fronte al binomio buoni-cattivi, risultato di uno storytelling di intrattenimento che riduce le informazioni a dicotomie e schieramenti estremamente polarizzati. Lo scopo del sito è dimostrare che la formazione di questa polarità non è un processo oggettivo e naturale, ma dipende sempre dal contesto sociale, dalla costruzione mediatica e dal punto di vista di ogni singolo individuo: uno stesso evento può plasmare molteplici realtà, tutte contemporaneamente vere perché interpretazioni di fatti oggettivi.
+
+L’intento non è quello di chiudere il dibattito sugli “eroi” e i “cattivi” delle Olimpiadi, ma di stimolare una riflessione riguardo al processo di creazione di protagonisti e antagonisti, idoli e capri espiatori, frutto dell’approccio estremizzante della comunicazione di massa.`,
     sources: 'fonte placeholder',
     modelSrc: '/oggetti/snowboardlady.glb'
   },
   {
     id: 'lower-slope',
-    azimuth: 0.32,
-    elevation: 0.38,
-    label: 'Pendio inferiore',
-    title: 'Lo sport',
+    azimuth: 0.3,
+    elevation: 0.34,
+    label: 'Divergenza',
+    title: 'Chi siamo – Divergenza',
     template: 'sport',
-    body:
-      'Le discipline invernali raccontano atleti che competono sotto gli occhi del mondo, tra preparazione fisica, pressione mediatica e aspettative nazionali.\n\nOgni performance può diventare simbolo di vittoria o delusione, a seconda del racconto che la circonda e del momento in cui viene consumata.',
+    body: `“Divergenza” è un gruppo di sei studenti del Politecnico di Milano, al secondo anno del Corso di Laurea in Design della Comunicazione.
+
+Crediamo nella duplice essenza del Design: sia emotivo che funzionale. Per noi i progetti di comunicazione visiva, analogici o digitali che siano, hanno il compito di provocare nel fruitore una riflessione, sia interiore che rispetto al mondo che lo circonda.
+
+Silvia La Mastra, implementazione e coding; Chiara Moretti, implementazione e coding; Letizia Neri, design system, prototipazione, copywriting; Giovanni Palladino, supporto a identità visiva; Siyu Yang, supporto a prototipazione; Jieni Ye, modellazione 3D.`,
     sources: 'fonte placeholder',
     modelSrc: '/oggetti/scii.glb'
   },
   {
     id: 'west-ridge',
-    azimuth: 0.58,
-    elevation: 0.62,
-    label: 'Cresta ovest',
-    title: 'La velocità',
+    azimuth: 0.54,
+    elevation: 0.48,
+    label: 'Ricerca quantitativa',
+    title: 'Ricerca quantitativa',
     template: 'sport',
-    body:
-      'Bob e discipline a cronometro mettono in scena il corpo come macchina al limite: traiettorie, ghiaccio, rischio calcolato.\n\nLa medaglia qui non è solo talento, ma anche ingegneria, squadra e decisioni prese in frazioni di secondo.',
+    body: `Come primo passaggio di ricerca sociale abbiamo condotto un sondaggio anonimo online, raccogliendo le opinioni di più di 130 soggetti campione, in modo da avere una visione d’insieme su come il pubblico generale ha visto e interpretato gli eventi dei Giochi.
+
+La maggioranza delle risposte che abbiamo ricevuto provenivano da giovani adulti (18-25 anni) residenti a Milano o in zone di hinterland, questa categoria demografica identifica i soggetti che hanno vissuto sulla propria pelle l’organizzazione e lo svolgimento delle Olimpiadi Invernali senza esserne direttamente coinvolti in prima persona.
+
+I canali di informazione privilegiati sono stati i mezzi di comunicazione di massa (TV, giornali e social media), mentre i contenuti più discussi e ricordati riguardano gare, medaglie, storie personali degli atleti, ma anche proteste e controversie. La maggior parte del campione individuato ha visto i Giochi come portatori di una legacy positiva in ambito infrastrutturale e di immagine pubblica del Paese, mentre l’impatto su ambiente, territorio e residenti delle aree coinvolte è ritenuto critico.
+
+Dal sondaggio sono emersi diversi “eroi” e “cattivi”, individuati tra molteplici categorie. Talvolta, uno stesso soggetto è risultato essere sia positivo che negativo, sulla base delle differenti risposte. Tali dati sono andati a confermare la nostra tesi di duplice natura della realtà, ponendo la base per la realizzazione di questo progetto.`,
     sources: 'fonte placeholder',
     modelSrc: '/oggetti/bobsled.glb'
   },
   {
     id: 'peak',
-    azimuth: 0.88,
-    elevation: 0.88,
-    label: 'Vetta',
-    title: 'Il team',
+    azimuth: 0.78,
+    elevation: 0.56,
+    label: 'Ricerca qualitativa',
+    title: 'Ricerca qualitativa',
     template: 'sport',
-    body:
-      'Sul ghiaccio e sulla neve, lo sport di squadra amplifica il tema della medaglia: successo collettivo, errore condiviso, leadership e sostituzioni.\n\nOgni giocatore porta una versione diversa della stessa partita, e ogni versione può sembrare la più vera.',
+    body: `Per comprendere a livello specifico i profili degli utenti e le motivazioni che li hanno spinti a percepire un determinato fatto o soggetto come buono o cattivo abbiamo svolto interviste con diverse persone scelte per rappresentare le idee del campione demografico di riferimento in relazione con le loro posizioni sulle Olimpiadi Milano Cortina 2026, basate sulle diverse categorie di individui emerse dal sondaggio preliminare.
+
+Al fine di creare i commenti relativi ad ogni fatto delle 3 sezioni del sito sono state quindi poste domande aperte a 3 persone tra i 20 e 25 anni residenti a Milano ognuna con un punto di vista diverso sull’evento che volontariamente si sono sottoposte ad un intervista frontale in contesto privato.
+
+In particolare Chiara, attivista e scrittrice laureata in Economia e Scienze Politiche; Arianna, studentessa e sportiva socialmente attiva; Nicolò, studente di ingegneria entusiasta per le opportunità create.
+
+Attraverso le loro risposte abbiamo individuato pensieri e opinioni per ogni evento presentato nel sito in modo tale che l’utente possa confrontare e scegliere tra le diverse posizioni presentate.`,
     sources: 'fonte placeholder',
     modelSrc: '/oggetti/ice_hockey_player.glb'
   }
@@ -372,21 +432,25 @@ export function ensureCardNearMountain(pos, worldBox, mountainModel, horizontal,
  * @param {number} [minDist]
  */
 export function enforceHotspotSeparation(positions, minDist = MIN_HOTSPOT_SPACING) {
-  for (let pass = 0; pass < 14; pass++) {
+  for (let pass = 0; pass < 10; pass++) {
     let moved = false;
-    for (let i = 0; i < positions.length; i++) {
-      for (let j = i + 1; j < positions.length; j++) {
-        const delta = new THREE.Vector3().subVectors(positions[i], positions[j]);
-        delta.y = 0;
-        const dist = delta.length();
-        if (dist >= minDist || dist < 1e-4) continue;
-        const push = (minDist - dist) * 0.5;
-        delta.normalize();
-        positions[i].addScaledVector(delta, push);
-        positions[j].addScaledVector(delta, -push);
-        moved = true;
-      }
+
+    for (let i = 0; i < positions.length - 1; i++) {
+      const delta = new THREE.Vector3().subVectors(positions[i + 1], positions[i]);
+      const horizontal = new THREE.Vector3(delta.x, 0, delta.z);
+      const horizLen = horizontal.length();
+      const dist = delta.length();
+      if (dist >= minDist || horizLen < 1e-4) continue;
+
+      const push = (minDist - dist) * 0.55;
+      horizontal.normalize();
+
+      positions[i + 1].addScaledVector(horizontal, push * 0.75);
+      positions[i + 1].y += push * 0.28;
+      positions[i].addScaledVector(horizontal, -push * 0.45);
+      moved = true;
     }
+
     if (!moved) break;
   }
 }
@@ -552,6 +616,94 @@ export function sampleOrbitFocusTransition(
 }
 
 /**
+ * Transizione morbida camera↔target: slerp sulla direzione e lerp sulla distanza
+ * rispetto al target interpolato (evita lo scatto del lerp lineare in world space).
+ *
+ * @param {THREE.Vector3} fromCam
+ * @param {THREE.Vector3} toCam
+ * @param {THREE.Vector3} fromTarget
+ * @param {THREE.Vector3} toTarget
+ * @param {number} t
+ * @returns {{ cam: THREE.Vector3, target: THREE.Vector3 }}
+ */
+export function sampleSmoothCameraTransition(fromCam, toCam, fromTarget, toTarget, t) {
+  const target = new THREE.Vector3().lerpVectors(fromTarget, toTarget, t);
+
+  const fromRel = new THREE.Vector3().subVectors(fromCam, fromTarget);
+  const toRel = new THREE.Vector3().subVectors(toCam, toTarget);
+  const fromDist = fromRel.length();
+  const toDist = toRel.length();
+
+  if (fromDist < 1e-5 || toDist < 1e-5) {
+    return {
+      cam: new THREE.Vector3().lerpVectors(fromCam, toCam, t),
+      target
+    };
+  }
+
+  const fromDir = fromRel.normalize();
+  const toDir = toRel.normalize();
+  const dir = slerpUnitVectors(fromDir, toDir, t);
+  const dist = THREE.MathUtils.lerp(fromDist, toDist, t);
+
+  return {
+    cam: target.clone().addScaledVector(dir, dist),
+    target
+  };
+}
+
+/**
+ * Deselezione: arco attorno al centro montagna (slerp direzione + lerp raggio)
+ * senza forzare il raggio minimo orbita — evita di passare sotto la montagna.
+ *
+ * @param {THREE.Vector3} fromCam
+ * @param {THREE.Vector3} toCam
+ * @param {THREE.Vector3} fromTarget
+ * @param {THREE.Vector3} toTarget
+ * @param {THREE.Vector3} mountainCenter
+ * @param {number} t
+ * @param {{ minPhi?: number; maxPhi?: number }} [options]
+ * @returns {{ cam: THREE.Vector3, target: THREE.Vector3 }}
+ */
+export function sampleUnfocusTransition(
+  fromCam,
+  toCam,
+  fromTarget,
+  toTarget,
+  mountainCenter,
+  t,
+  options = {}
+) {
+  const minPhi = options.minPhi ?? 0.2;
+  const maxPhi = options.maxPhi ?? Math.PI / 2 - 0.1;
+
+  const fromOffset = new THREE.Vector3().subVectors(fromCam, mountainCenter);
+  const toOffset = new THREE.Vector3().subVectors(toCam, mountainCenter);
+  const fromR = Math.max(fromOffset.length(), 1e-4);
+  const toR = Math.max(toOffset.length(), 1e-4);
+
+  const fromDir = fromOffset.normalize();
+  const toDir = toOffset.normalize();
+  const dir = slerpUnitVectors(fromDir, toDir, t);
+  const radius = THREE.MathUtils.lerp(fromR, toR, t);
+
+  const cam = mountainCenter.clone().addScaledVector(dir, radius);
+
+  const rel = new THREE.Vector3().subVectors(cam, mountainCenter);
+  const sph = new THREE.Spherical().setFromVector3(rel);
+  const clampedPhi = THREE.MathUtils.clamp(sph.phi, minPhi, maxPhi);
+  if (clampedPhi !== sph.phi) {
+    sph.phi = clampedPhi;
+    rel.setFromSpherical(sph);
+    cam.copy(mountainCenter).add(rel);
+  }
+
+  const target = new THREE.Vector3().lerpVectors(fromTarget, toTarget, t);
+
+  return { cam, target };
+}
+
+/**
  * @param {THREE.PerspectiveCamera} cam
  * @param {THREE.Object3D} mountainModel
  * @param {THREE.Box3} worldBox
@@ -624,8 +776,8 @@ export function clampFocusCameraPosition(surfacePoint, desiredCamPos, mountainMo
   return out;
 }
 
-/** Frazione viewport (0–1) dove inquadrare il marker in focus — lato sinistro, come Figma. */
-export const FOCUS_VIEWPORT_X = 0.44;
+/** Frazione viewport (0–1) dove inquadrare il marker in focus — lato sinistro. */
+export const FOCUS_VIEWPORT_X = 0.32;
 
 const _focusProj = new THREE.Vector3();
 const _focusFwd = new THREE.Vector3();

@@ -1,4 +1,5 @@
 <script>
+  import { tick, onMount } from 'svelte';
   import { getHotspotPathIndex, ABOUT_HOTSPOT_PATH } from './aboutHotspots.js';
 
   /** @type {{
@@ -18,6 +19,51 @@
       .filter(Boolean)
   );
 
+  /** @type {HTMLElement | null} */
+  let panelEl = $state(null);
+  /** @type {HTMLElement | null} */
+  let contentEl = $state(null);
+
+  async function fitPanelContent() {
+    await tick();
+    if (!panelEl || !contentEl) return;
+
+    contentEl.style.zoom = '1';
+
+    const available = panelEl.clientHeight;
+    const needed = contentEl.scrollHeight;
+    if (needed <= available || available <= 0) return;
+
+    const scale = Math.max(0.76, available / needed);
+    contentEl.style.zoom = String(scale);
+  }
+
+  $effect(() => {
+    hotspot.id;
+    paragraphs.length;
+    fitPanelContent();
+  });
+
+  $effect(() => {
+    if (!panelEl) return;
+
+    const observer = new ResizeObserver(() => {
+      fitPanelContent();
+    });
+    observer.observe(panelEl);
+
+    return () => observer.disconnect();
+  });
+
+  onMount(() => {
+    document.fonts?.ready.then(() => fitPanelContent());
+    window.addEventListener('resize', fitPanelContent);
+
+    return () => {
+      window.removeEventListener('resize', fitPanelContent);
+    };
+  });
+
   function onContinue() {
     if (hasNext) onnext?.();
     else onclose();
@@ -29,17 +75,19 @@
     <div class="grad-side"></div>
   </div>
 
-  <aside class="sport-panel" aria-labelledby="sport-detail-title">
-    <button type="button" class="close-btn" aria-label="Chiudi" onclick={onclose}>×</button>
+  <aside class="sport-panel" bind:this={panelEl} aria-labelledby="sport-detail-title">
+    <div class="sport-panel-content" bind:this={contentEl}>
+      <button type="button" class="close-btn" aria-label="Chiudi" onclick={onclose}>×</button>
 
-    {#key hotspot.id}
-      <h1 id="sport-detail-title" class="sport-title">{title}</h1>
-      <div class="sport-body">
-        {#each paragraphs as paragraph}
-          <p>{paragraph}</p>
-        {/each}
-      </div>
-    {/key}
+      {#key hotspot.id}
+        <h1 id="sport-detail-title" class="sport-title">{title}</h1>
+        <div class="sport-body">
+          {#each paragraphs as paragraph}
+            <p>{paragraph}</p>
+          {/each}
+        </div>
+      {/key}
+    </div>
   </aside>
 
   <button type="button" class="continue-btn" onclick={onContinue}>
@@ -54,6 +102,7 @@
     inset: 0;
     z-index: 50;
     pointer-events: none;
+    --panel-padding-x: clamp(24px, 5.23vw, 79px);
   }
 
   .sport-detail-gradients {
@@ -65,29 +114,37 @@
   .grad-side {
     position: absolute;
     top: 0;
-    left: 49%;
+    left: 36%;
     right: 0;
     height: 100%;
     background: linear-gradient(
       to right,
       rgba(249, 249, 250, 0) 0%,
-      rgba(249, 249, 250, 0.55) 32%,
-      #f9f9fa 52%
+      rgba(249, 249, 250, 0.72) 22%,
+      rgba(249, 249, 250, 0.92) 38%,
+      #f9f9fa 50%
     );
   }
 
   .sport-panel {
     position: absolute;
-    top: calc(50% + 42px);
-    left: calc(66.67% + 14px);
+    top: calc(50% + 22px);
+    right: var(--panel-padding-x);
+    left: auto;
     transform: translateY(-50%);
-    width: min(380px, calc(33.33vw - 28px));
-    max-height: min(72vh, 640px);
-    overflow-y: auto;
-    padding: 0 4px 24px;
+    width: min(402px, calc(50vw - var(--panel-padding-x) - 12px));
+    max-height: calc(100vh - clamp(108px, 14vh, 136px));
+    overflow: hidden;
+    padding: 0;
     box-sizing: border-box;
     pointer-events: auto;
     animation: panelIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .sport-panel-content {
+    position: relative;
+    padding: 0 0 24px;
+    transform-origin: top right;
   }
 
   .close-btn {
@@ -95,16 +152,14 @@
     top: 0;
     right: 0;
     z-index: 2;
-    width: 36px;
-    height: 36px;
+    width: auto;
+    height: auto;
     margin: 0;
-    padding: 0;
-    border: 1px solid rgba(22, 26, 31, 0.2);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    font-size: 1.35rem;
+    padding: 4px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-size: 1.75rem;
     line-height: 1;
     color: #161a1f;
     cursor: pointer;
@@ -114,7 +169,7 @@
   }
 
   .close-btn:hover {
-    background: rgba(255, 255, 255, 0.95);
+    opacity: 0.55;
   }
 
   .close-btn:focus-visible {
@@ -206,13 +261,18 @@
   }
 
   @media (max-width: 900px) {
+    .sport-detail {
+      --panel-padding-x: 20px;
+    }
+
     .grad-side {
       width: 100%;
       background: linear-gradient(
         to top,
         #f9f9fa 0%,
-        rgba(249, 249, 250, 0.92) 42%,
-        rgba(249, 249, 250, 0) 72%
+        rgba(249, 249, 250, 0.96) 52%,
+        rgba(249, 249, 250, 0.55) 68%,
+        rgba(249, 249, 250, 0) 82%
       );
     }
 
@@ -223,11 +283,17 @@
       bottom: 0;
       transform: none;
       width: 100%;
-      max-height: min(58vh, 520px);
-      padding: 20px 20px 28px;
-      background: linear-gradient(to top, #f9f9fa 88%, rgba(249, 249, 250, 0.96));
+      max-height: min(74vh, calc(100vh - 108px));
+      overflow: hidden;
+      padding: 0;
+      background: linear-gradient(to top, #f9f9fa 94%, rgba(249, 249, 250, 0.98));
       border-radius: 20px 20px 0 0;
       animation-name: panelInMobile;
+    }
+
+    .sport-panel-content {
+      padding: 20px var(--panel-padding-x) 28px;
+      transform-origin: top center;
     }
   }
 

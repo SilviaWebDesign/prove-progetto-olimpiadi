@@ -364,9 +364,17 @@
       --navbar-padding-top: 24px;
     }
 
+    .navbar.always-visible {
+      --navbar-padding-x: 22px;
+    }
+
     .menu-overlay {
       --navbar-padding-x: 20px;
       --navbar-padding-top: 24px;
+    }
+
+    .navbar.always-visible ~ .menu-overlay {
+      --navbar-padding-x: 22px;
     }
 
     .navbar-inner {

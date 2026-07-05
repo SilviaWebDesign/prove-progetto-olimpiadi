@@ -13,7 +13,6 @@
     SNOW_ZONE_SCROLL,
     HOME_CARDS_START,
     HOME_CARDS_END,
-    HOME_TEXT2,
     stageMoxyOpacity
   } from '../../../lib/materiali-home/scrollStages.js';
   import { homeScrollProgress } from '../../../lib/materiali-home/homeScrollProgress.js';
@@ -39,25 +38,41 @@
    * Ogni blocco: fade in → visibile → fade out → scroll vuoto prima del successivo.
    */
   const TEXT1 = { in: 0.06, inEnd: 0.11, out: 0.13, outEnd: 0.18 };
-  const TEXT2 = HOME_TEXT2;
+  const TEXT2 = { in: 0.28, inEnd: 0.33, out: 0.35, outEnd: 0.40 };
   /** Compare solo dopo sfondo bianco pieno (SNOW_ZONE_SCROLL ≈ 0.54) */
   const TEXT3 = { in: 0.58, inEnd: 0.68, out: 0.70, outEnd: 0.80 };
-  const CARDS = { in: 0.90, inEnd: 0.95 };
+  const CARDS = { in: 0.82, inEnd: 0.88 };
 
   const TEXT1_LINES = [
+    'La realtà non è unica e oggettiva,',
+    'dipende dai fatti che osservi',
+    'e dal punto di vista che scegli.'
+  ];
+  const TEXT2_LINES = [
+    'Attraversa il percorso, tra sostenibilità,',
+    'sport e infrastrutture, e prendi posizione',
+    'davanti alle informazioni.'
+  ];
+  const TEXT3_LINES = [
+    'Le tue scelte plasmeranno gli eroi',
+    'e i cattivi di Milano-Cortina 2026.'
+  ];
+
+  /** A capo mobile — Figma node 315:2402 (come reso visivo a 390px) */
+  const TEXT1_LINES_MOBILE = [
     'La realtà non è unica',
     'e oggettiva, dipende',
     'dai fatti che osservi e dal',
     'punto di vista che scegli.'
   ];
-  const TEXT2_LINES = [
-    'Attraversa il percorso',
+  const TEXT2_LINES_MOBILE = [
+    'Attraversa il percorso,',
     'tra sostenibilità, sport',
     'e infrastrutture, e prendi',
     'posizione davanti',
     'alle informazioni.'
   ];
-  const TEXT3_LINES = [
+  const TEXT3_LINES_MOBILE = [
     'Le tue scelte',
     'plasmeranno la realtà di',
     'Milano-Cortina 2026.'
@@ -190,11 +205,8 @@
           </h1>
         </div>
         <div class="scroll-hint hero-reveal" style="--reveal-delay: 480ms">
-          <span class="scroll-hint__label">Continua</span>
-          <svg class="scroll-hint__chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
-            <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
-                  stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <span class="arrow">↓</span>
+          <span class="text">Scorri per continuare</span>
         </div>
       </div>
     </section>
@@ -205,8 +217,13 @@
       style="opacity: {text1Opacity}; pointer-events: {text1Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text1Opacity < 0.05}
     >
-      <div class="split-lines-container">
+      <div class="split-lines-container split-lines-container--desktop">
         {#each TEXT1_LINES as line}
+          <h2 class="narrative-line">{line}</h2>
+        {/each}
+      </div>
+      <div class="split-lines-container split-lines-container--mobile split-lines-container--text1">
+        {#each TEXT1_LINES_MOBILE as line}
           <h2 class="narrative-line">{line}</h2>
         {/each}
       </div>
@@ -218,8 +235,13 @@
       style="opacity: {text2Opacity}; pointer-events: {text2Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text2Opacity < 0.05}
     >
-      <div class="split-lines-container">
+      <div class="split-lines-container split-lines-container--desktop">
         {#each TEXT2_LINES as line}
+          <h3 class="narrative-line">{line}</h3>
+        {/each}
+      </div>
+      <div class="split-lines-container split-lines-container--mobile split-lines-container--text2">
+        {#each TEXT2_LINES_MOBILE as line}
           <h3 class="narrative-line">{line}</h3>
         {/each}
       </div>
@@ -231,8 +253,13 @@
       style="opacity: {text3Opacity}; pointer-events: {text3Opacity > 0.1 ? 'auto' : 'none'};"
       aria-hidden={text3Opacity < 0.05}
     >
-      <div class="split-lines-container">
+      <div class="split-lines-container split-lines-container--desktop">
         {#each TEXT3_LINES as line}
+          <h3 class="narrative-line">{line}</h3>
+        {/each}
+      </div>
+      <div class="split-lines-container split-lines-container--mobile split-lines-container--text3">
+        {#each TEXT3_LINES_MOBILE as line}
           <h3 class="narrative-line">{line}</h3>
         {/each}
       </div>
@@ -268,7 +295,7 @@
     --hero-pad-bottom: 52px;
     --hero-pad-x: 20px;
     /* spazio sotto il titolo = hint scroll (allinea i testi narrativi) */
-    --hero-text-lift: 4.75rem;
+    --hero-text-lift: 5.25rem;
     /* Tipografia home — allineata a Figma (node 2:118) */
     --home-title-leading: 1;
     --home-title-tracking: 0;
@@ -340,7 +367,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.1rem;
+    gap: 1.75rem;
     padding-bottom: 0.25rem;
   }
 
@@ -456,29 +483,16 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 0 14px 10px;
+    gap: 8px;
   }
-
-  .scroll-hint__label {
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1;
-    margin-top: -4px;
-    text-align: center;
-    color: #161A1F;
-  }
-
-  .scroll-hint__chevron {
-    display: block;
-    width: 21px;
-    height: 9px;
-    animation: chevron-bounce 1.4s ease-in-out infinite;
-  }
-
-  @keyframes chevron-bounce {
-    0%, 100% { transform: translateY(0); }
-    50%       { transform: translateY(5px); }
+  .scroll-hint .arrow { font-size: 1rem; color: #000000; animation: bounce 2s infinite; }
+  .scroll-hint .text {
+    font-size: 1.25rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: normal;
+    text-transform: none;
+    color: #000000;
   }
 
   .split-lines-container {
@@ -488,6 +502,10 @@
     gap: var(--home-narrative-gap);
     max-width: 1200px;
     text-transform: none;
+  }
+
+  .split-lines-container--mobile {
+    display: none;
   }
 
   .narrative-line {
@@ -534,6 +552,12 @@
     height: 1300vh; /* più scroll = più pausa tra le fasi */
   }
 
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+    60% { transform: translateY(-3px); }
+  }
+
   @media (max-width: 768px) {
     .organimo-wrapper {
       --hero-pad-top: 96px;
@@ -556,7 +580,7 @@
     }
 
     .hero-lower {
-      gap: 0.85rem;
+      gap: 1.25rem;
     }
 
     .hero-title-stack {
@@ -564,19 +588,36 @@
     }
 
     .brand-tag {
-      font-size: 1.1rem;
+      font-size: 20px;
     }
 
     .main-title {
-      --home-title-size: 3.85rem;
+      --home-title-size: 56px;
+      max-width: 335px;
     }
 
     .narrative-line {
-      --home-narrative-size: 1.5rem;
+      --home-narrative-size: 24px;
     }
 
-    .split-lines-container {
+    .split-lines-container--desktop {
+      display: none;
+    }
+
+    .split-lines-container--mobile {
+      display: flex;
+    }
+
+    .split-lines-container--text1 {
       max-width: 278px;
+    }
+
+    .split-lines-container--text2 {
+      max-width: 276px;
+    }
+
+    .split-lines-container--text3 {
+      max-width: 277px;
     }
 
     .cards-stage :global(.cards-stage-inner) {

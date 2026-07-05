@@ -22,10 +22,13 @@
     snapPositionToSnowSurface,
     computeFocusCameraPosition,
     clampFocusCameraPosition,
+    clampCameraOutsideMountain,
     focusCameraDistance,
     sampleOrbitFocusTransition,
     getMarkerFocusPoint,
-    panFocusToViewportX
+    panFocusToViewportX,
+    snowLineY,
+    CAMERA_SURFACE_MARGIN
   } from './aboutHotspots.js';
   import {
     preloadAboutMarkerModels,
@@ -89,6 +92,8 @@
   /** Quota minima camera (linea neve / base render). */
   /** @type {number | null} */
   let cameraFloorY = null;
+  /** @type {number | null} */
+  let orbitTargetMinY = null;
   let cameraReady = false;
   /** @type {string | null} */
   let lastSelectedHotspotId = null;
@@ -124,12 +129,35 @@
     controls.target.copy(_heroLookAt);
   }
 
-  /** Imposta limiti verticali ampi (solo init e dopo transizioni). */
+  /** Impedisce orbita e pan sotto la montagna. */
   function setupOrbitPolarLimits() {
     if (!controls || !camera || !controls.target) return;
 
-    controls.minPolarAngle = 0.25;
-    controls.maxPolarAngle = Math.PI / 2 + 0.62;
+    controls.minPolarAngle = 0.22;
+    controls.maxPolarAngle = Math.PI / 2 - 0.1;
+  }
+
+  function clampFreeCamera() {
+    if (!camera || !controls || !snowMountainModel || cameraFloorY == null) return;
+
+    if (orbitTargetMinY != null && controls.target.y < orbitTargetMinY) {
+      const lift = orbitTargetMinY - controls.target.y;
+      controls.target.y = orbitTargetMinY;
+      camera.position.y += lift;
+    }
+
+    if (camera.position.y < cameraFloorY) {
+      camera.position.y = cameraFloorY;
+    }
+
+    clampCameraOutsideMountain(
+      camera,
+      snowMountainModel,
+      _worldBox,
+      raycaster,
+      CAMERA_SURFACE_MARGIN,
+      { meshRaycast: true }
+    );
   }
 
   function applyFocusOrbitLimits() {
@@ -259,6 +287,7 @@
     camera.lookAt(target);
     camera.zoom = THREE.MathUtils.lerp(cameraTransition.fromZoom, cameraTransition.toZoom, t);
     camera.updateProjectionMatrix();
+    clampFreeCamera();
 
     if (cameraTransition.focusing && selectedHotspot) {
       const entry = getHotspotMarkerEntry(selectedHotspot);
@@ -304,7 +333,7 @@
 
       const active = selectedHotspot?.id === entry.hotspot.id;
       const pulseSpeed = active ? 1.15 : 0.72;
-      const pulseAmp = active ? 0.12 : 0.055;
+      const pulseAmp = active ? 0.045 : 0.018;
       const pulse = Math.abs(Math.sin(elapsed * Math.PI * pulseSpeed + entry.pulsePhase)) * pulseAmp;
       updateMarkerPulse(entry.model, pulse);
     }
@@ -436,6 +465,7 @@
       updateCameraTransition(now);
     } else {
       controls?.update();
+      clampFreeCamera();
       updateMarkerOrientations();
     }
 
@@ -487,6 +517,7 @@
     sceneFog = undefined;
     homeOrbitConfig = null;
     cameraFloorY = null;
+    orbitTargetMinY = null;
     cameraReady = false;
     lastSelectedHotspotId = null;
     lastAnimationTime = 0;
@@ -518,7 +549,7 @@
 
       scene = new THREE.Scene();
       markerGroup = new THREE.Group();
-      scene.add(markerGroup);
+      markerGroup.renderOrder = 2;
 
       sceneFog = new THREE.FogExp2(smogColor, 0.028);
       scene.fog = sceneFog;
@@ -537,6 +568,7 @@
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setClearColor(0xffffff, 1);
+      renderer.sortObjects = true;
       container.appendChild(renderer.domElement);
 
       container.style.cursor = 'grab';
@@ -577,7 +609,9 @@
         const { mountainCenter, snowField, orbitRadius, topDownHeight } =
           fitMountainModel(snowMountainModel);
         setupMountainRenderMaterials(snowMountainModel);
+        snowMountainModel.renderOrder = 0;
         scene.add(snowMountainModel);
+        scene.add(markerGroup);
 
         _worldBox.setFromObject(snowMountainModel);
         homeOrbitConfig = buildHomeOrbitConfig(
@@ -586,7 +620,8 @@
           orbitRadius,
           topDownHeight
         );
-        cameraFloorY = snowField.y - 0.2;
+        cameraFloorY = snowLineY(_worldBox) - 0.8;
+        orbitTargetMinY = snowLineY(_worldBox) - 2.2;
         await buildMarkers(_worldBox);
 
         applyHomeHeroCamera(camera, homeOrbitConfig, _heroLookAt);

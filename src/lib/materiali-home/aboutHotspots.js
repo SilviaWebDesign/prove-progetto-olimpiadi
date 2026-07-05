@@ -15,15 +15,15 @@ import * as THREE from 'three';
  */
 
 /** Distanza minima tra marker consecutivi sul percorso (unità mondo). */
-export const MIN_HOTSPOT_SPACING = 4.8;
+export const MIN_HOTSPOT_SPACING = 7.4;
 
 /** Quattro tappe sul percorso in senso orario (azimuth crescente = avanti nel percorso). */
 /** @type {AboutHotspot[]} */
 export const ABOUT_HOTSPOT_PATH = [
   {
     id: 'start',
-    azimuth: 0.06,
-    elevation: 0.14,
+    azimuth: 0.04,
+    elevation: 0.1,
     label: 'Partenza',
     title: 'Il progetto',
     template: 'sport',
@@ -34,8 +34,8 @@ export const ABOUT_HOTSPOT_PATH = [
   },
   {
     id: 'lower-slope',
-    azimuth: 0.32,
-    elevation: 0.38,
+    azimuth: 0.3,
+    elevation: 0.34,
     label: 'Pendio inferiore',
     title: 'Lo sport',
     template: 'sport',
@@ -46,8 +46,8 @@ export const ABOUT_HOTSPOT_PATH = [
   },
   {
     id: 'west-ridge',
-    azimuth: 0.58,
-    elevation: 0.62,
+    azimuth: 0.6,
+    elevation: 0.58,
     label: 'Cresta ovest',
     title: 'La velocità',
     template: 'sport',
@@ -58,8 +58,8 @@ export const ABOUT_HOTSPOT_PATH = [
   },
   {
     id: 'peak',
-    azimuth: 0.88,
-    elevation: 0.88,
+    azimuth: 0.9,
+    elevation: 0.92,
     label: 'Vetta',
     title: 'Il team',
     template: 'sport',

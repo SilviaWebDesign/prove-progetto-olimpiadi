@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 
-export const MARKER_SPHERE_RADIUS = 0.925;
-const PARTICLE_COUNT = 5000;
-/** Raggio mondo di ogni particella (allineato a Scene3D, scalato sul marker). */
-const PARTICLE_RADIUS = 0.038;
-const DIR_SCALE = 1.15;
+export const MARKER_SPHERE_RADIUS = 0.58;
+const PARTICLE_COUNT = 12000;
+const PARTICLE_RADIUS = 0.0065;
+const DIR_SCALE = 0.24;
 
 /** @type {THREE.BufferGeometry | null} */
 let sharedParticleGeo = null;
@@ -35,11 +34,13 @@ function createParticleMaterial({ active = false } = {}) {
       uniform float uBaseOpacity;
 
       void main() {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, uBaseOpacity + uPulse * 0.45);
+        float alpha = uBaseOpacity + uPulse * 0.45;
+        if (alpha < 0.08) discard;
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
       }
     `,
-    transparent: true,
-    depthWrite: false,
+    transparent: false,
+    depthWrite: true,
     depthTest: true,
   });
 }
@@ -52,7 +53,7 @@ function buildSharedParticleGeo() {
     directions[i * 3 + 2] = (Math.random() - 0.5) * DIR_SCALE;
   }
 
-  const geo = new THREE.SphereGeometry(PARTICLE_RADIUS, 5, 5);
+  const geo = new THREE.SphereGeometry(PARTICLE_RADIUS, 4, 4);
   geo.setAttribute('aDirection', new THREE.InstancedBufferAttribute(directions, 3));
   return geo;
 }
@@ -109,7 +110,7 @@ export function createParticleSphereMarker(active = false) {
   const root = new THREE.Group();
   const spinGroup = new THREE.Group();
   const positions = sampleSphereSurface();
-  const geo = ensureSharedParticleGeo().clone();
+  const geo = ensureSharedParticleGeo();
   const mat = createParticleMaterial({ active });
 
   const particles = new THREE.InstancedMesh(geo, mat, PARTICLE_COUNT);

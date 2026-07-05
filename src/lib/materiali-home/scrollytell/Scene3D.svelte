@@ -66,15 +66,6 @@
     '/oggetti/sport.glb': 0.72,
   };
 
-  const PIANTA_MODEL_PREFIX = '/oggetti/pianta';
-
-  /** Rotazione correttiva al load (export Blender capovolto). */
-  function applyModelOrientation(root: THREE.Object3D, src: string) {
-    if (!src.startsWith(PIANTA_MODEL_PREFIX)) return;
-    root.rotation.x = Math.PI;
-    root.updateMatrixWorld(true);
-  }
-
   /** Modelli piccoli nel file GLB: crossfade sulle posizioni finali invece del volo dall'origine. */
   const MODEL_PARTICLE_CROSSFADE = new Set([
     '/oggetti/pianta.glb',
@@ -88,8 +79,9 @@
   /** Scala e posizione del modello in fase feedback. */
   const DEFAULT_FEEDBACK = { scaleMul: 1.33, yOffset: 0.55, lockSettled: false };
   const MODEL_FEEDBACK: Record<string, Partial<typeof DEFAULT_FEEDBACK>> = {
-    '/oggetti/sport.glb': { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
-    '/oggetti/pianta.glb': { scaleMul: 0.5, yOffset: 0.55, lockSettled: false },
+    '/oggetti/sport.glb':          { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
+    '/oggetti/pianta.glb':         { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
+    '/oggetti/infrastrutture.glb': { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
   };
 
   function feedbackConfig() {
@@ -426,7 +418,6 @@
       (gltf) => {
         if (!scene || !camera) return;
 
-        applyModelOrientation(gltf.scene, modelSrc);
         const box    = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
         const size   = box.getSize(new THREE.Vector3());
@@ -869,7 +860,6 @@
     loader.setDRACOLoader(draco);
     loader.load(path, (gltf) => {
       draco.dispose();
-      applyModelOrientation(gltf.scene, path);
       resultModels.set(path, gltf.scene);
       doMorph(gltf.scene, onDone);
     }, undefined, (err) => {

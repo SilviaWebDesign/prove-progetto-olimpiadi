@@ -49,6 +49,8 @@
   let currentTopic    = $state(0);
   let topicLikes      = $state<boolean[][]>(config.topics.map(t => t.comments.map(() => false)));
   let isTransitioning = $state(false);
+  let mobileCardsVisible = $state(false);
+  let mobileTopicsScrollComplete = $state(false);
 
   type PagePhase = 'intro' | 'topics' | 'feedback';
   let phase = $state<PagePhase>('intro');
@@ -76,6 +78,23 @@
       ? 'Scopri il tuo risultato'
       : 'Continua'
   );
+
+  const ctaActive = $derived(
+    !isTransitioning &&
+    phase === 'topics' &&
+    (isMobile
+      ? (!mobileCardsVisible ? mobileTopicsScrollComplete : anyLiked)
+      : anyLiked)
+  );
+
+  function handleCtaClick() {
+    if (!ctaActive || isTransitioning) return;
+    if (isMobile && !mobileCardsVisible) {
+      void mobileShowCards().then(() => setTimeout(updateMobileModelFit, 450));
+      return;
+    }
+    goNext();
+  }
 
   const nextSectionRoute: Record<string, string> = {
     sustainability: '/sezioni/sport',
@@ -263,15 +282,15 @@
   let cardsScrollAnimating = false;
 
   // ── Mobile-specific state ─────────────────────────────────────────────────
-  let mobileCardsVisible = $state(false);
   let cardsScrollRef = $state<HTMLElement | null>(null);
   let stageTextEl = $state<HTMLElement | null>(null);
   let stageRightEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
 
   // ── Model 3D: adatta posizione/scala allo spazio libero tra testo e commenti (mobile) ──
-  const MOBILE_MODEL_MARGIN = 14;
-  const MOBILE_CTA_RESERVE  = 110;
+  const MOBILE_MODEL_MARGIN = 28;
+  const MOBILE_CTA_RESERVE  = 100;
+  const MOBILE_TOPICS_READY_PROGRESS = 0.97;
 
   function updateMobileModelFit() {
     if (!isMobile || !scene3d || !stageTextEl) return;
@@ -284,11 +303,41 @@
   }
 
   const PARTICLE_SCROLL_START = 0.58;
-  const PARTICLE_SCROLL_END   = 0.98;
+  const PARTICLE_SCROLL_END = 0.98;
+  const MOBILE_CARDS_HIDE_PROGRESS = 0.975;
+  /** Dopo questa soglia di morph particelle, il modello scende verso la posizione finale. */
+  const MOBILE_LAYOUT_START = 0.55;
 
   function particleProgressFromScroll(scrollProgress: number): number {
     if (scrollProgress <= PARTICLE_SCROLL_START) return 0;
     return Math.min(1, (scrollProgress - PARTICLE_SCROLL_START) / (PARTICLE_SCROLL_END - PARTICLE_SCROLL_START));
+  }
+
+  function mobileLayoutBlendFromParticleT(particleT: number): number {
+    if (particleT <= MOBILE_LAYOUT_START) return 0;
+    return Math.min(1, (particleT - MOBILE_LAYOUT_START) / (1 - MOBILE_LAYOUT_START));
+  }
+
+  function updateMobileScrollLayout(particleT: number) {
+    if (!isMobile || !scene3d) return;
+    updateMobileModelFit();
+    scene3d.setMobileLayoutBlend(mobileLayoutBlendFromParticleT(particleT));
+  }
+
+  function updateMobileCardsFromScroll(progress: number) {
+    if (!isMobile || !topicsMode || cardsScrollAnimating) return;
+
+    if (mobileCardsVisible && progress < MOBILE_CARDS_HIDE_PROGRESS) {
+      void mobileHideCards().then(() => setTimeout(updateMobileModelFit, 450));
+    }
+  }
+
+  function updateMobileTopicsScrollComplete(progress: number, particleT: number) {
+    if (!isMobile || !topicsMode) {
+      mobileTopicsScrollComplete = false;
+      return;
+    }
+    mobileTopicsScrollComplete = progress >= MOBILE_TOPICS_READY_PROGRESS && particleT >= 1;
   }
 
   // ── Model loaded signal ───────────────────────────────────────────────────
@@ -339,39 +388,34 @@
     mobileScrollRatio = max > 0 ? el.scrollTop / max : 0;
   }
 
-  // Scroll gesture (touch) per alternare argomento esteso/compatto, in aggiunta al tap
-  // su .stage__text (toggleMobileCardsPanel): dito verso l'alto (scroll giù) → compatto,
-  // dito verso il basso (scroll su) → esteso. Non avanza mai tra argomenti.
+  // Tap sul testo argomento (mobile): alternativa rapida per aprire/chiudere i commenti.
+  let touchStartX = 0;
   let touchStartY = 0;
-  let mobileSwipeHandled = false;
-  const MOBILE_SWIPE_THRESHOLD = 40;
+  const MOBILE_TAP_THRESHOLD = 12;
 
   function mobileTouchStart(e: TouchEvent) {
     if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) return;
+    touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
-    mobileSwipeHandled = false;
   }
 
-  // Non-passive: prevents page scroll (including iOS inertia) while in topics/feedback mode,
-  // lasciando libero lo scroll nativo dentro la lista commenti.
-  // NB: un blocco via `position:fixed` sul body (position + scrollTo) è stato provato e
-  // scartato: cambia la posizione di scroll reale della finestra, che è ciò che ScrollTrigger
-  // usa per calcolare il progress — il risultato era un loop enterTopicsMode/exitTopicsMode
-  // continuo che resettava `phase` in modo intermittente (bug "mai portato al feedback").
-  function mobilePreventScroll(e: TouchEvent) {
-    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) {
-      return; // allow natural scroll inside the cards box
-    }
-    e.preventDefault();
+  function mobileTouchEnd(e: TouchEvent) {
+    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) return;
+    if (phase !== 'topics' || isTransitioning || cardsScrollAnimating || !stageTextEl) return;
 
-    if (mobileSwipeHandled || phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
-    const deltaY = e.touches[0].clientY - touchStartY;
-    if (deltaY <= -MOBILE_SWIPE_THRESHOLD) {
-      mobileSwipeHandled = true;
-      if (!mobileCardsVisible) mobileShowCards().then(() => setTimeout(updateMobileModelFit, 450));
-    } else if (deltaY >= MOBILE_SWIPE_THRESHOLD) {
-      mobileSwipeHandled = true;
-      if (mobileCardsVisible) mobileHideCards().then(() => setTimeout(updateMobileModelFit, 450));
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+    if (Math.hypot(dx, dy) > MOBILE_TAP_THRESHOLD) return;
+
+    const rect = stageTextEl.getBoundingClientRect();
+    if (
+      touch.clientX >= rect.left &&
+      touch.clientX <= rect.right &&
+      touch.clientY >= rect.top &&
+      touch.clientY <= rect.bottom
+    ) {
+      toggleMobileCardsPanel();
     }
   }
 
@@ -389,7 +433,7 @@
     phase = 'topics';
     if (isMobile) {
       document.addEventListener('touchstart', mobileTouchStart, { passive: true });
-      document.addEventListener('touchmove', mobilePreventScroll, { passive: false });
+      document.addEventListener('touchend', mobileTouchEnd, { passive: true });
       tick().then(updateMobileModelFit);
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -427,7 +471,14 @@
     topicsMode = false;
     if (isMobile) {
       document.removeEventListener('touchstart', mobileTouchStart);
-      document.removeEventListener('touchmove', mobilePreventScroll);
+      document.removeEventListener('touchend', mobileTouchEnd);
+      mobileTopicsScrollComplete = false;
+      if (mobileCardsVisible) {
+        mobileCardsVisible = false;
+        mobileScrollRatio = 0;
+        if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
+        cardStack?.resetHidden();
+      }
     } else {
       window.removeEventListener('wheel', onTopicsWheel, { capture: true } as EventListenerOptions);
       lenisRef?.start();
@@ -521,7 +572,7 @@
       const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
 
       gsap.set(titleEl,         { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
-      gsap.set('.phrase',       { y: 30, autoAlpha: 0 });
+      gsap.set('.phrase, .phrase--multiline', { y: 30, autoAlpha: 0 });
       gsap.set('.stage__text',  { x: -30 });
       // On mobile, CSS class controls .stage__right opacity (no GSAP inline style so CSS class can win)
       if (!isMobile) gsap.set('.stage__right', { opacity: 0 });
@@ -548,12 +599,12 @@
         { autoAlpha: 0, ease: 'power2.inOut', duration: 0.30 },
         0
       );
-      heroTl.fromTo('.phrase',
+      heroTl.fromTo('.phrase, .phrase--multiline',
         { autoAlpha: 0, y: 30 },
         { autoAlpha: 1, y: 0, ease: 'power2.out', duration: 0.20 },
         0.20
       );
-      heroTl.to('.phrase', { autoAlpha: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
+      heroTl.to('.phrase, .phrase--multiline', { autoAlpha: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
 
       const proxy = { rot: 0, scale: 1, appear: 0 };
 
@@ -572,15 +623,20 @@
             else maybeResetCards();
 
             scene3d?.setTransitionProgress(particleT);
+            updateMobileScrollLayout(particleT);
 
             if (particleT >= 1 && !topicsMode) {
               enterTopicsMode();
             } else if (particleT < 1 && topicsMode) {
               exitTopicsMode();
             }
+
+            updateMobileTopicsScrollComplete(progress, particleT);
+            updateMobileCardsFromScroll(progress);
           },
           onReverseComplete: () => {
             scene3d?.setTransitionProgress(0);
+            scene3d?.setMobileLayoutBlend(0);
             exitTopicsMode();
             maybeResetCards();
           },
@@ -600,7 +656,7 @@
       }
 
       threeTl.to(proxy, {
-        scale: isMobile ? 0.28 : 0.56, ease: 'power2.inOut', duration: 0.28,
+        scale: isMobile ? 0.40 : 0.56, ease: 'power2.inOut', duration: 0.28,
         onUpdate: () => scene3d?.setScale(proxy.scale),
       }, 0.46);
 
@@ -685,7 +741,7 @@
 </svelte:head>
 
 <section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
-  <div class="scene__viewport">
+  <div class="scene__viewport" class:m-cards-mode={isMobile && mobileCardsVisible}>
 
     <!-- Layer frost -->
     <div class="layer layer--frost">
@@ -750,10 +806,9 @@
         class="stage__text"
         bind:this={stageTextEl}
         class:m-compact={isMobile && mobileCardsVisible}
-        class:m-tappable={isMobile && phase === 'topics'}
         role="button"
         tabindex={isMobile && phase === 'topics' ? 0 : -1}
-        onclick={toggleMobileCardsPanel}
+        onclick={() => { if (!isMobile) return; toggleMobileCardsPanel(); }}
         onkeydown={(e) => { if (isMobile && phase === 'topics' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileCardsPanel(); } }}
       >
         <TextBlock
@@ -770,8 +825,10 @@
       <!-- Cards column -->
       <div class="stage__right" bind:this={stageRightEl} class:no-pointer={phase === 'feedback'} class:m-cards-visible={isMobile && mobileCardsVisible}>
         <p class="stage__right-heading">Metti like alle opinioni con cui sei d'accordo</p>
-        <div class="stage__right-scroll" bind:this={cardsScrollRef} onscroll={onCardsScroll}>
-          <CardStack bind:api={cardStack} {cards} sectionId={config.sectionId} onToggleLike={toggleLike} topicIndex={currentTopic} />
+        <div class="stage__right-scroll-wrap">
+          <div class="stage__right-scroll" bind:this={cardsScrollRef} onscroll={onCardsScroll}>
+            <CardStack bind:api={cardStack} {cards} sectionId={config.sectionId} onToggleLike={toggleLike} topicIndex={currentTopic} />
+          </div>
         </div>
       </div>
 
@@ -781,12 +838,12 @@
     <div class="stage__cta">
       <div
         class="stage__cta-content"
-        class:active={anyLiked && !isTransitioning}
+        class:active={ctaActive}
         role="button"
-        tabindex={anyLiked && !isTransitioning ? 0 : -1}
-        aria-disabled={!anyLiked || isTransitioning}
-        onclick={() => { if (anyLiked && !isTransitioning) goNext(); }}
-        onkeydown={(e) => { if (anyLiked && !isTransitioning && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goNext(); } }}
+        tabindex={ctaActive ? 0 : -1}
+        aria-disabled={!ctaActive}
+        onclick={handleCtaClick}
+        onkeydown={(e) => { if (ctaActive && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleCtaClick(); } }}
       >
         {#key ctaLabel}
           <span class="cta-label"
@@ -813,7 +870,7 @@
     <!-- Overlay fase feedback -->
     {#if phase === 'feedback'}
       <div class="feedback-top" style="opacity: 0">
-        <p class="feedback-title">Fatti unici, molteplici sguardi.<br>Questa è la realtà, plasmata dalla tua opinione.</p>
+        <p class="feedback-title">Fatti unici, molteplici sguardi.<br>Questa è la realtà plasmata dalla tua opinione.</p>
       </div>
       <p class="feedback-subtitle" style="opacity: 0">
         {getResultLabel(currentResultPath)}
@@ -1181,6 +1238,20 @@
      ═══════════════════════════════════════════════════════════════════════ */
   @media (max-width: 768px) {
 
+    .scene__viewport {
+      touch-action: pan-y;
+    }
+
+    .scene__viewport.m-cards-mode :global(.scene-wrapper) {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .scene {
+      height: 600vh;
+    }
+
     /* Titolone: centrato verticalmente sullo schermo (entrambe le varianti: center e spread) */
     .hero-title--section {
       justify-content: center;
@@ -1202,15 +1273,14 @@
       z-index: 5;
     }
 
-    .stage__text.m-tappable {
-      cursor: pointer;
-      pointer-events: auto;
-    }
-
     /* Topic title font size transition */
     .stage__text :global(.section-fact-block) {
       width: 100%;
       gap: 16px;
+    }
+
+    .stage__text :global(.section-fact-block__counter) {
+      transform: translateY(10px);
     }
 
     .stage__text :global(.section-fact-block__title) {
@@ -1249,10 +1319,12 @@
       gap: 8px;
       justify-self: unset;
       z-index: 5;
+      pointer-events: none;
     }
 
     .stage__right.m-cards-visible {
       opacity: 1;
+      pointer-events: auto;
       transition: opacity 0.3s ease;
     }
 
@@ -1267,9 +1339,33 @@
        an axis can't stay 'visible' once the other is scrollable), which cut the
        cards' box-shadow/outline at the edges. Padding + matching negative margin
        gives that glow room to bleed without shifting the cards' visual position. */
+    .stage__right-scroll-wrap {
+      position: relative;
+    }
+
+    .stage__right.m-cards-visible .stage__right-scroll-wrap::after {
+      content: '';
+      position: absolute;
+      left: -16px;
+      right: -16px;
+      bottom: 0;
+      height: 52px;
+      pointer-events: none;
+      z-index: 2;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      background: linear-gradient(
+        to bottom,
+        rgba(235, 235, 235, 0) 0%,
+        rgba(235, 235, 235, 0.55) 100%
+      );
+      mask-image: linear-gradient(to bottom, transparent 0%, black 72%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 72%);
+    }
+
     .stage__right-scroll {
       height: 281px;
-      padding: 0 16px;
+      padding: 4px 16px 0;
       margin: 0 -16px;
       overflow-y: auto;
       scrollbar-width: none;

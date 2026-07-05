@@ -159,5 +159,7 @@
 
   .fact-sources {
     text-align: right;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
   }
 </style>

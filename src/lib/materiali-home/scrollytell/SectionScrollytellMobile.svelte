@@ -232,7 +232,7 @@
 
         <p class="mobile-feedback__headline">
           Fatti unici, molteplici sguardi.<br>
-          Questa è la realtà, plasmata dalla tua opinione.
+          Questa è la realtà plasmata dalla tua opinione.
         </p>
 
         <div class="mobile-feedback__model" aria-hidden="true">

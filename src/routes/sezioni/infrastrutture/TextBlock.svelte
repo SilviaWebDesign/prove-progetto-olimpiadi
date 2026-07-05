@@ -59,5 +59,7 @@
     letter-spacing: 0.08em;
     color: var(--color-text-primary, #16181D);
     margin-top: auto;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
   }
 </style>

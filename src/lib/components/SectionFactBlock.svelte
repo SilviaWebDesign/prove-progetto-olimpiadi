@@ -73,5 +73,7 @@
     font-weight: 700;
     line-height: 1.1;
     text-transform: uppercase;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
   }
 </style>

@@ -21,6 +21,7 @@
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
     setMobileFit:           (topPx: number, bottomPx: number) => void;
+    setMobileLayoutBlend:   (t: number) => void;
     clearMobileFit:         () => void;
   }
 
@@ -84,9 +85,12 @@
   // tra testo e commenti, aggiornato via lerp continuo nel render loop ────────
   let mobileFitActive       = false;
   let mobileFitTargetScale  = 1;
-  let mobileFitTargetOffsetY = 0;
+  let mobileFitFinalOffsetY = 0;
+  let mobileLayoutBlend     = 0;
   const MOBILE_FIT_LERP = 0.1;
-  const MOBILE_FIT_RATIO = 0.78;
+  const MOBILE_FIT_RATIO = 1.08;
+  /** 0.5 = centro del gap; valori più alti spostano il modello verso il basso. */
+  const MOBILE_FIT_CENTER_BIAS = 0.56;
 
   const clock      = new THREE.Clock();
   const IDLE_RAD_S = THREE.MathUtils.degToRad(7);
@@ -138,6 +142,7 @@
   const _hoverTarget = new THREE.Vector3();
   const _hoverCenter = new THREE.Vector3();
   let lastPointerMoveMs = 0;
+  let particleHoverRadius = 1.2;
 
   function particlesHoverActive() {
     return (
@@ -146,6 +151,18 @@
       !orbitEnabled &&
       transitionState !== 'none'
     );
+  }
+
+  function computeParticleHoverRadius() {
+    let maxDistSq = 0;
+    for (let i = 0; i < COUNT; i++) {
+      const x = particleTargets[i * 3];
+      const y = particleTargets[i * 3 + 1];
+      const z = particleTargets[i * 3 + 2];
+      const d = x * x + y * y + z * z;
+      if (d > maxDistSq) maxDistSq = d;
+    }
+    particleHoverRadius = Math.sqrt(maxDistSq) * 1.1;
   }
 
   function resetParticleHover() {
@@ -171,11 +188,22 @@
 
     modelGroup.worldToLocal(_hoverHit);
     _hoverTarget.copy(_hoverHit);
+
+    const distToCenter = _hoverTarget.length();
+    if (distToCenter > particleHoverRadius) {
+      particleMat.uniforms.uHoverStrength.value = THREE.MathUtils.lerp(
+        particleMat.uniforms.uHoverStrength.value,
+        0,
+        0.22,
+      );
+      return;
+    }
+
     particleMat.uniforms.uPointer.value.lerp(_hoverTarget, 0.42);
     particleMat.uniforms.uHoverStrength.value = THREE.MathUtils.lerp(
       particleMat.uniforms.uHoverStrength.value,
       1,
-      0.38,
+      0.28,
     );
     lastPointerMoveMs = performance.now();
   }
@@ -190,8 +218,8 @@
 
   function decayParticleHover(dt: number) {
     if (!particleMat || !particlesHoverActive()) return;
-    if (performance.now() - lastPointerMoveMs < 120) return;
-    const decay = Math.pow(0.04, dt);
+    if (performance.now() - lastPointerMoveMs < 140) return;
+    const decay = Math.pow(0.06, dt);
     particleMat.uniforms.uHoverStrength.value *= decay;
     if (particleMat.uniforms.uHoverStrength.value < 0.01) {
       particleMat.uniforms.uHoverStrength.value = 0;
@@ -250,10 +278,17 @@
         const gapPx     = Math.max(24, bottomPx - topPx);
         const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
         mobileFitTargetScale = (MOBILE_FIT_RATIO * (gapPx / vh)) / (0.9 * fitFactor);
-        const centerPx = (topPx + bottomPx) / 2;
-        mobileFitTargetOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
+        const centerPx = topPx + gapPx * MOBILE_FIT_CENTER_BIAS;
+        mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
-      clearMobileFit: () => { mobileFitActive = false; },
+      setMobileLayoutBlend: (t) => {
+        mobileLayoutBlend = Math.max(0, Math.min(1, t));
+      },
+      clearMobileFit: () => {
+        mobileFitActive = false;
+        mobileLayoutBlend = 0;
+        if (spinner) spinner.position.y = 0;
+      },
     };
 
     initThree();
@@ -516,6 +551,7 @@
     if (!scene || !spinner) return;
 
     sampleParticleTargets(root);
+    computeParticleHoverRadius();
 
     // Match infrastrutture's world-space visual exactly.
     // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.012, dirRange=8
@@ -540,8 +576,9 @@
         uPulse:         { value: 0.0 },
         uBaseOpacity:   { value: 0.0 },
         uPointer:       { value: new THREE.Vector3() },
-        uHoverRadius:   { value: 0.9 * INFRA_BS / baseScale },
-        uHoverPush:     { value: 0.75 * INFRA_BS / baseScale },
+        uHoverRadius:   { value: 1.8 * INFRA_BS / baseScale },
+        uHoverPush:     { value: 1.5 * INFRA_BS / baseScale },
+        uHoverExpand:   { value: 1.1 * INFRA_BS / baseScale },
         uHoverStrength: { value: 0.0 },
       },
       vertexShader: /* glsl */`
@@ -550,14 +587,16 @@
         uniform vec3 uPointer;
         uniform float uHoverRadius;
         uniform float uHoverPush;
+        uniform float uHoverExpand;
         uniform float uHoverStrength;
 
         void main() {
-          vec3 local = position + aDirection * uPulse;
+          float expand = uHoverStrength * uHoverExpand;
+          vec3 local = position + aDirection * (uPulse + expand);
           vec3 instPos = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
           vec3 toPart = instPos - uPointer;
           float dist = length(toPart);
-          float infl = smoothstep(uHoverRadius, uHoverRadius * 0.28, dist) * uHoverStrength;
+          float infl = smoothstep(uHoverRadius, uHoverRadius * 0.18, dist) * uHoverStrength;
           vec3 repel = dist > 0.0001 ? normalize(toPart) * infl * uHoverPush : vec3(0.0);
           vec3 p = local + repel;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
@@ -592,6 +631,13 @@
     root.add(particleMesh);
   }
 
+  /** Offset verticale del modello in fase feedback (più alto sullo schermo). */
+  const FEEDBACK_MODEL_Y_OFFSET = 0.55;
+
+  function applyFeedbackModelYOffset() {
+    if (spinner) spinner.position.y = FEEDBACK_MODEL_Y_OFFSET;
+  }
+
   function centerFeedbackView(scaleMul: number) {
     if (!modelGroup || !camera) return;
 
@@ -616,6 +662,8 @@
       controls.target.set(0, 0, 0);
       controls.update();
     }
+
+    applyFeedbackModelYOffset();
   }
 
   function showEnlargedSourceModel(scaleMul: number, onDone: () => void) {
@@ -834,6 +882,8 @@
 
     scrollDrivenTransition = false;
     transitionPrepared = false;
+    if (spinner) spinner.position.y = 0;
+    mobileLayoutBlend = 0;
   }
 
   function ensureTransitionPrepared() {
@@ -959,12 +1009,15 @@
     }
     if (controls?.enabled) controls.update(dt);
 
-    if (mobileFitActive && modelGroup && spinner &&
-        (transitionState === 'none' || transitionState === 'done')) {
-      const currentScale = modelGroup.scale.x / baseScale;
-      const nextScale = currentScale + (mobileFitTargetScale - currentScale) * MOBILE_FIT_LERP;
-      modelGroup.scale.setScalar(baseScale * nextScale);
-      spinner.position.y += (mobileFitTargetOffsetY - spinner.position.y) * MOBILE_FIT_LERP;
+    if (mobileFitActive && spinner) {
+      const targetY = mobileFitFinalOffsetY * mobileLayoutBlend;
+      spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;
+
+      if (modelGroup && (transitionState === 'none' || transitionState === 'done')) {
+        const currentScale = modelGroup.scale.x / baseScale;
+        const nextScale = currentScale + (mobileFitTargetScale - currentScale) * MOBILE_FIT_LERP;
+        modelGroup.scale.setScalar(baseScale * nextScale);
+      }
     }
 
     decayParticleHover(dt);
@@ -1041,6 +1094,7 @@
         morphState = 'none';
         particleMesh.visible = false;
         resultModelMaterials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
+        applyFeedbackModelYOffset();
         const cb = morphDoneCallback;
         morphDoneCallback = null;
         cb?.();

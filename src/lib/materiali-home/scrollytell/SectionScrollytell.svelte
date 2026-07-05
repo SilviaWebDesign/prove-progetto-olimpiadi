@@ -12,7 +12,7 @@
   import CardStack from './CardStack.svelte';
   import type { CardStackApi } from './CardStack.svelte';
   import Scene3D from './Scene3D.svelte';
-  import type { MobileFitOptions, Scene3DApi } from './Scene3D.svelte';
+  import type { Scene3DApi } from './Scene3D.svelte';
 
   import './tokens.css';
   import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
@@ -104,7 +104,7 @@
   function handleTopicsForwardNavigation() {
     if (!ctaActive || isTransitioning) return;
     if (isMobile && !mobileCardsVisible) {
-      void mobileShowCards().then(() => setTimeout(updateMobileModelFit, 450));
+      void mobileShowCards().then(() => setTimeout(updateTopicsModelFit, 450));
       return;
     }
     goNext();
@@ -113,7 +113,7 @@
   function handleTopicsBackwardNavigation() {
     if (phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
     if (isMobile && mobileCardsVisible) {
-      void mobileHideCards().then(() => setTimeout(updateMobileModelFit, 450));
+      void mobileHideCards().then(() => setTimeout(updateTopicsModelFit, 450));
       return;
     }
     if (currentTopic > 0) goPrev();
@@ -183,8 +183,8 @@
     if (isMobile) {
       // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
       // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
-      updateMobileModelFit();
-      setTimeout(updateMobileModelFit, 450);
+      updateTopicsModelFit();
+      setTimeout(updateTopicsModelFit, 450);
     } else {
       await cardStack?.animateIn();
     }
@@ -256,8 +256,8 @@
     if (isMobile) {
       // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
       // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
-      updateMobileModelFit();
-      setTimeout(updateMobileModelFit, 450);
+      updateTopicsModelFit();
+      setTimeout(updateTopicsModelFit, 450);
     } else {
       await cardStack?.animateIn();
     }
@@ -290,8 +290,8 @@
     if (isMobile) {
       // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
       // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
-      updateMobileModelFit();
-      setTimeout(updateMobileModelFit, 450);
+      updateTopicsModelFit();
+      setTimeout(updateTopicsModelFit, 450);
     } else {
       await cardStack?.animateIn();
     }
@@ -313,12 +313,10 @@
   let stageRightEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
 
-  // ── Model 3D: adatta posizione/scala allo spazio libero tra testo e commenti (mobile) ──
-  const MOBILE_MODEL_MARGIN = 28;
-  const MOBILE_CARDS_MODEL_MARGIN = 14;
-  const MOBILE_CTA_RESERVE  = 100;
-  /** Valori più bassi spostano il modello verso l'alto nel gap commenti. */
-  const MOBILE_CARDS_CENTER_BIAS = 0.40;
+  // ── Model 3D: stessa distanza da testo sopra e card/CTA sotto (tutte le sezioni) ──
+  const TOPICS_MODEL_MARGIN = 24;
+  const TOPICS_CTA_RESERVE  = 100;
+  const TOPICS_FIT_CENTER_BIAS = 0.5;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
   /** Altezza viewport scroll commenti: 2 card visibili per volta. */
   const MOBILE_CARD_AVG_HEIGHT = 96;
@@ -336,51 +334,80 @@
   /** Più piccolo quando i commenti sono visibili (meno spazio verticale). */
   const TOPICS_SCALE_MOBILE_CARDS = 0.26;
 
-  const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
-    sustainability: { centerBias: 0.44 },
-    sport: { centerBias: 0.42 },
-    infrastructure: { centerBias: 0.38 },
-  };
-
   function topicsScaleMul(cardsMode = false): number {
     if (!isMobile) return TOPICS_SCALE_DESKTOP;
     return cardsMode ? TOPICS_SCALE_MOBILE_CARDS : TOPICS_SCALE_MOBILE;
   }
 
-  function updateMobileModelFit() {
-    if (!isMobile || !scene3d || !stageTextEl) return;
-    const margin = mobileCardsVisible ? MOBILE_CARDS_MODEL_MARGIN : MOBILE_MODEL_MARGIN;
+  function topicsCardsActive(): boolean {
+    return isMobile ? mobileCardsVisible : cardsIntroduced;
+  }
+
+  function updateTopicsModelFit() {
+    if (!scene3d || !stageTextEl || phase === 'feedback') return;
+
     const textRect = stageTextEl.getBoundingClientRect();
-    const topPx = textRect.bottom + margin;
-    const bottomPx = mobileCardsVisible && stageRightEl
-      ? stageRightEl.getBoundingClientRect().top - margin
-      : window.innerHeight - MOBILE_CTA_RESERVE;
-    const fitOptions = { ...MOBILE_FIT_BY_SECTION[config.sectionId] };
-    if (mobileCardsVisible) {
-      fitOptions.centerBias = MOBILE_CARDS_CENTER_BIAS;
+    const cardsRect = stageRightEl?.getBoundingClientRect();
+    const cardsActive = topicsCardsActive();
+    let topPx: number;
+    let bottomPx: number;
+
+    if (isMobile) {
+      const bottomBoundPx = cardsActive && cardsRect
+        ? cardsRect.top
+        : window.innerHeight - TOPICS_CTA_RESERVE;
+      topPx = textRect.bottom + TOPICS_MODEL_MARGIN;
+      bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
+    } else if (cardsActive && cardsRect && cardsRect.height > 0) {
+      const overlapTop = Math.max(textRect.top, cardsRect.top);
+      const overlapBottom = Math.min(textRect.bottom, cardsRect.bottom);
+      if (overlapBottom - overlapTop >= TOPICS_MODEL_MARGIN * 2 + 40) {
+        topPx = overlapTop + TOPICS_MODEL_MARGIN;
+        bottomPx = overlapBottom - TOPICS_MODEL_MARGIN;
+      } else {
+        topPx = Math.min(textRect.top, cardsRect.top) + TOPICS_MODEL_MARGIN;
+        bottomPx = Math.max(textRect.bottom, cardsRect.bottom) - TOPICS_MODEL_MARGIN;
+      }
+    } else {
+      topPx = textRect.bottom + TOPICS_MODEL_MARGIN;
+      bottomPx = window.innerHeight - TOPICS_CTA_RESERVE - TOPICS_MODEL_MARGIN;
     }
-    scene3d.setMobileFit(topPx, bottomPx, fitOptions);
-    scene3d.setScale(topicsScaleMul(mobileCardsVisible));
-    if (mobileCardsVisible || mobileTopicsScrollComplete) {
+
+    if (bottomPx - topPx < 48) return;
+
+    scene3d.setMobileFit(topPx, bottomPx, { centerBias: TOPICS_FIT_CENTER_BIAS });
+    scene3d.setScale(topicsScaleMul(isMobile && mobileCardsVisible));
+    if (
+      (isMobile && (mobileCardsVisible || mobileTopicsScrollComplete)) ||
+      (!isMobile && cardsIntroduced)
+    ) {
       scene3d.setMobileLayoutBlend(1);
     }
   }
 
   $effect(() => {
-    if (!isMobile || !stageTextEl) return;
-    const observer = new ResizeObserver(() => updateMobileModelFit());
+    if (!stageTextEl || phase === 'feedback') return;
+    const observer = new ResizeObserver(() => updateTopicsModelFit());
     observer.observe(stageTextEl);
     return () => observer.disconnect();
   });
 
   $effect(() => {
-    if (!isMobile || phase !== 'topics') return;
+    if (phase === 'feedback') return;
     currentTopic;
     mobileCardsVisible;
+    cardsIntroduced;
     void tick().then(() => {
-      updateMobileModelFit();
-      setTimeout(updateMobileModelFit, 450);
+      updateTopicsModelFit();
+      setTimeout(updateTopicsModelFit, 450);
     });
+  });
+
+  $effect(() => {
+    if (!stageRightEl || phase === 'feedback') return;
+    const observer = new ResizeObserver(() => updateTopicsModelFit());
+    observer.observe(stageRightEl);
+    return () => observer.disconnect();
   });
 
   const PARTICLE_SCROLL_START = 0.58;
@@ -394,22 +421,22 @@
     return Math.min(1, (scrollProgress - PARTICLE_SCROLL_START) / (PARTICLE_SCROLL_END - PARTICLE_SCROLL_START));
   }
 
-  function mobileLayoutBlendFromParticleT(particleT: number): number {
+  function topicsLayoutBlendFromParticleT(particleT: number): number {
     if (particleT <= MOBILE_LAYOUT_START) return 0;
     return Math.min(1, (particleT - MOBILE_LAYOUT_START) / (1 - MOBILE_LAYOUT_START));
   }
 
-  function updateMobileScrollLayout(particleT: number) {
-    if (!isMobile || !scene3d) return;
-    updateMobileModelFit();
-    scene3d.setMobileLayoutBlend(mobileLayoutBlendFromParticleT(particleT));
+  function updateTopicsScrollLayout(particleT: number) {
+    if (!scene3d) return;
+    updateTopicsModelFit();
+    scene3d.setMobileLayoutBlend(topicsLayoutBlendFromParticleT(particleT));
   }
 
   function updateMobileCardsFromScroll(progress: number) {
     if (!isMobile || !topicsMode || cardsScrollAnimating) return;
 
     if (mobileCardsVisible && progress < MOBILE_CARDS_HIDE_PROGRESS) {
-      void mobileHideCards().then(() => setTimeout(updateMobileModelFit, 450));
+      void mobileHideCards().then(() => setTimeout(updateTopicsModelFit, 450));
     }
   }
 
@@ -433,7 +460,7 @@
     cardsScrollAnimating = true;
     mobileCardsVisible = true; // CSS class m-cards-visible makes container visible
     await tick();
-    updateMobileModelFit();
+    updateTopicsModelFit();
     await cardStack?.animateIn();
     cardsScrollAnimating = false;
   }
@@ -448,7 +475,7 @@
     mobileScrollRatio = 0;
     if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     await tick();
-    updateMobileModelFit();
+    updateTopicsModelFit();
     cardsScrollAnimating = false;
   }
 
@@ -457,7 +484,7 @@
   function toggleMobileCardsPanel() {
     if (!isMobile || phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
     const action = mobileCardsVisible ? mobileHideCards() : mobileShowCards();
-    action.then(() => setTimeout(updateMobileModelFit, 450));
+    action.then(() => setTimeout(updateTopicsModelFit, 450));
   }
 
   function onCardsScroll() {
@@ -555,11 +582,13 @@
     phase = 'topics';
     if (isMobile) {
       mobileTopicsScrollComplete = true;
-      tick().then(updateMobileModelFit);
-      setTimeout(updateMobileModelFit, 450);
+      tick().then(updateTopicsModelFit);
+      setTimeout(updateTopicsModelFit, 450);
     } else {
       lenisRef?.stop();
       window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
+      tick().then(updateTopicsModelFit);
+      setTimeout(updateTopicsModelFit, 450);
     }
   }
 
@@ -571,6 +600,7 @@
     gsap.set('.stage__right', { opacity: 1 });
     void tick().then(async () => {
       await cardStack?.animateIn();
+      updateTopicsModelFit();
       cardsScrollAnimating = false;
     });
   }
@@ -584,6 +614,7 @@
       gsap.set('.stage__right-heading', { opacity: 0 });
       cardStack?.resetHidden();
       cardsScrollAnimating = false;
+      updateTopicsModelFit();
     });
   }
 
@@ -684,11 +715,11 @@
         lenisRaf = (t: number) => lenis!.raf(t * 1000);
         gsap.ticker.add(lenisRaf);
       } else {
-        window.addEventListener('resize', updateMobileModelFit);
         document.addEventListener('touchstart', mobileTouchStart, { passive: true });
         document.addEventListener('touchmove', mobileTouchMove, { passive: true });
         document.addEventListener('touchend', mobileTouchEnd, { passive: true });
       }
+      window.addEventListener('resize', updateTopicsModelFit);
 
       const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
       const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
@@ -745,7 +776,7 @@
             else maybeResetCards();
 
             scene3d?.setTransitionProgress(particleT);
-            updateMobileScrollLayout(particleT);
+            updateTopicsScrollLayout(particleT);
 
             if (particleT >= 1 && !topicsMode) {
               enterTopicsMode();
@@ -846,7 +877,7 @@
         ctx.revert();
         if (lenisRaf) gsap.ticker.remove(lenisRaf);
         if (lenis) lenis.destroy();
-        if (isMobile) window.removeEventListener('resize', updateMobileModelFit);
+        window.removeEventListener('resize', updateTopicsModelFit);
         if (isMobile) {
           document.removeEventListener('touchstart', mobileTouchStart);
           document.removeEventListener('touchmove', mobileTouchMove);

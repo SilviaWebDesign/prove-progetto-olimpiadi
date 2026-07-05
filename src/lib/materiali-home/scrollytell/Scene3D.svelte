@@ -161,7 +161,7 @@
   let mobileLayoutBlend     = 0;
   const MOBILE_FIT_LERP = 0.1;
   /** 0.5 = centro del gap; valori più alti spostano il modello verso il basso. */
-  const MOBILE_FIT_CENTER_BIAS = 0.42;
+  const MOBILE_FIT_CENTER_BIAS = 0.5;
 
   const clock      = new THREE.Clock();
   const IDLE_RAD_S = THREE.MathUtils.degToRad(7);

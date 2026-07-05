@@ -29,6 +29,7 @@
     frostSrc: string;
     bgSrc: string;
     phrase: string;
+    phraseLines?: string[];
     modelSrc: string;
     resultPaths: string[];
     sectionId: 'infrastructure' | 'sport' | 'sustainability';
@@ -152,7 +153,15 @@
 
   <!-- ── Frase intro ────────────────────────────────────────────────────────── -->
   <div class="mobile-phrase">
-    <p class="mobile-phrase__text">{config.phrase}</p>
+    {#if config.phraseLines?.length}
+      <div class="mobile-phrase__lines">
+        {#each config.phraseLines as line}
+          <p class="mobile-phrase__line">{line}</p>
+        {/each}
+      </div>
+    {:else}
+      <p class="mobile-phrase__text">{config.phrase}</p>
+    {/if}
   </div>
 
   <!-- ── Contenuto principale ───────────────────────────────────────────────── -->
@@ -352,6 +361,25 @@
     font-size: clamp(22px, 6vw, 32px);
     line-height: 1.2;
     color: #161a1f;
+  }
+
+  .mobile-phrase__lines {
+    display: flex;
+    flex-direction: column;
+    max-width: 354px;
+  }
+
+  .mobile-phrase__line {
+    margin: 0;
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1.1;
+    color: #161a1f;
+  }
+
+  .mobile-page--sustainability .mobile-phrase {
+    padding: 52px 18px 40px;
   }
 
   /* ── Main content ────────────────────────────────────────────────────────── */

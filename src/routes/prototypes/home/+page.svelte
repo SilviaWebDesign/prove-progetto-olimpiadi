@@ -44,18 +44,22 @@
   const CARDS = { in: 0.90, inEnd: 0.95 };
 
   const TEXT1_LINES = [
-    'La realtà non è unica e oggettiva,',
-    'dipende dai fatti che osservi',
-    'e dal punto di vista che scegli.'
+    'La realtà non è unica',
+    'e oggettiva, dipende',
+    'dai fatti che osservi e dal',
+    'punto di vista che scegli.'
   ];
   const TEXT2_LINES = [
-    'Attraversa il percorso, tra sostenibilità,',
-    'sport e infrastrutture, e prendi posizione',
-    'davanti alle informazioni.'
+    'Attraversa il percorso',
+    'tra sostenibilità, sport',
+    'e infrastrutture, e prendi',
+    'posizione davanti',
+    'alle informazioni.'
   ];
   const TEXT3_LINES = [
-    'Le tue scelte plasmeranno gli eroi',
-    'e i cattivi di Milano-Cortina 2026.'
+    'Le tue scelte',
+    'plasmeranno la realtà di',
+    'Milano-Cortina 2026.'
   ];
 
   let text1Opacity = $derived(
@@ -557,7 +561,11 @@
     }
 
     .narrative-line {
-      --home-narrative-size: 1.55rem;
+      --home-narrative-size: 1.5rem;
+    }
+
+    .split-lines-container {
+      max-width: 278px;
     }
 
     .cards-stage :global(.cards-stage-inner) {

@@ -33,6 +33,7 @@
     frostSrc: string;
     bgSrc: string;
     phrase: string;
+    phraseLines?: string[];
     modelSrc: string;
     resultPaths: string[];
     sectionId: 'infrastructure' | 'sport' | 'sustainability';
@@ -485,41 +486,48 @@
 
     if (!browser || !sceneEl) return;
 
-    if ($overlayVisible) setTimeout(() => overlayVisible.set(false), 60);
+    let teardown: (() => void) | undefined;
 
-    history.scrollRestoration = 'manual';
-    window.scrollTo(0, 0);
+    void (async () => {
+      if ($overlayVisible) setTimeout(() => overlayVisible.set(false), 60);
 
-    gsap.registerPlugin(ScrollTrigger);
+      history.scrollRestoration = 'manual';
+      window.scrollTo(0, 0);
 
-    // Lenis only on desktop (mobile has native touch scroll for GSAP)
-    let lenis: Lenis | null = null;
-    let lenisRaf: ((t: number) => void) | null = null;
+      await tick();
 
-    gsap.ticker.lagSmoothing(0);
+      if (!sceneEl) return;
 
-    if (!isMobile) {
-      lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
-      lenis.scrollTo(0, { immediate: true });
-      lenisRef = lenis;
-      lenis.on('scroll', ScrollTrigger.update);
-      lenisRaf = (t: number) => lenis!.raf(t * 1000);
-      gsap.ticker.add(lenisRaf);
-    } else {
-      window.addEventListener('resize', updateMobileModelFit);
-    }
+      gsap.registerPlugin(ScrollTrigger);
 
-    const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
-    const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
+      // Lenis only on desktop (mobile has native touch scroll for GSAP)
+      let lenis: Lenis | null = null;
+      let lenisRaf: ((t: number) => void) | null = null;
 
-    gsap.set(titleEl,         { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
-    gsap.set('.phrase',       { y: 30, autoAlpha: 0 });
-    gsap.set('.stage__text',  { x: -30 });
-    // On mobile, CSS class controls .stage__right opacity (no GSAP inline style so CSS class can win)
-    if (!isMobile) gsap.set('.stage__right', { opacity: 0 });
-    gsap.set('.stage__right-heading', { opacity: 0 });
+      gsap.ticker.lagSmoothing(0);
 
-    const ctx = gsap.context(() => {
+      if (!isMobile) {
+        lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
+        lenis.scrollTo(0, { immediate: true });
+        lenisRef = lenis;
+        lenis.on('scroll', ScrollTrigger.update);
+        lenisRaf = (t: number) => lenis!.raf(t * 1000);
+        gsap.ticker.add(lenisRaf);
+      } else {
+        window.addEventListener('resize', updateMobileModelFit);
+      }
+
+      const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
+      const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
+
+      gsap.set(titleEl,         { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
+      gsap.set('.phrase',       { y: 30, autoAlpha: 0 });
+      gsap.set('.stage__text',  { x: -30 });
+      // On mobile, CSS class controls .stage__right opacity (no GSAP inline style so CSS class can win)
+      if (!isMobile) gsap.set('.stage__right', { opacity: 0 });
+      gsap.set('.stage__right-heading', { opacity: 0 });
+
+      const ctx = gsap.context(() => {
 
       const heroTl = gsap.timeline({
         scrollTrigger: {
@@ -658,14 +666,17 @@
       requestAnimationFrame(() => requestAnimationFrame(() => ScrollTrigger.refresh()));
     });
 
-    return () => {
-      exitTopicsMode();
-      lenisRef = null;
-      ctx.revert();
-      if (lenisRaf) gsap.ticker.remove(lenisRaf);
-      if (lenis) lenis.destroy();
-      if (isMobile) window.removeEventListener('resize', updateMobileModelFit);
-    };
+      teardown = () => {
+        exitTopicsMode();
+        lenisRef = null;
+        ctx.revert();
+        if (lenisRaf) gsap.ticker.remove(lenisRaf);
+        if (lenis) lenis.destroy();
+        if (isMobile) window.removeEventListener('resize', updateMobileModelFit);
+      };
+    })();
+
+    return () => teardown?.();
   });
 </script>
 
@@ -713,7 +724,15 @@
 
     <!-- Frase -->
     <div class="phrase-container">
-      <p class="phrase">{config.phrase}</p>
+      {#if config.phraseLines?.length}
+        <div class="phrase phrase--multiline">
+          {#each config.phraseLines as line}
+            <p class="phrase__line">{line}</p>
+          {/each}
+        </div>
+      {:else}
+        <p class="phrase">{config.phrase}</p>
+      {/if}
     </div>
 
     <!-- Layer 3D: canvas full-viewport, dietro la griglia -->
@@ -975,6 +994,18 @@
     text-align: left;
     font-size: clamp(28px, 4.497vw, 68px);
     color: #161a1f;
+  }
+
+  .phrase--multiline {
+    display: flex;
+    flex-direction: column;
+    width: min(354px, calc(100% - 40px));
+    max-width: 354px;
+  }
+
+  .phrase__line {
+    margin: 0;
+    line-height: 1.1;
   }
 
   /* ── Stage ──────────────────────────────────────────────────────────── */
@@ -1302,6 +1333,15 @@
       text-align: left;
       font-size: 36px;
       width: 100%;
+    }
+
+    .phrase--multiline {
+      width: min(354px, calc(100% - 40px));
+      max-width: 354px;
+    }
+
+    .phrase__line {
+      line-height: 1.1;
     }
 
     .scene--sustainability .phrase-container {

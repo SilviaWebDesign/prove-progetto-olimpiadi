@@ -202,6 +202,7 @@ export function getScrollytellConfig(key) {
     frostSrc: visualByKey[key]?.frostSrc ?? section.hero.background,
     bgSrc: visualByKey[key]?.bgSrc ?? section.hero.background,
     phrase: phraseByKey[key] ?? section.intro,
+    phraseLines: key === 'sustainability' ? sections.sustainability.introClaim : undefined,
     modelSrc: key === 'infrastructure' ? '/oggetti/infrastrutture.glb' : section.modelSrc,
     resultPaths: resultPathsByKey[key] ?? [],
     sectionId: /** @type {'infrastructure' | 'sport' | 'sustainability'} */ (section.id),

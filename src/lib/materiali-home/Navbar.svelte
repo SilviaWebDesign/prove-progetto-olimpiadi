@@ -11,6 +11,10 @@
   let scrolled = $state(false);
   let cardsPhase = $state(false);
 
+  /** @type {HTMLElement | null} */
+  let titleEl = $state(null);
+  let iconSize = $state(20);
+
   const SCROLL_THRESHOLD = 8;
 
   /** @type {{ label: string, href: string }[]} */
@@ -54,13 +58,45 @@
     document.body.style.overflow = menuOpen ? 'hidden' : '';
   });
 
+  function measureTitleCapHeight() {
+    if (!titleEl) return;
+    const style = getComputedStyle(titleEl);
+    const probe = document.createElement('span');
+    probe.textContent = 'Q';
+    probe.style.font = style.font;
+    probe.style.fontFamily = style.fontFamily;
+    probe.style.fontWeight = style.fontWeight;
+    probe.style.fontSize = style.fontSize;
+    probe.style.fontStretch = style.fontStretch;
+    probe.style.fontVariationSettings = style.fontVariationSettings;
+    probe.style.lineHeight = 'normal';
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    probe.style.whiteSpace = 'nowrap';
+    probe.style.textTransform = 'uppercase';
+    titleEl.appendChild(probe);
+
+    const range = document.createRange();
+    range.selectNodeContents(probe);
+    const cap = range.getBoundingClientRect().height;
+    probe.remove();
+
+    if (cap > 0) iconSize = Math.round(cap * 0.93);
+  }
+
   onMount(() => {
     updateScrollState();
+    measureTitleCapHeight();
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(measureTitleCapHeight);
+    }
     window.addEventListener('scroll', updateScrollState, { passive: true });
     window.addEventListener('keydown', handleKeydown);
+    window.addEventListener('resize', measureTitleCapHeight);
     return () => {
       window.removeEventListener('scroll', updateScrollState);
       window.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('resize', measureTitleCapHeight);
     };
   });
 </script>
@@ -72,18 +108,31 @@
   class:reveal-at-cards={revealAtCards}
   class:menu-open={menuOpen}
 >
-  <div class="navbar-inner">
-    <a href="/prototypes/home#sezioni" class="navbar-title">Quante facce ha una medaglia?</a>
-    <button
-      type="button"
-      class="menu-button"
-      aria-expanded={menuOpen}
-      aria-controls="site-menu"
-      aria-label={menuOpen ? 'Chiudi menu' : 'Apri menu'}
-      onclick={toggleMenu}
-    >
-      <img src="/icons/menu.svg" alt="" width="24" height="24" />
-    </button>
+  <div class="navbar-inner" style="--navbar-icon-size: {iconSize}px">
+    <div class="navbar-row">
+      <a bind:this={titleEl} href="/prototypes/home#sezioni" class="navbar-title">Quante facce ha una medaglia?</a>
+      <button
+        type="button"
+        class="menu-button"
+        aria-expanded={menuOpen}
+        aria-controls="site-menu"
+        aria-label={menuOpen ? 'Chiudi menu' : 'Apri menu'}
+        onclick={toggleMenu}
+      >
+        {#if menuOpen}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 4L20 20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M20 4L4 20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M2 4H22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M2 12H22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M2 20H22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        {/if}
+      </button>
+    </div>
   </div>
 </header>
 
@@ -94,15 +143,6 @@
   aria-hidden={!menuOpen}
   onclick={(e) => e.target === e.currentTarget && closeMenu()}
 >
-  <button
-    type="button"
-    class="menu-close"
-    aria-label="Chiudi menu"
-    onclick={closeMenu}
-  >
-    <img src="/icons/menu.svg" alt="" width="24" height="24" />
-  </button>
-
   <nav id="site-menu" class="menu-panel" aria-hidden={!menuOpen}>
     <ul class="menu-list">
       {#each menuItems as item (item.label)}
@@ -131,7 +171,6 @@
     opacity: 0;
     --navbar-padding-x: clamp(24px, 5.23vw, 79px);
     --navbar-padding-top: clamp(16px, 2.51vw, 38px);
-    --navbar-row-height: 26px;
     transition:
       transform 0.35s ease,
       opacity 0.35s ease;
@@ -143,8 +182,10 @@
   }
 
   .navbar.menu-open {
-    opacity: 0;
-    pointer-events: none;
+    z-index: 201;
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .navbar.always-visible {
@@ -167,22 +208,24 @@
     }
 
     .navbar.always-visible.menu-open {
-      opacity: 0;
+      opacity: 1;
     }
   }
 
   .navbar-inner {
-    --navbar-control-height: 24px;
     --navbar-title-size: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     width: 100%;
-    min-height: var(--navbar-row-height);
     padding: var(--navbar-padding-top) var(--navbar-padding-x) 0;
     box-sizing: border-box;
     pointer-events: auto;
+  }
+
+  .navbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
+    width: 100%;
   }
 
   .navbar-title {
@@ -191,15 +234,17 @@
     font-weight: 900;
     font-variation-settings: 'wght' 900;
     font-stretch: condensed;
-    line-height: 1.15;
+    line-height: 1;
     text-transform: uppercase;
     color: #161a1f;
     text-decoration: none;
     white-space: nowrap;
-    display: flex;
-    align-items: center;
-    flex: 1;
     min-width: 0;
+    margin: 0;
+    padding: 0;
+    display: block;
+    text-box-trim: trim-both;
+    text-box-edge: cap alphabetic;
   }
 
   .navbar-title:hover {
@@ -211,19 +256,20 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: var(--navbar-control-height);
-    height: var(--navbar-control-height);
+    width: var(--navbar-icon-size, 20px);
+    height: var(--navbar-icon-size, 20px);
     margin: 0;
     padding: 0;
     border: none;
     background: none;
+    color: #161a1f;
     cursor: pointer;
   }
 
-  .menu-button img {
+  .menu-button svg {
     display: block;
-    width: var(--navbar-control-height);
-    height: var(--navbar-control-height);
+    width: 100%;
+    height: 100%;
   }
 
   .menu-button:focus-visible {
@@ -234,7 +280,6 @@
   .menu-overlay {
     --navbar-padding-x: clamp(24px, 5.23vw, 79px);
     --navbar-padding-top: clamp(16px, 2.51vw, 38px);
-    --navbar-row-height: 26px;
     position: fixed;
     inset: 0;
     z-index: 9;
@@ -256,34 +301,6 @@
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-  }
-
-  .menu-close {
-    position: absolute;
-    top: calc(var(--navbar-padding-top) + (var(--navbar-row-height, 26px) - 24px) / 2);
-    right: var(--navbar-padding-x);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: none;
-    cursor: pointer;
-    z-index: 1;
-  }
-
-  .menu-close img {
-    display: block;
-    width: 24px;
-    height: 24px;
-  }
-
-  .menu-close:focus-visible {
-    outline: 2px solid #161a1f;
-    outline-offset: 4px;
   }
 
   .menu-panel {
@@ -339,7 +356,7 @@
     }
 
     .navbar.menu-open {
-      opacity: 0;
+      opacity: 1;
     }
 
     .navbar {
@@ -353,13 +370,8 @@
     }
 
     .navbar-inner {
-      --navbar-control-height: 20px;
       --navbar-title-size: 20px;
       padding: var(--navbar-padding-top) var(--navbar-padding-x) 0;
-    }
-
-    .menu-close {
-      right: var(--navbar-padding-x);
     }
 
     .menu-list {

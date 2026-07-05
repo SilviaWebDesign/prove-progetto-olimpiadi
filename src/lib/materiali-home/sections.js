@@ -50,11 +50,19 @@ const SPORT_OPINIONS = [
 ];
 
 const SUSTAINABILITY_INTRO_CLAIM = [
-  'Le Olimpiadi sono accompagnate da scelte che riguardano ambiente e risorse.',
-  'Questi interventi possono essere letti',
-  'come attenzione al territorio oppure',
-  'come iniziative dal valore limitato,',
-  'misurabile solo nel tempo.'
+  'Le Olimpiadi sono',
+  'accompagnate da',
+  'scelte che',
+  'riguardano ambiente',
+  'e risorse. Questi',
+  'interventi possono',
+  'essere letti come',
+  'attenzione al',
+  'territorio oppure',
+  'come iniziative dal',
+  'valore limitato,',
+  'misurabile solo nel',
+  'tempo.'
 ];
 
 const SUSTAINABILITY_FACT_1_BODY =

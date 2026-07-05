@@ -189,8 +189,11 @@
           </h1>
         </div>
         <div class="scroll-hint hero-reveal" style="--reveal-delay: 480ms">
-          <span class="arrow">↓</span>
-          <span class="text">Scorri per continuare</span>
+          <span class="scroll-hint__label">Continua</span>
+          <svg class="scroll-hint__chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
+            <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </div>
       </div>
     </section>
@@ -452,16 +455,28 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    padding: 0 14px;
   }
-  .scroll-hint .arrow { font-size: 1rem; color: #000000; animation: bounce 2s infinite; }
-  .scroll-hint .text {
-    font-size: 1.25rem;
-    font-weight: 400;
-    letter-spacing: 0;
-    line-height: normal;
-    text-transform: none;
-    color: #000000;
+
+  .scroll-hint__label {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+    color: #161A1F;
+  }
+
+  .scroll-hint__chevron {
+    display: block;
+    width: 21px;
+    height: 9px;
+    animation: chevron-bounce 1.4s ease-in-out infinite;
+  }
+
+  @keyframes chevron-bounce {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(5px); }
   }
 
   .split-lines-container {
@@ -515,12 +530,6 @@
 
   .space-padding {
     height: 1300vh; /* più scroll = più pausa tra le fasi */
-  }
-
-  @keyframes bounce {
-    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-6px); }
-    60% { transform: translateY(-3px); }
   }
 
   @media (max-width: 768px) {

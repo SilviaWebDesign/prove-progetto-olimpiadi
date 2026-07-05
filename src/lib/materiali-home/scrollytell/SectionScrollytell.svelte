@@ -1386,28 +1386,32 @@
       left: -16px;
       right: -16px;
       bottom: 0;
-      height: 52px;
+      height: 20px;
       pointer-events: none;
       z-index: 2;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       background: linear-gradient(
         to bottom,
         rgba(235, 235, 235, 0) 0%,
-        rgba(235, 235, 235, 0.55) 100%
+        rgba(235, 235, 235, 0.35) 100%
       );
-      mask-image: linear-gradient(to bottom, transparent 0%, black 72%);
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 72%);
+      mask-image: linear-gradient(to bottom, transparent 0%, black 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 100%);
     }
 
     .stage__right-scroll {
-      height: 281px;
-      padding: 4px 16px 0;
+      height: 309px;
+      padding: 4px 16px 14px;
       margin: 0 -16px;
       overflow-y: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
+    }
+
+    .stage__right-scroll :global(.card-stack) {
+      padding-bottom: 4px;
     }
 
     .stage__right-scroll::-webkit-scrollbar {
@@ -1429,7 +1433,7 @@
       position: absolute;
       right: 6px;
       bottom: 80px;
-      height: 281px;
+      height: 309px;
       width: 3px;
       background: rgba(22, 26, 31, 0.12);
       border-radius: 2px;

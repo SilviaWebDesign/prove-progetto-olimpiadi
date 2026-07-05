@@ -66,21 +66,37 @@
     '/oggetti/sport.glb': 0.72,
   };
 
+  const PIANTA_MODEL_PREFIX = '/oggetti/pianta';
+
+  /** Rotazione correttiva al load (export Blender capovolto). */
+  function applyModelOrientation(root: THREE.Object3D, src: string) {
+    if (!src.startsWith(PIANTA_MODEL_PREFIX)) return;
+    root.rotation.x = Math.PI;
+    root.updateMatrixWorld(true);
+  }
+
   /** Modelli piccoli nel file GLB: crossfade sulle posizioni finali invece del volo dall'origine. */
   const MODEL_PARTICLE_CROSSFADE = new Set([
-    '/oggetti/sostenibilita.glb',
+    '/oggetti/pianta.glb',
     '/oggetti/sport.glb',
     '/oggetti/ice_skate.glb',
     '/oggetti/infrastrutture.glb',
   ]);
 
-  const MODEL_DISABLE_IDLE_SPIN = new Set(['/oggetti/sostenibilita.glb']);
+  const MODEL_DISABLE_IDLE_SPIN = new Set(['/oggetti/pianta.glb']);
 
-  /** Scala del modello in fase feedback (moltiplicatore su baseScale). */
-  const MODEL_RESULT_SCALE: Record<string, number> = {
-    '/oggetti/sostenibilita.glb': 0.5,
+  /** Scala e posizione del modello in fase feedback. */
+  const DEFAULT_FEEDBACK = { scaleMul: 1.33, yOffset: 0.55, lockSettled: false };
+  const MODEL_FEEDBACK: Record<string, Partial<typeof DEFAULT_FEEDBACK>> = {
+    '/oggetti/sport.glb': { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
+    '/oggetti/pianta.glb': { scaleMul: 0.5, yOffset: 0.55, lockSettled: false },
   };
-  const DEFAULT_RESULT_SCALE = 1.33;
+
+  function feedbackConfig() {
+    return { ...DEFAULT_FEEDBACK, ...MODEL_FEEDBACK[modelSrc] };
+  }
+
+  let activeResultGroup: THREE.Group | null = null;
 
   let rafId:    number | null = null;
   let spinner:  THREE.Group | null = null;
@@ -265,14 +281,24 @@
       morphToResult,
       returnToParticles: () => {
         if (controls) controls.enabled = false;
+        morphState = 'none';
+        morphElapsed = 0;
+        morphDoneCallback = null;
+        if (spinner) {
+          spinner.children
+            .filter((child) => child !== modelGroup)
+            .forEach((child) => spinner!.remove(child));
+        }
+        resultModelMaterials = [];
+        activeResultGroup = null;
         restoreTopicsPose();
+        if (spinner) spinner.position.y = 0;
         materials.forEach(m => { m.opacity = 0; m.visible = false; });
         if (particleMesh) particleMesh.visible = true;
         if (particleMat) {
           particleMat.uniforms.uBaseOpacity.value = 0.85;
           particleMat.uniforms.uPulse.value = 0;
         }
-        resultModelMaterials.forEach(m => { m.opacity = 0; m.visible = false; });
       },
       setMobileFit: (topPx, bottomPx, options = {}) => {
         if (!camera) return;
@@ -400,6 +426,7 @@
       (gltf) => {
         if (!scene || !camera) return;
 
+        applyModelOrientation(gltf.scene, modelSrc);
         const box    = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
         const size   = box.getSize(new THREE.Vector3());
@@ -639,20 +666,57 @@
   }
 
   /** Offset verticale del modello in fase feedback (più alto sullo schermo). */
-  const FEEDBACK_MODEL_Y_OFFSET = 0.55;
-
   function applyFeedbackModelYOffset() {
-    if (spinner) spinner.position.y = FEEDBACK_MODEL_Y_OFFSET;
+    if (!spinner) return;
+    spinner.position.y = feedbackConfig().yOffset;
+  }
+
+  function finalizeMorphView() {
+    if (activeResultGroup && spinner) {
+      // Trasferisce la rotazione idle sul modello risultato prima di azzerare lo spinner,
+      // altrimenti il pattino appare capovolto/spostato a fine morph.
+      activeResultGroup.rotation.y += spinner.rotation.y;
+      spinner.rotation.set(0, 0, 0);
+    }
+
+    if (camera) {
+      camera.position.set(0, 0, 6);
+      camera.lookAt(0, 0.3, 0);
+      if (controls) {
+        controls.target.set(0, 0.3, 0);
+        controls.update();
+      }
+    }
+
+    if (activeResultGroup) alignFeedbackResultToScreen(activeResultGroup);
+    else applyFeedbackModelYOffset();
+  }
+
+  function alignFeedbackResultToScreen(resultGroup: THREE.Group) {
+    if (!spinner) return;
+    const { yOffset } = feedbackConfig();
+    resultGroup.updateMatrixWorld(true);
+    const center = new THREE.Box3().setFromObject(resultGroup).getCenter(new THREE.Vector3());
+    spinner.position.set(-center.x, yOffset - center.y, -center.z);
+  }
+
+  function resetFeedbackCamera() {
+    if (!camera) return;
+    freezeSpinnerRotation();
+    if (spinner) spinner.rotation.set(0, 0, 0);
+    camera.position.set(0, 0, 6);
+    camera.lookAt(0, 0.3, 0);
+    if (controls) {
+      controls.target.set(0, 0.3, 0);
+      controls.update();
+    }
   }
 
   function centerFeedbackView(scaleMul: number) {
     if (!modelGroup || !camera) return;
 
-    freezeSpinnerRotation();
-    if (spinner) {
-      spinner.position.set(0, 0, 0);
-      spinner.rotation.set(0, 0, 0);
-    }
+    if (spinner) spinner.position.set(0, 0, 0);
+    resetFeedbackCamera();
 
     modelGroup.rotation.set(0, 0, 0);
     modelGroup.position.set(0, 0, 0);
@@ -662,13 +726,6 @@
     const box = new THREE.Box3().setFromObject(modelGroup);
     const center = box.getCenter(new THREE.Vector3());
     modelGroup.position.sub(center);
-
-    camera.position.set(0, 0, 6);
-    camera.lookAt(0, 0, 0);
-    if (controls) {
-      controls.target.set(0, 0, 0);
-      controls.update();
-    }
 
     applyFeedbackModelYOffset();
   }
@@ -698,7 +755,9 @@
   function doMorph(source: THREE.Group, onDone: () => void) {
     if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) { onDone(); return; }
 
+    freezeSpinnerRotation();
     const resultGroup = source.clone();
+    resultGroup.rotation.copy(modelGroup.rotation);
 
     resultGroup.updateMatrixWorld(true);
     const box    = new THREE.Box3().setFromObject(resultGroup);
@@ -711,13 +770,12 @@
     const maxDim     = Math.max(size.x, size.y, size.z);
     const resultBase = (visibleH * 0.9) / maxDim;
     const settled    = modelGroup.scale.x / baseScale;
-    const resultMul  = MODEL_RESULT_SCALE[modelSrc] ?? DEFAULT_RESULT_SCALE;
-
-    if (modelSrc in MODEL_RESULT_SCALE) {
-      resultGroup.scale.setScalar(baseScale * resultMul);
-    } else {
-      resultGroup.scale.setScalar(resultBase * settled * resultMul);
-    }
+    const fb         = feedbackConfig();
+    const morphSettled = fb.lockSettled ? 1 : settled;
+    const resultMul    = fb.scaleMul;
+    // Adatta sempre il modello di risultato al suo bounding box (non riusare baseScale
+    // del modello sorgente: per sostenibilità causava scale errate con i GLB di feedback).
+    resultGroup.scale.setScalar(resultBase * morphSettled * resultMul);
 
     resultModelMaterials = [];
     resultGroup.traverse(node => {
@@ -734,6 +792,7 @@
     });
 
     spinner.add(resultGroup);
+    activeResultGroup = resultGroup;
     scene.updateMatrixWorld();
 
     const modelGroupWorldInv = new THREE.Matrix4().copy(modelGroup.matrixWorld).invert();
@@ -795,9 +854,9 @@
   }
 
   function morphToResult(path: string, onDone: () => void) {
-    const feedbackScale = MODEL_RESULT_SCALE[modelSrc];
-    if (feedbackScale !== undefined && path === modelSrc) {
-      showEnlargedSourceModel(feedbackScale, onDone);
+    const { scaleMul } = feedbackConfig();
+    if (MODEL_FEEDBACK[modelSrc] && path === modelSrc) {
+      showEnlargedSourceModel(scaleMul, onDone);
       return;
     }
 
@@ -810,6 +869,7 @@
     loader.setDRACOLoader(draco);
     loader.load(path, (gltf) => {
       draco.dispose();
+      applyModelOrientation(gltf.scene, path);
       resultModels.set(path, gltf.scene);
       doMorph(gltf.scene, onDone);
     }, undefined, (err) => {
@@ -1101,7 +1161,7 @@
         morphState = 'none';
         particleMesh.visible = false;
         resultModelMaterials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
-        applyFeedbackModelYOffset();
+        finalizeMorphView();
         const cb = morphDoneCallback;
         morphDoneCallback = null;
         cb?.();

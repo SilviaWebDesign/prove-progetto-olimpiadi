@@ -96,7 +96,7 @@ export const sections = {
     menuLabel: 'Sostenibilità',
     theme: 'sustainability',
     accent: '#3eaf3f',
-    modelSrc: '/oggetti/sostenibilita.glb',
+    modelSrc: '/oggetti/pianta.glb',
     hero: {
       background: '/images/foresta.png'
     },

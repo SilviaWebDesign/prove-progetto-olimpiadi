@@ -165,7 +165,13 @@ const SPORT_RESULT_PATHS = [
   '/oggetti/sport-neutro.glb',
 ];
 
-const SUSTAINABILITY_RESULT_PATHS = Array(5).fill('/oggetti/sostenibilita.glb');
+const SUSTAINABILITY_RESULT_PATHS = [
+  '/oggetti/pianta_positivo.glb',
+  '/oggetti/pianta_negativo.glb',
+  '/oggetti/pianta_estremo_positivo.glb',
+  '/oggetti/pianta_estremo_negativo.glb',
+  '/oggetti/pianta_neutro.glb',
+];
 
 const RESULT_PATHS_BY_KEY = {
   infrastructure: INFRASTRUCTURE_RESULT_PATHS,

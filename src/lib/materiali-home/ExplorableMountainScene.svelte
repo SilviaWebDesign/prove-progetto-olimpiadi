@@ -32,8 +32,9 @@
     cloneMarkerModel,
     applyMarkerMaterial,
     disposeMarkerGeometries,
-    orientMarkerTowardWorldPoint
-  } from './aboutMarkerModels.js';
+    orientMarkerTowardWorldPoint,
+    updateMarkerPulse
+  } from './aboutParticleSphere.js';
 
   const FOCUS_CAMERA_ZOOM = 1.45;
   const CAMERA_TRANSITION_MS = 900;
@@ -71,6 +72,7 @@
    *   hotspot: import('./aboutHotspots.js').AboutHotspot;
    *   baseScale: number;
    *   spinSpeed: number;
+   *   pulsePhase: number;
    * }[]}
    */
   let markers = [];
@@ -284,7 +286,7 @@
   function updateMarkerSelection() {
     for (const entry of markers) {
       const active = selectedHotspot?.id === entry.hotspot.id;
-      applyMarkerMaterial(entry.object, active);
+      applyMarkerMaterial(entry.model, active);
       entry.object.scale.setScalar(active ? entry.baseScale * 1.22 : entry.baseScale);
     }
   }
@@ -295,8 +297,16 @@
     lastAnimationTime = now;
     if (delta === 0) return;
 
+    const elapsed = now * 0.001;
+
     for (const entry of markers) {
       entry.model.rotation.y += entry.spinSpeed * delta;
+
+      const active = selectedHotspot?.id === entry.hotspot.id;
+      const pulseSpeed = active ? 1.15 : 0.72;
+      const pulseAmp = active ? 0.12 : 0.055;
+      const pulse = Math.abs(Math.sin(elapsed * Math.PI * pulseSpeed + entry.pulsePhase)) * pulseAmp;
+      updateMarkerPulse(entry.model, pulse);
     }
   }
 
@@ -322,7 +332,7 @@
 
     for (const entry of markers) {
       markerGroup.remove(entry.object);
-      disposeMarkerGeometries(entry.object);
+      disposeMarkerGeometries(entry.model);
     }
     markers = [];
 
@@ -349,13 +359,20 @@
 
     for (let index = 0; index < ABOUT_HOTSPOT_PATH.length; index++) {
       const hotspot = ABOUT_HOTSPOT_PATH[index];
-      const model = await cloneMarkerModel(hotspot.modelSrc);
+      const model = await cloneMarkerModel();
       const root = new THREE.Group();
       root.add(model);
       root.position.copy(positions[index]);
       root.userData.hotspot = hotspot;
       markerGroup.add(root);
-      markers.push({ object: root, model, hotspot, baseScale: 1, spinSpeed: MARKER_SPIN_SPEED });
+      markers.push({
+        object: root,
+        model,
+        hotspot,
+        baseScale: 1,
+        spinSpeed: MARKER_SPIN_SPEED,
+        pulsePhase: Math.random() * Math.PI * 2
+      });
     }
 
     updateMarkerOrientations();
@@ -435,7 +452,7 @@
 
     for (const entry of markers) {
       markerGroup?.remove(entry.object);
-      disposeMarkerGeometries(entry.object);
+      disposeMarkerGeometries(entry.model);
     }
     markers = [];
 

@@ -21,7 +21,7 @@
     preloadResultModels:    () => void;
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
-    setMobileFit:           (topPx: number, bottomPx: number) => void;
+    setMobileFit:           (topPx: number, bottomPx: number, scaleBoost?: number, anchor?: 'center' | 'top' | 'bottom') => void;
     clearMobileFit:         () => void;
   }
 
@@ -89,7 +89,7 @@
   let mobileFitTargetScale  = 1;
   let mobileFitTargetOffsetY = 0;
   const MOBILE_FIT_LERP = 0.1;
-  const MOBILE_FIT_RATIO = 0.78;
+  const MOBILE_FIT_RATIO = 1.28;
 
   const clock      = new THREE.Clock();
   const IDLE_RAD_S = THREE.MathUtils.degToRad(7);
@@ -242,7 +242,7 @@
         }
         resultModelMaterials.forEach(m => { m.opacity = 0; m.visible = false; });
       },
-      setMobileFit: (topPx, bottomPx) => {
+      setMobileFit: (topPx, bottomPx, scaleBoost = 1, anchor = 'center') => {
         if (!camera) return;
         mobileFitActive = true;
         const vh        = window.innerHeight;
@@ -250,8 +250,14 @@
         const visibleH  = 2 * Math.tan(fov / 2) * camera.position.z;
         const gapPx     = Math.max(24, bottomPx - topPx);
         const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
-        mobileFitTargetScale = (MOBILE_FIT_RATIO * (gapPx / vh)) / (0.9 * fitFactor);
-        const centerPx = (topPx + bottomPx) / 2;
+        const fitScale  = (MOBILE_FIT_RATIO * scaleBoost * (gapPx / vh)) / (0.9 * fitFactor);
+        mobileFitTargetScale = fitScale;
+        const visualHeightPx = gapPx * MOBILE_FIT_RATIO * scaleBoost * 0.92;
+        const centerPx = anchor === 'top'
+          ? Math.min(topPx + visualHeightPx * 0.5, bottomPx - visualHeightPx * 0.5 - 4)
+          : anchor === 'bottom'
+          ? topPx + gapPx * 0.82
+          : (topPx + bottomPx) / 2;
         mobileFitTargetOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
       clearMobileFit: () => { mobileFitActive = false; },

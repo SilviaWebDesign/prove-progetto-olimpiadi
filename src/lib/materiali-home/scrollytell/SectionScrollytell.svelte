@@ -264,21 +264,47 @@
   let cardsScrollRef = $state<HTMLElement | null>(null);
   let stageTextEl = $state<HTMLElement | null>(null);
   let stageRightEl = $state<HTMLElement | null>(null);
+  let stageCommentsHeadingEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
 
   // ── Model 3D: adatta posizione/scala allo spazio libero tra testo e commenti (mobile) ──
-  const MOBILE_MODEL_MARGIN = 14;
-  const MOBILE_CTA_RESERVE  = 110;
+  const MOBILE_MODEL_MARGIN          = 14;
+  const MOBILE_MODEL_MARGIN_COMPACT  = 10;
+  const MOBILE_COMMENTS_SCALE_BOOST  = 1.85;
+  const MOBILE_SCROLL_SCALE_BOOST    = 1.55;
+  const MOBILE_CTA_RESERVE           = 48;
+  const MOBILE_MODEL_ZONE_TOP        = 0.64;
 
   function updateMobileModelFit() {
     if (!isMobile || !scene3d || !stageTextEl) return;
+    const vh = window.innerHeight;
     const textRect = stageTextEl.getBoundingClientRect();
-    const topPx = textRect.bottom + MOBILE_MODEL_MARGIN;
-    const bottomPx = mobileCardsVisible && stageRightEl
-      ? stageRightEl.getBoundingClientRect().top - MOBILE_MODEL_MARGIN
-      : window.innerHeight - MOBILE_CTA_RESERVE;
-    scene3d.setMobileFit(topPx, bottomPx);
+
+    if (mobileCardsVisible) {
+      const margin = MOBILE_MODEL_MARGIN_COMPACT;
+      const topPx = textRect.bottom + margin;
+      const commentsTopPx = stageCommentsHeadingEl
+        ? stageCommentsHeadingEl.getBoundingClientRect().top
+        : stageRightEl?.getBoundingClientRect().top ?? vh * 0.62;
+      const bottomPx = commentsTopPx - margin;
+      if (bottomPx <= topPx + 24) return;
+      scene3d.setMobileFit(topPx, bottomPx, MOBILE_COMMENTS_SCALE_BOOST, 'center');
+      return;
+    }
+
+    const topPx = Math.max(vh * MOBILE_MODEL_ZONE_TOP, textRect.bottom + MOBILE_MODEL_MARGIN);
+    const bottomPx = vh - MOBILE_CTA_RESERVE;
+    scene3d.setMobileFit(topPx, bottomPx, MOBILE_SCROLL_SCALE_BOOST, 'bottom');
   }
+
+  $effect(() => {
+    if (!isMobile || !mobileCardsVisible) return;
+    void tick().then(() => {
+      updateMobileModelFit();
+      setTimeout(updateMobileModelFit, 120);
+      setTimeout(updateMobileModelFit, 480);
+    });
+  });
 
   const PARTICLE_SCROLL_START = 0.58;
   const PARTICLE_SCROLL_END   = 0.98;
@@ -550,7 +576,7 @@
     gsap.ticker.lagSmoothing(0);
 
     if (!isMobile) {
-      lenis = new Lenis({ smoothWheel: true, lerp: 0.08 });
+      lenis = new Lenis({ smoothWheel: true, lerp: 0.05 });
       lenis.scrollTo(0, { immediate: true });
       lenisRef = lenis;
       lenis.on('scroll', ScrollTrigger.update);
@@ -576,8 +602,8 @@
         scrollTrigger: {
           trigger: sceneEl,
           start:   'top top',
-          end:     () => `+=${window.innerHeight * 1.5}`,
-          scrub:   1.2,
+          end:     () => `+=${window.innerHeight * 2}`,
+          scrub:   1.8,
         },
       });
 
@@ -606,7 +632,7 @@
           trigger:           sceneEl,
           start:             () => `top+=${window.innerHeight * 1.85}`,
           end:               'bottom bottom',
-          scrub:             1.2,
+          scrub:             1.8,
           onUpdate:          (self: { progress: number }) => {
             const progress = self.progress;
             const particleT = particleProgressFromScroll(progress);
@@ -779,7 +805,7 @@
     </div>
 
     <!-- Layer 3D: canvas full-viewport, dietro la griglia -->
-    <div class="scene-3d-layer" class:hidden-on-mobile-topics={isMobile && mobileCardsVisible && phase === 'topics'}>
+    <div class="scene-3d-layer">
       <Scene3D
         bind:api={scene3d}
         modelSrc={config.modelSrc}
@@ -806,7 +832,7 @@
 
       <!-- Cards column -->
       <div class="stage__right" bind:this={stageRightEl} class:no-pointer={phase === 'feedback'} class:m-cards-visible={isMobile && mobileCardsVisible}>
-        <p class="stage__right-heading">Metti like alle opinioni con cui sei d'accordo</p>
+        <p class="stage__right-heading" bind:this={stageCommentsHeadingEl}>Metti like alle opinioni con cui sei d'accordo</p>
         <div class="stage__right-scroll" bind:this={cardsScrollRef} onscroll={onCardsScroll}>
           <CardStack bind:api={cardStack} {cards} sectionId={config.sectionId} onToggleLike={toggleLike} topicIndex={currentTopic} />
         </div>
@@ -904,7 +930,7 @@
   }
 
   .scene {
-    height: 520vh;
+    height: 850vh;
     position: relative;
   }
 
@@ -1322,17 +1348,13 @@
       padding: 0;
     }
 
-    .scene-3d-layer.hidden-on-mobile-topics {
-      opacity: 0;
-    }
-
-    /* ── Topic text — Figma 875:6920: left 22px, width 354px ── */
+    /* ── Topic text — Figma 656:3090 ── */
     .stage__text {
       position: absolute;
       top: 56px;
-      left: 22px;
+      left: 24px;
       right: auto;
-      width: min(354px, calc(100% - 44px));
+      width: min(354px, calc(100% - 48px));
       z-index: 5;
     }
 
@@ -1348,21 +1370,13 @@
     .stage__text :global(.section-fact-block__title) {
       font-size: 36px;
       font-weight: 800;
-      transition: font-size 0.4s ease;
-    }
-
-    .stage__text.m-compact :global(.section-fact-block__title) {
-      font-size: 28px;
+      transition: font-size 0.4s ease, line-height 0.4s ease;
     }
 
     .stage__text :global(.section-fact-block__body) {
       font-size: 20px;
       font-weight: 700;
-      transition: font-size 0.4s ease;
-    }
-
-    .stage__text.m-compact :global(.section-fact-block__body) {
-      font-size: 16px;
+      transition: font-size 0.4s ease, line-height 0.4s ease;
     }
 
     .stage__text :global(.section-fact-block__source) {
@@ -1370,18 +1384,41 @@
       font-weight: 700;
     }
 
-    /* ── Cards column: bottom of viewport ── */
+    /* Fase commenti: tipografia compatta + oggetto 3D nello spazio centrale */
+    .stage__text.m-compact {
+      top: 86px;
+    }
+
+    .stage__text.m-compact :global(.section-fact-block) {
+      gap: 10px;
+    }
+
+    .stage__text.m-compact :global(.section-fact-block__title) {
+      font-size: 24px;
+      line-height: 1.1;
+    }
+
+    .stage__text.m-compact :global(.section-fact-block__body) {
+      font-size: 15px;
+      line-height: 1.1;
+    }
+
+    .stage__text.m-compact :global(.section-fact-block__source) {
+      display: none;
+    }
+
+    /* ── Cards column — Figma 656:3090 ── */
     .stage__right {
       position: absolute;
       bottom: 80px;
       left: 0;
       right: 0;
-      padding: 0 22px;
+      padding: 0 18px;
       width: 100%;
       height: auto;
       overflow: visible;
       flex-direction: column;
-      gap: 8px;
+      gap: 14px;
       justify-self: unset;
       z-index: 5;
     }
@@ -1396,6 +1433,7 @@
       font-size: 11px;
       line-height: 1.1;
       color: #333333;
+      text-align: center;
     }
 
     /* Scrollable cards inner container */
@@ -1415,6 +1453,10 @@
     }
 
     /* Ensure cards are visible when the cards panel is open (CSS fallback in case GSAP opacity animation is delayed) */
+    .stage__right.m-cards-visible :global(.card-stack) {
+      gap: 18px;
+    }
+
     .stage__right.m-cards-visible :global(.card-stack__item) {
       opacity: 1;
     }

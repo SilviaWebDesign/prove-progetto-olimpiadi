@@ -5,7 +5,7 @@
   import AboutHotspotCard from '$lib/materiali-home/AboutHotspotCard.svelte';
   import Navbar from '$lib/materiali-home/Navbar.svelte';
   import { preloadMountainGltf } from '$lib/materiali-home/mountainGltf.js';
-  import { preloadAboutMarkerModels } from '$lib/materiali-home/aboutMarkerModels.js';
+  import { preloadAboutMarkerModels } from '$lib/materiali-home/aboutParticleSphere.js';
   import { getNextHotspot, getPrevHotspot } from '$lib/materiali-home/aboutHotspots.js';
   import { overlayVisible } from '$lib/stores/pageTransition';
   import { browser } from '$app/environment';

@@ -64,13 +64,13 @@
   {#if !isMobile}
     <div class="models-row">
       <div class="model-wrap">
-        <ModelViewer src={$visitedSections.sustainability.resultModelPath} fitFactor={0.98} />
+        <ModelViewer src={$visitedSections.sustainability.resultModelPath} fitFactor={0.78} />
       </div>
       <div class="model-wrap">
-        <ModelViewer src={$visitedSections.sport.resultModelPath} fitFactor={1.12} />
+        <ModelViewer src={$visitedSections.sport.resultModelPath} fitFactor={0.88} />
       </div>
       <div class="model-wrap">
-        <ModelViewer src={$visitedSections.infrastructure.resultModelPath} fitFactor={1.12} />
+        <ModelViewer src={$visitedSections.infrastructure.resultModelPath} fitFactor={0.88} />
       </div>
     </div>
   {:else}
@@ -83,14 +83,15 @@
     >
       <!-- Quote above model on mobile (3 lines) -->
       <p class="carousel__quote">
-        La realtà non è mai unica e uguale per tutti.<br>
+        La realtà non è mai unica<br>
+        e uguale per tutti.<br>
         Lo stesso evento può generare visioni<br>
         differenti e soggettive.
       </p>
 
       {#key currentIndex}
         <div class="carousel__model">
-          <ModelViewer src={modelPaths[currentIndex]} fitFactor={1.05} />
+          <ModelViewer src={modelPaths[currentIndex]} fitFactor={0.82} />
         </div>
       {/key}
 
@@ -125,7 +126,8 @@
   {/if}
 
   <p class="quote">
-    La realtà non è mai unica e uguale per tutti.<br>
+    La realtà non è mai unica<br>
+    e uguale per tutti.<br>
     Lo stesso evento può generare visioni differenti e soggettive, in base alle opinioni di ognuno
   </p>
 
@@ -295,8 +297,7 @@
     width: 40px;
     height: 40px;
     border: none;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(6px);
+    background: transparent;
     border-radius: 50%;
     display: flex;
     align-items: center;

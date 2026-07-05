@@ -336,8 +336,9 @@
   const TOPICS_SCALE_MOBILE_CARDS = 0.26;
 
   const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
-    sustainability: { centerBias: 0.56 },
-    sport: { centerBias: 0.50 },
+    sustainability: { centerBias: 0.44 },
+    sport: { centerBias: 0.42 },
+    infrastructure: { centerBias: 0.38 },
   };
 
   function topicsScaleMul(cardsMode = false): number {

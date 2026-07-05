@@ -573,7 +573,8 @@
   function updateMarkerScales() {
     for (const entry of markers) {
       const active = selectedHotspot?.id === entry.hotspot.id;
-      const hovered = hoveredHotspot?.id === entry.hotspot.id;
+      const hovered =
+        !isAboutPanelMobileLayout() && hoveredHotspot?.id === entry.hotspot.id;
       let targetScale = entry.baseScale;
 
       if (active) targetScale = entry.baseScale * ACTIVE_MARKER_SCALE;
@@ -685,6 +686,16 @@
   function onPointerMove(event) {
     if (!renderer || !markerGroup || transitionActive) return;
 
+    if (isAboutPanelMobileLayout()) {
+      if (hoveredHotspot) hoveredHotspot = null;
+      focusParticleHover = false;
+      for (const entry of markers) {
+        resetMarkerParticleScatter(entry.model);
+      }
+      updateCanvasCursor(null);
+      return;
+    }
+
     if (selectedHotspot) {
       const entry = getHotspotMarkerEntry(selectedHotspot);
       updateFocusParticleHover(event.clientX, event.clientY, entry);
@@ -753,6 +764,10 @@
       buildMarkers(_worldBox);
     } else {
       mobileLayout = nextMobileLayout;
+    }
+
+    if (isAboutPanelMobileLayout()) {
+      hoveredHotspot = null;
     }
   }
 

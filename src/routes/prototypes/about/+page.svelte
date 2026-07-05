@@ -18,9 +18,9 @@
   let lastHintTitle = $state('');
   let isMobileExplore = $state(false);
 
-  let hintVisible = $derived(!!hoveredHotspot);
+  let hintVisible = $derived(!!hoveredHotspot && !isMobileExplore);
   let showMobileExploreHint = $derived(isMobileExplore && introDismissed && !selectedHotspot);
-  let showHintOverlay = $derived(hintVisible || showMobileExploreHint);
+  let showHintOverlay = $derived(showMobileExploreHint || hintVisible);
 
   $effect(() => {
     if (hoveredHotspot) {
@@ -115,7 +115,7 @@
     <div
       class="mountain-hover-hint"
       class:visible={showHintOverlay}
-      class:mountain-hover-hint--mobile-explore={showMobileExploreHint && !hintVisible}
+      class:mountain-hover-hint--mobile-explore={showMobileExploreHint}
       aria-live="polite"
       aria-hidden={!showHintOverlay}
     >

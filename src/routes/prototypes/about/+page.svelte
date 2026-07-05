@@ -16,8 +16,11 @@
   let introDismissed = $state(false);
   let introProgress = $state(0);
   let lastHintTitle = $state('');
+  let isMobileExplore = $state(false);
 
   let hintVisible = $derived(!!hoveredHotspot);
+  let showMobileExploreHint = $derived(isMobileExplore && introDismissed && !selectedHotspot);
+  let showHintOverlay = $derived(hintVisible || showMobileExploreHint);
 
   $effect(() => {
     if (hoveredHotspot) {
@@ -59,10 +62,19 @@
     overlayVisible.set(false);
     preloadMountainGltf();
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
+    const mobileMq = window.matchMedia('(max-width: 900px)');
+    const syncMobileExplore = () => {
+      isMobileExplore = mobileMq.matches;
+    };
+    syncMobileExplore();
+    mobileMq.addEventListener('change', syncMobileExplore);
+
     window.addEventListener('wheel', onWheelDismiss, { passive: true });
     window.addEventListener('keydown', onIntroKeydown);
 
     return () => {
+      mobileMq.removeEventListener('change', syncMobileExplore);
       window.removeEventListener('wheel', onWheelDismiss);
       window.removeEventListener('keydown', onIntroKeydown);
       document.body.style.overflow = '';
@@ -102,16 +114,19 @@
   {#if introDismissed && !selectedHotspot}
     <div
       class="mountain-hover-hint"
-      class:visible={hintVisible}
+      class:visible={showHintOverlay}
+      class:mountain-hover-hint--mobile-explore={showMobileExploreHint && !hintVisible}
       aria-live="polite"
-      aria-hidden={!hintVisible}
+      aria-hidden={!showHintOverlay}
     >
-      {#key hoveredHotspot?.id ?? 'none'}
-        <p class="mountain-hover-hint__title">
-          {hoveredHotspot?.title ?? hoveredHotspot?.label ?? lastHintTitle}
-        </p>
-        <p class="mountain-hover-hint__cta">Clicca per sapere di più</p>
-      {/key}
+      {#if hintVisible}
+        {#key hoveredHotspot?.id ?? 'none'}
+          <p class="mountain-hover-hint__title">
+            {hoveredHotspot?.title ?? hoveredHotspot?.label ?? lastHintTitle}
+          </p>
+        {/key}
+      {/if}
+      <p class="mountain-hover-hint__cta">Clicca per sapere di più</p>
     </div>
   {/if}
 
@@ -360,6 +375,18 @@
     }
     50% {
       transform: translateY(5px);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .mountain-hover-hint {
+      top: clamp(88px, 11vh, 112px);
+    }
+
+    .mountain-hover-hint--mobile-explore .mountain-hover-hint__cta {
+      opacity: 0.82;
+      transform: translateY(0);
+      animation: none;
     }
   }
 

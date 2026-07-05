@@ -1,16 +1,14 @@
 <script lang="ts">
   interface Props {
-    counter: string;
     title: string;
     body: string;
     source?: string;
   }
 
-  let { counter, title, body, source }: Props = $props();
+  let { title, body, source }: Props = $props();
 </script>
 
 <div class="text-block">
-  <span class="counter">{counter}</span>
   <h2 class="title">{title}</h2>
   <p class="body-text">{body}</p>
   {#if source}<span class="source">— {source}</span>{/if}
@@ -23,14 +21,6 @@
     flex-direction: column;
     align-items: flex-start;
     gap: clamp(12px, 1.2vw, 16px);
-  }
-
-  .counter {
-    font-family: 'Supreme Variable', sans-serif;
-    font-size: clamp(12px, 1.04vw, 14px);
-    font-weight: 700;
-    color: var(--color-text-primary, #16181D);
-    letter-spacing: 0.04em;
   }
 
   .title {

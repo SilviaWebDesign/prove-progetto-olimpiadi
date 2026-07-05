@@ -1,6 +1,23 @@
 const INTRO =
   'Le Olimpiadi prendono forma attraverso cantieri, impianti e collegamenti tra territori. Queste opere possono essere lette come investimenti utili o come interventi costosi, il cui valore dipende da cosa resterà dopo l’evento.';
 
+const INFRASTRUCTURE_INTRO_CLAIM = [
+  'Le Olimpiadi',
+  'prendono forma',
+  'attraverso cantieri,',
+  'impianti e',
+  'collegamenti tra',
+  'territori. Queste',
+  'opere possono',
+  'essere lette come',
+  'investimenti utili o',
+  'come interventi',
+  'costosi, il cui valore',
+  'dipende da cosa',
+  'resterà dopo',
+  'l’evento.'
+];
+
 const CLAIM =
   'Ogni Olimpiade lascia medaglie, record ed eventi memorabili. Ma lascia anche interpretazioni in conflitto. Qui non troverai un’opinione unica; scoprirai il modo in cui essa prende forma.';
 
@@ -13,39 +30,35 @@ const HERO_ASSETS = {
 };
 
 const SPORT_INTRO_PHRASE =
-  'Le Olimpiadi mettono al centro atleti, discipline e competizione. ' +
-  'Prestazioni, regolamenti e scelte organizzative possono essere letti come esaltazione ' +
-  'dello sport o come segnali di distorsione rispetto ai valori originari.';
+  'Le Olimpiadi vivono grazie a gare, atleti e discipline differenti. Questi eventi possono essere occasioni di crescita e partecipazione oppure competizioni incentrate su visibilità e risultati, in equilibrio tra sportività e spettacolo.';
 
 const SPORT_FACT_BODY =
-  'Milano-Cortina 2026 prevede oltre 100 medaglie in 16 discipline, con sedi che coprono ' +
-  'dalle arena milanesi alle piste dolomitiche. Il Comitato Organizzatore ha promosso programmi ' +
-  'di avvicinamento allo sport nelle scuole e campagne per tifosi e volontari.';
+  'Alysa Liu si presenta come una delle protagoniste più attese del pattinaggio artistico ai Giochi Olimpici Invernali di Milano-Cortina 2026. La sua partecipazione contribuisce a rafforzare l’attenzione internazionale sull’evento, in particolare tra il pubblico più giovane e gli appassionati degli sport su ghiaccio, grazie a uno stile tecnico e spettacolare che ha già segnato diverse competizioni internazionali.';
 
 const SPORT_OPINIONS = [
   {
     quote:
-      '“Le Olimpiadi aumentano la partecipazione sportiva giovanile e l’interesse verso discipline minori.”'
+      '“Sembra divertirsi davvero mentre gareggia, il che ormai è raro negli sport di alto livello, Liu è un ottimo esempio per i giovani atleti.”'
   },
   {
     quote:
-      '“Gli atleti olimpici ispirano intere generazioni e avvicinano lo sport al grande pubblico.”'
+      '“Il suo ritorno in gara dopo il ritiro la rende una delle storie sportive più ispiranti dei Giochi, Alysa è un simbolo di rinascita.”'
   },
   {
     quote:
-      '“Il programma di gare valorizza tradizioni locali come lo sci alpinismo e il curling.”'
+      '“Il suo atteggiamento ‘senza pressione’ rompe gli schemi tradizionali del pattinaggio, rendendo lo sport più moderno e pop.”'
   },
   {
     quote:
-      '“I costi di accesso al top level escludono molti talenti prima ancora delle qualifiche.”'
+      '“La sua storia di discontinuità con lo sport dimostra che non prende sul serio la sua disciplina.”'
   },
   {
     quote:
-      '“La pressione mediatica e agonistica pesa in modo sproporzionato sui giovani atleti.”'
+      '“La sua performance al Gala Olimpico è stata un insulto al pattinaggio artistico, avrebbe dovuto esibirsi su musica classica, non pop.”'
   },
   {
     quote:
-      '“Il medagliere rispecchia più la spesa pubblica per lo sport che il merito puro.”'
+      '“È solo un’atleta come le altre, ma ha ricevuto un’attenzione esagerata da parte dei media, si sentiva parlare solo di lei.”'
   }
 ];
 
@@ -69,10 +82,10 @@ const SUSTAINABILITY_FACT_1_BODY =
   'Milano-Cortina 2026 è stata progettata intorno a un uso esteso di sedi già esistenti o temporanee, al fine di non lasciare “cattedrali nel deserto”, come spesso accade. Secondo la comunicazione ufficiale, circa il 90% delle sedi di gara rientra in questa logica di riuso. Alcuni degli esempi sono lo stadio di San Siro, l’Unipol Forum, e Rho Fiera.';
 
 const SUSTAINABILITY_FACT_2_BODY =
-  'Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l’evento. Il progetto include edifici residenziali, spazi pubblici e una nuova piazza di quartiere.';
+  'Il report ufficiale di sostenibilità stima le emissioni complessive di circa 1.005.000 tonnellate di CO₂ equivalente per la realizzazione dell’evento, suddivise nel seguente modo: 30% per la pianificazione e realizzazione dei Giochi, 29% per la costruzione di infrastrutture permanenti, e 41% per le attività correlate.';
 
 const SUSTAINABILITY_FACT_3_BODY =
-  'Le scelte energetiche e i trasporti collegati ai Giochi sono stati presentati come un modello di efficienza. Il loro impatto reale dipende da come verranno usati impianti e infrastrutture dopo l’evento.';
+  'Le sedi alpine hanno fatto ricorso alla neve tecnica per garantire condizioni adatte alle competizioni. A Livigno sono stati prodotti oltre 600.000 metri cubi di neve da metà dicembre per freestyle e snowboard.';
 
 export const sections = {
   sustainability: {
@@ -94,21 +107,21 @@ export const sections = {
         label: 'sostenibilità · fact 1',
         title: 'Riuso delle sedi',
         body: SUSTAINABILITY_FACT_1_BODY,
-        sources: 'wikipedia, inarcassa'
+        sources: 'simico'
       },
       {
         id: 'fact-2',
         label: 'sostenibilità · fact 2',
-        title: 'Il Villaggio Olimpico',
+        title: 'Impatto climatico',
         body: SUSTAINABILITY_FACT_2_BODY,
-        sources: 'comune di milano, ioc'
+        sources: 'olympics'
       },
       {
         id: 'fact-3',
         label: 'sostenibilità · fact 3',
-        title: 'Energia e trasporti',
+        title: 'Neve artificiale',
         body: SUSTAINABILITY_FACT_3_BODY,
-        sources: 'ministero ambiente'
+        sources: 'reuters'
       }
     ],
     opinionsByFact: [
@@ -116,104 +129,114 @@ export const sections = {
         {
           id: 's1-o1',
           quote:
-            '“La comunicazione riguardo al riuso delle strutture non è stata trasparente, era solo una strategia di marketing.”',
-          sentiment: 'negative'
+            '“Questa scelta favorisce una migliore gestione del territorio, senza stravolgere le aree urbane e montane coinvolte.”',
+          sentiment: 'positive'
         },
         {
           id: 's1-o2',
           quote:
-            '“Il riuso delle sedi esistenti riduce sprechi e impatto ambientale rispetto a costruire ex novo.”',
+            '“In questo modo si evitano investimenti eccessivi in nuove infrastrutture destinate a restare inutilizzate.”',
           sentiment: 'positive'
         },
         {
           id: 's1-o3',
-          quote: '“Il 90% di sedi riutilizzate suona bene, ma i numeri vanno verificati nel dettaglio.”',
-          sentiment: 'negative'
+          quote:
+            '“Usare sedi esistenti è una scelta molto più sensata che costruire tutto da zero, l’impatto ambientale è ridotto significativamente.”',
+          sentiment: 'positive'
         },
         {
           id: 's1-o4',
           quote:
-            '“San Siro e Rho Fiera dimostrano che si può organizzare un evento globale senza nuovi colossi.”',
-          sentiment: 'positive'
+            '“Le Olimpiadi potevano essere un’occasione per costruire nuovi impianti più moderni nelle sedi coinvolte, per restare al passo coi tempi.”',
+          sentiment: 'negative'
         },
         {
           id: 's1-o5',
           quote:
-            '“Il riuso dichiarato non tiene conto degli impatti indotti da cantieri e trasformazioni urbane.”',
+            '“La comunicazione riguardo al riuso delle strutture non è stata trasparente, era solo una strategia di marketing e green-washing.”',
           sentiment: 'negative'
         },
         {
           id: 's1-o6',
           quote:
-            '“Riutilizzare impianti esistenti è la scelta più sensata per ridurre la carbon footprint.”',
-          sentiment: 'positive'
+            '“Molti impianti esistenti rischiano di non essere davvero adeguati agli standard richiesti per le competizioni olimpiche.”',
+          sentiment: 'negative'
         }
       ],
       [
         {
           id: 's2-o1',
           quote:
-            '“Il villaggio olimpico lascerà un patrimonio utile alla città se diventa davvero student housing.”',
+            '“Il fatto che parte delle emissioni sia legata a infrastrutture permanenti suggerisce investimenti utili anche dopo i Giochi.”',
           sentiment: 'positive'
         },
         {
           id: 's2-o2',
-          quote: '“Porta Romana rischia di restare un’isola costosa senza integrazione col quartiere.”',
-          sentiment: 'negative'
+          quote:
+            '“È ammirevole che vengano rilasciate pubblicamente queste informazioni: Olimpiadi trasparenti e sostenibili!”',
+          sentiment: 'positive'
         },
         {
           id: 's2-o3',
-          quote: '“La piazza e gli spazi pubblici possono rigenerare un’area trascurata da anni.”',
+          quote:
+            '“Suddividere le emissioni per fasi consente di individuare con precisione le aree su cui intervenire per ridurre l’impatto ambientale.”',
           sentiment: 'positive'
         },
         {
           id: 's2-o4',
-          quote: '“Gli alloggi post-Giochi non bastano da soli a compensare il disagio dei cantieri.”',
+          quote:
+            '“Un milione di tonnellate di CO₂ sono ancora troppe per poter chiamare queste Olimpiadi ‘sostenibili’.”',
           sentiment: 'negative'
         },
         {
           id: 's2-o5',
           quote:
-            '“La comunicazione sul riuso delle strutture non è stata trasparente, era solo una strategia di marketing.”',
+            '“Possono spacciarla come una conquista, ma bisogna vedere cosa viene considerato nel conteggio, conviene diffidare.”',
           sentiment: 'negative'
         },
         {
           id: 's2-o6',
-          quote: '“Un campus universitario può rilanciare un intero quartiere se ben collegato.”',
-          sentiment: 'positive'
+          quote:
+            '“Un report di sostenibilità non garantisce che le emissioni vengano realmente ridotte nelle fasi operative dell’evento.”',
+          sentiment: 'negative'
         }
       ],
       [
         {
           id: 's3-o1',
-          quote: '“Le politiche green dei Giochi sono un segnale importante per il Paese.”',
+          quote:
+            '“Garantire piste adeguate può avere ricadute positive anche sul turismo invernale delle località coinvolte.”',
           sentiment: 'positive'
         },
         {
           id: 's3-o2',
-          quote: '“Trasporti e energia restano impatti enormi, anche con sedi riusate.”',
-          sentiment: 'negative'
+          quote:
+            '“La scelta di investire nella neve artificiale dimostra la volontà di adattare gli eventi sportivi al cambiamento climatico.”',
+          sentiment: 'positive'
         },
         {
           id: 's3-o3',
-          quote: '“Senza monitoraggio post-evento, le promesse ambientali restano sulla carta.”',
-          sentiment: 'negative'
+          quote:
+            '“La neve tecnica è l’unica soluzione concreta per mantenere vive le località alpine legate agli sport invernali.”',
+          sentiment: 'positive'
         },
         {
           id: 's3-o4',
-          quote: '“Un’Olimpiade può accelerare investimenti in mobilità sostenibile duratura.”',
-          sentiment: 'positive'
+          quote:
+            '“Produrre una tale quantità di metri cubi di neve artificiale comporta un enorme consumo di acqua ed energia.”',
+          sentiment: 'negative'
         },
         {
           id: 's3-o5',
           quote:
-            '“Le promesse green servono più a costruire un’immagine che a cambiare le pratiche.”',
+            '“La necessità di produrre neve artificiale è indicatore di un’edizione dei Giochi poco sostenibile.”',
           sentiment: 'negative'
         },
         {
           id: 's3-o6',
-          quote: '“Monitorare i dati post-Giochi è l’unico modo per giudicare il reale impatto.”',
-          sentiment: 'positive'
+          quote:
+            '“Affidarsi alla neve tecnica per le competizioni renderà sempre meno naturale l’esperienza degli sport invernali.”',
+          sentiment: 'negative'
         }
       ]
     ],
@@ -225,9 +248,10 @@ export const sections = {
     claim: CLAIM,
     featured: {
       title:
-        'Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l’evento. Il progetto include edifici residenziali, spazi pubblici e una nuova piazza di quartiere.',
+        'Il report ufficiale di sostenibilità stima le emissioni complessive di circa 1.005.000 tonnellate di CO₂ equivalente per la realizzazione dell’evento, suddivise nel seguente modo: 30% per la pianificazione e realizzazione dei Giochi, 29% per la costruzione di infrastrutture permanenti, e 41% per le attività correlate.',
       cta: 'Scopri di più',
-      body: 'Il Villaggio Olimpico di Porta Romana è stato progettato per ospitare gli atleti durante i Giochi e diventare student housing dopo l’evento. Il progetto include edifici residenziali, spazi pubblici e una nuova piazza di quartiere.'
+      body:
+        'Il report ufficiale di sostenibilità stima le emissioni complessive di circa 1.005.000 tonnellate di CO₂ equivalente per la realizzazione dell’evento, suddivise nel seguente modo: 30% per la pianificazione e realizzazione dei Giochi, 29% per la costruzione di infrastrutture permanenti, e 41% per le attività correlate.'
     },
     opinions: Array.from({ length: 6 }, () => ({ quote: OPINION_QUOTE })),
     footerBand: true,
@@ -250,10 +274,10 @@ export const sections = {
     introPhrase: SPORT_INTRO_PHRASE,
     claim: CLAIM,
     featured: {
-      title: 'Atleti e competizione',
+      title: 'Alysa Liu',
       cta: 'Scopri di più',
       body: SPORT_FACT_BODY,
-      sources: 'ioc, coni'
+      sources: 'wikipedia'
     },
     opinions: SPORT_OPINIONS,
     footerBand: false,
@@ -273,6 +297,7 @@ export const sections = {
       background: '/images/villaggio.png'
     },
     intro: INTRO,
+    introClaim: INFRASTRUCTURE_INTRO_CLAIM,
     claim: CLAIM,
     featured: {
       title: 'Il villaggio olimpico ha distrutto Porta Romana',

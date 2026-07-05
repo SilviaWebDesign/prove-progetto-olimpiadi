@@ -89,8 +89,8 @@
     filter: blur(6px);
     background-image: radial-gradient(
       ellipse 75% 75% at 22% 50%,
-      rgba(22, 24, 29, 0.26) 0%,
-      rgba(22, 24, 29, 0.06) 60%,
+      rgba(22, 24, 29, 0.14) 0%,
+      rgba(22, 24, 29, 0.03) 60%,
       rgba(255, 255, 255, 0) 100%
     );
   }
@@ -103,17 +103,16 @@
      devices to just default/selected, avoiding a hover state stuck after tap. */
   @media (hover: hover) and (pointer: fine) {
     .comment-card-glass:hover::before {
-      opacity: 1;
+      opacity: 0.5;
     }
 
     .comment-card-glass[data-liked='true']:hover::before {
-      opacity: 1;
+      opacity: 0.5;
     }
 
     .comment-card-glass:hover {
-      transform: translateY(-0.5px);
-      border-color: rgba(22, 24, 29, 0.8);
-      outline-color: rgba(22, 24, 29, 0.8);
+      border-color: rgba(22, 24, 29, 0.62);
+      outline-color: rgba(22, 24, 29, 0.62);
     }
   }
 

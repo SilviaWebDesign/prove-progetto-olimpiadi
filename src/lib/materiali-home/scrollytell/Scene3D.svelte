@@ -9,6 +9,11 @@
   import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+  export interface MobileFitOptions {
+    ratio?: number;
+    centerBias?: number;
+  }
+
   export interface Scene3DApi {
     setRotationY:           (rad: number) => void;
     setScale:               (factor: number) => void;
@@ -20,7 +25,7 @@
     resetPulse:             () => void;
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
-    setMobileFit:           (topPx: number, bottomPx: number) => void;
+    setMobileFit:           (topPx: number, bottomPx: number, options?: MobileFitOptions) => void;
     setMobileLayoutBlend:   (t: number) => void;
     clearMobileFit:         () => void;
   }
@@ -199,11 +204,11 @@
       return;
     }
 
-    particleMat.uniforms.uPointer.value.lerp(_hoverTarget, 0.42);
+    particleMat.uniforms.uPointer.value.lerp(_hoverTarget, 0.28);
     particleMat.uniforms.uHoverStrength.value = THREE.MathUtils.lerp(
       particleMat.uniforms.uHoverStrength.value,
       1,
-      0.28,
+      0.16,
     );
     lastPointerMoveMs = performance.now();
   }
@@ -269,7 +274,7 @@
         }
         resultModelMaterials.forEach(m => { m.opacity = 0; m.visible = false; });
       },
-      setMobileFit: (topPx, bottomPx) => {
+      setMobileFit: (topPx, bottomPx, options = {}) => {
         if (!camera) return;
         mobileFitActive = true;
         const vh        = window.innerHeight;
@@ -277,8 +282,10 @@
         const visibleH  = 2 * Math.tan(fov / 2) * camera.position.z;
         const gapPx     = Math.max(24, bottomPx - topPx);
         const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
-        mobileFitTargetScale = (MOBILE_FIT_RATIO * (gapPx / vh)) / (0.9 * fitFactor);
-        const centerPx = topPx + gapPx * MOBILE_FIT_CENTER_BIAS;
+        const ratio     = options.ratio ?? MOBILE_FIT_RATIO;
+        const centerBias = options.centerBias ?? MOBILE_FIT_CENTER_BIAS;
+        mobileFitTargetScale = (ratio * (gapPx / vh)) / (0.9 * fitFactor);
+        const centerPx = topPx + gapPx * centerBias;
         mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
       setMobileLayoutBlend: (t) => {
@@ -576,9 +583,9 @@
         uPulse:         { value: 0.0 },
         uBaseOpacity:   { value: 0.0 },
         uPointer:       { value: new THREE.Vector3() },
-        uHoverRadius:   { value: 1.8 * INFRA_BS / baseScale },
-        uHoverPush:     { value: 1.5 * INFRA_BS / baseScale },
-        uHoverExpand:   { value: 1.1 * INFRA_BS / baseScale },
+        uHoverRadius:   { value: 1.35 * INFRA_BS / baseScale },
+        uHoverPush:     { value: 0.85 * INFRA_BS / baseScale },
+        uHoverExpand:   { value: 0.55 * INFRA_BS / baseScale },
         uHoverStrength: { value: 0.0 },
       },
       vertexShader: /* glsl */`

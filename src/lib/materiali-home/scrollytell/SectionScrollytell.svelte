@@ -12,17 +12,23 @@
   import CardStack from './CardStack.svelte';
   import type { CardStackApi } from './CardStack.svelte';
   import Scene3D from './Scene3D.svelte';
-  import type { Scene3DApi } from './Scene3D.svelte';
+  import type { MobileFitOptions, Scene3DApi } from './Scene3D.svelte';
 
   import './tokens.css';
   import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
   import { overlayVisible } from '$lib/stores/pageTransition';
+  import {
+    FEEDBACK_HEADING,
+    computeResultKey,
+    computeResultPath,
+    getFeedbackBody,
+  } from './scrollytellConfig.js';
 
   // ── Mobile detection ───────────────────────────────────────────────────────
   let isMobile = $state(false);
 
   interface CardData { id: number; body: string; liked: boolean; }
-  interface TopicData { counter: string; title: string; body: string; source?: string; comments: string[]; }
+  interface TopicData { title: string; body: string; source?: string; comments: string[]; }
 
   interface ScrollytellConfig {
     pageTitle: string;
@@ -55,6 +61,7 @@
   type PagePhase = 'intro' | 'topics' | 'feedback';
   let phase = $state<PagePhase>('intro');
   let currentResultPath = $state<string>('');
+  let currentResultKey = $state<'positivo' | 'negativo' | 'piu-positivo' | 'piu-negativo' | 'neutro'>('neutro');
 
   const cards: CardData[] = $derived(
     topics[currentTopic].comments.map((body, i) => ({
@@ -120,25 +127,11 @@
   }
 
   function computeResult(): string {
-    let totalPositive = 0, totalNegative = 0;
-    for (const tl of topicLikes) {
-      totalPositive += tl.slice(0, 3).filter(Boolean).length;
-      totalNegative += tl.slice(3, 6).filter(Boolean).length;
-    }
-    const [pos, neg, piuPos, piuNeg, neutro] = config.resultPaths;
-    if (totalPositive > 0 && totalNegative === 0) return pos;
-    if (totalNegative > 0 && totalPositive === 0) return neg;
-    if (totalPositive > totalNegative)            return piuPos;
-    if (totalNegative > totalPositive)            return piuNeg;
-    return neutro;
+    return computeResultPath(config.sectionId, topicLikes);
   }
 
-  function getResultLabel(path: string): string {
-    if (path.includes('piu-positivo')) return 'Placeholder testo per il modello maggiormente positivo. La tua visione è prevalentemente ottimista con qualche riserva.';
-    if (path.includes('piu-negativo')) return 'Placeholder testo per il modello maggiormente negativo. La tua visione è prevalentemente critica con qualche apertura.';
-    if (path.includes('positivo'))    return 'Placeholder testo per il modello positivo. Il tuo punto di vista guarda alle opportunità di questo grande evento.';
-    if (path.includes('negativo'))    return 'Placeholder testo per il modello negativo. Il tuo punto di vista si concentra sulle criticità di questo grande evento.';
-    return 'Placeholder testo per il modello neutro. La tua visione è equilibrata tra aspetti positivi e negativi.';
+  function getResultLabel(): string {
+    return getFeedbackBody(config.sectionId, currentResultKey);
   }
 
   async function exitFeedbackPhase() {
@@ -193,6 +186,7 @@
 
     const resultModelPath = computeResult();
     currentResultPath = resultModelPath;
+    currentResultKey = computeResultKey(topicLikes);
     visitedSections.markCompleted(config.sectionId, resultModelPath);
     gsap.to('.layer--bg', { filter: 'blur(12px)', duration: 0.8, ease: 'power2.inOut' });
 
@@ -292,6 +286,14 @@
   const MOBILE_CTA_RESERVE  = 100;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
 
+  const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
+    sport: { ratio: 0.74, centerBias: 0.42 },
+  };
+
+  const MOBILE_SCROLL_SCALE_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], number>> = {
+    sport: 0.30,
+  };
+
   function updateMobileModelFit() {
     if (!isMobile || !scene3d || !stageTextEl) return;
     const textRect = stageTextEl.getBoundingClientRect();
@@ -299,7 +301,7 @@
     const bottomPx = mobileCardsVisible && stageRightEl
       ? stageRightEl.getBoundingClientRect().top - MOBILE_MODEL_MARGIN
       : window.innerHeight - MOBILE_CTA_RESERVE;
-    scene3d.setMobileFit(topPx, bottomPx);
+    scene3d.setMobileFit(topPx, bottomPx, MOBILE_FIT_BY_SECTION[config.sectionId]);
   }
 
   const PARTICLE_SCROLL_START = 0.58;
@@ -656,7 +658,10 @@
       }
 
       threeTl.to(proxy, {
-        scale: isMobile ? 0.40 : 0.56, ease: 'power2.inOut', duration: 0.28,
+        scale: isMobile
+          ? (MOBILE_SCROLL_SCALE_BY_SECTION[config.sectionId] ?? 0.40)
+          : 0.56,
+        ease: 'power2.inOut', duration: 0.28,
         onUpdate: () => scene3d?.setScale(proxy.scale),
       }, 0.46);
 
@@ -812,7 +817,6 @@
         onkeydown={(e) => { if (isMobile && phase === 'topics' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileCardsPanel(); } }}
       >
         <TextBlock
-          counter={topics[currentTopic].counter}
           title={topics[currentTopic].title}
           body={topics[currentTopic].body}
           source={topics[currentTopic].source ?? ''}
@@ -870,10 +874,10 @@
     <!-- Overlay fase feedback -->
     {#if phase === 'feedback'}
       <div class="feedback-top" style="opacity: 0">
-        <p class="feedback-title">Fatti unici, molteplici sguardi.<br>Questa è la realtà plasmata dalla tua opinione.</p>
+        <p class="feedback-title">{FEEDBACK_HEADING.line1}<br>{FEEDBACK_HEADING.line2}</p>
       </div>
       <p class="feedback-subtitle" style="opacity: 0">
-        {getResultLabel(currentResultPath)}
+        {getResultLabel()}
       </p>
       <div
         class="feedback-bottom-cta"
@@ -1050,6 +1054,43 @@
     max-width: 1349px;
     text-align: left;
     font-size: clamp(28px, 4.497vw, 68px);
+    color: #161a1f;
+  }
+
+  .scene--sport .phrase-container {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding-top: clamp(180px, 47.25vh, 464px);
+    padding-left: 18px;
+    padding-right: clamp(24px, 5.556vw, 79px);
+    box-sizing: border-box;
+  }
+
+  .scene--sport .phrase {
+    width: 354px;
+    max-width: min(354px, calc(100% - 36px));
+    text-align: left;
+    font-size: clamp(28px, 4.497vw, 68px);
+    line-height: 1.1;
+    color: #161a1f;
+    word-break: break-word;
+  }
+
+  .scene--infrastructure .phrase-container {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding-top: clamp(180px, 47.25vh, 464px);
+    padding-left: 18px;
+    padding-right: clamp(24px, 5.556vw, 79px);
+    box-sizing: border-box;
+  }
+
+  .scene--infrastructure .phrase {
+    width: 354px;
+    max-width: min(354px, calc(100% - 36px));
+    text-align: left;
+    font-size: clamp(28px, 4.497vw, 68px);
+    line-height: 1.1;
     color: #161a1f;
   }
 
@@ -1279,10 +1320,6 @@
       gap: 16px;
     }
 
-    .stage__text :global(.section-fact-block__counter) {
-      transform: translateY(10px);
-    }
-
     .stage__text :global(.section-fact-block__title) {
       font-size: 36px;
       transition: font-size 0.4s ease;
@@ -1431,6 +1468,14 @@
       width: 100%;
     }
 
+    .scene--sport .phrase,
+    .scene--infrastructure .phrase {
+      width: min(354px, calc(100% - 40px));
+      max-width: 354px;
+      line-height: 1.1;
+      word-break: break-word;
+    }
+
     .phrase--multiline {
       width: min(354px, calc(100% - 40px));
       max-width: 354px;
@@ -1444,6 +1489,13 @@
       padding-top: 100px;
       padding-left: 20px;
       padding-right: 20px;
+    }
+
+    .scene--sport .phrase-container,
+    .scene--infrastructure .phrase-container {
+      padding-top: 100px;
+      padding-left: 18px;
+      padding-right: 18px;
     }
 
     /* ── Feedback overlay adapted ── */

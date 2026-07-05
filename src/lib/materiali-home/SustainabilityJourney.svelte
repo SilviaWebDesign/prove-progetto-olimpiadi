@@ -221,7 +221,6 @@
       onToggleLike={(id) => toggleLike(fact.id, id)}
       showGateHint={scrollGateMessage && likedCount(fact.id) === 0}
       factIndex={activeFactIndex}
-      factCount={section.facts.length}
     />
   {/if}
 

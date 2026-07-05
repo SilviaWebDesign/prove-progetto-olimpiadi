@@ -11,9 +11,14 @@
   import './tokens.css';
   import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
   import { overlayVisible } from '$lib/stores/pageTransition';
+  import {
+    FEEDBACK_HEADING,
+    computeResultKey,
+    computeResultPath,
+    getFeedbackBody,
+  } from './scrollytellConfig.js';
 
   interface TopicData {
-    counter: string;
     title: string;
     body: string;
     source?: string;
@@ -47,6 +52,7 @@
   let phase = $state<'topics' | 'feedback'>('topics');
   let isTransitioning = $state(false);
   let currentResultPath = $state('');
+  let currentResultKey = $state<'positivo' | 'negativo' | 'piu-positivo' | 'piu-negativo' | 'neutro'>('neutro');
   let topicsEl = $state<HTMLDivElement | null>(null);
 
   const anyLikedInCurrent = $derived(topicLikes[currentTopic].some(l => l));
@@ -64,25 +70,11 @@
   }
 
   function computeResult(): string {
-    let totalPositive = 0, totalNegative = 0;
-    for (const tl of topicLikes) {
-      totalPositive += tl.slice(0, 3).filter(Boolean).length;
-      totalNegative += tl.slice(3, 6).filter(Boolean).length;
-    }
-    const [pos, neg, piuPos, piuNeg, neutro] = config.resultPaths;
-    if (totalPositive > 0 && totalNegative === 0) return pos;
-    if (totalNegative > 0 && totalPositive === 0) return neg;
-    if (totalPositive > totalNegative)            return piuPos;
-    if (totalNegative > totalPositive)            return piuNeg;
-    return neutro;
+    return computeResultPath(config.sectionId, topicLikes);
   }
 
-  function getResultLabel(path: string): string {
-    if (path.includes('piu-positivo')) return 'La tua visione è prevalentemente ottimista con qualche riserva.';
-    if (path.includes('piu-negativo')) return 'La tua visione è prevalentemente critica con qualche apertura.';
-    if (path.includes('positivo'))    return 'Il tuo punto di vista guarda alle opportunità di questo grande evento.';
-    if (path.includes('negativo'))    return 'Il tuo punto di vista si concentra sulle criticità di questo grande evento.';
-    return 'La tua visione è equilibrata tra aspetti positivi e negativi.';
+  function getResultLabel(): string {
+    return getFeedbackBody(config.sectionId, currentResultKey);
   }
 
   async function goNext() {
@@ -96,6 +88,7 @@
     } else {
       const resultPath = computeResult();
       currentResultPath = resultPath;
+      currentResultKey = computeResultKey(topicLikes);
       visitedSections.markCompleted(config.sectionId, resultPath);
       phase = 'feedback';
       await tick();
@@ -174,7 +167,6 @@
           <!-- Testo del topic -->
           <div class="mobile-topic__text">
             <SectionFactBlock
-              counter={topics[currentTopic].counter}
               title={topics[currentTopic].title}
               body={topics[currentTopic].body}
               source={topics[currentTopic].source ?? ''}
@@ -231,8 +223,8 @@
       <div class="mobile-feedback" in:fade={{ duration: 400 }}>
 
         <p class="mobile-feedback__headline">
-          Fatti unici, molteplici sguardi.<br>
-          Questa è la realtà plasmata dalla tua opinione.
+          {FEEDBACK_HEADING.line1}<br>
+          {FEEDBACK_HEADING.line2}
         </p>
 
         <div class="mobile-feedback__model" aria-hidden="true">
@@ -240,7 +232,7 @@
         </div>
 
         <p class="mobile-feedback__subtitle">
-          {getResultLabel(currentResultPath)}
+          {getResultLabel()}
         </p>
 
         <button
@@ -378,8 +370,17 @@
     color: #161a1f;
   }
 
-  .mobile-page--sustainability .mobile-phrase {
+  .mobile-page--sustainability .mobile-phrase,
+  .mobile-page--sport .mobile-phrase,
+  .mobile-page--infrastructure .mobile-phrase {
     padding: 52px 18px 40px;
+  }
+
+  .mobile-page--sport .mobile-phrase__text {
+    font-size: 36px;
+    line-height: 1.1;
+    max-width: 354px;
+    word-break: break-word;
   }
 
   /* ── Main content ────────────────────────────────────────────────────────── */

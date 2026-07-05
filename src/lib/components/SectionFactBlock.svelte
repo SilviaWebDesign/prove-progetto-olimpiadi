@@ -1,17 +1,15 @@
 <script lang="ts">
   interface Props {
-    counter: string;
     title: string;
     body: string;
     source: string;
     class?: string;
   }
 
-  let { counter, title, body, source, class: className = '' }: Props = $props();
+  let { title, body, source, class: className = '' }: Props = $props();
 </script>
 
 <div class="section-fact-block {className}">
-  <p class="section-fact-block__counter">{counter}</p>
   <div class="section-fact-block__main">
     <h2 class="section-fact-block__title">{title}</h2>
     <p class="section-fact-block__body">{body}</p>
@@ -28,15 +26,6 @@
     width: min(377px, calc(100vw - 48px));
     color: #000000;
     line-height: 1.1;
-  }
-
-  .section-fact-block__counter {
-    margin: 0;
-    width: 100%;
-    font-family: 'Supreme Variable', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: lowercase;
   }
 
   .section-fact-block__main {

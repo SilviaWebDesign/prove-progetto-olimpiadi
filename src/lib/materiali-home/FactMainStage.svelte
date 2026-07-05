@@ -11,7 +11,6 @@
   /**
    * @type {{
    *   fact: { id: string, label: string, title?: string, body: string, sources: string },
-   *   factCount?: number,
    *   opinions: { id: string, quote: string, sentiment?: string }[],
    *   opacity?: number,
    *   likedIds?: Set<string>,
@@ -27,8 +26,7 @@
     likedIds = new Set(),
     onToggleLike,
     showGateHint = false,
-    factIndex = 0,
-    factCount = 3
+    factIndex = 0
   } = $props();
 
   const frameW = FACT_DOCK_FRAME.width;
@@ -53,7 +51,6 @@
   <div class="fact-main-layout">
     <div class="fact-main-card">
       <SectionFactBlock
-        counter="{factIndex + 1} / {factCount}"
         title={fact.title ?? fact.label}
         body={fact.body}
         source={fact.sources}

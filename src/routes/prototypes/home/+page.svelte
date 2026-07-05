@@ -268,7 +268,7 @@
     --hero-pad-bottom: 52px;
     --hero-pad-x: 20px;
     /* spazio sotto il titolo = hint scroll (allinea i testi narrativi) */
-    --hero-text-lift: 5.25rem;
+    --hero-text-lift: 4.75rem;
     /* Tipografia home — allineata a Figma (node 2:118) */
     --home-title-leading: 1;
     --home-title-tracking: 0;
@@ -340,7 +340,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.75rem;
+    gap: 1.1rem;
     padding-bottom: 0.25rem;
   }
 
@@ -457,13 +457,14 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    padding: 0 14px;
+    padding: 0 14px 10px;
   }
 
   .scroll-hint__label {
     font-size: 12px;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1;
+    margin-top: -4px;
     text-align: center;
     color: #161A1F;
   }
@@ -555,7 +556,7 @@
     }
 
     .hero-lower {
-      gap: 1.25rem;
+      gap: 0.85rem;
     }
 
     .hero-title-stack {

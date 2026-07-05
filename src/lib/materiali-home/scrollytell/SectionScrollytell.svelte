@@ -1093,12 +1093,12 @@
     z-index: 0;
     background-size: cover;
     background-position: center;
-    opacity: 0.28;
+    opacity: 0.10;
     pointer-events: none;
   }
 
-  .scene--sustainability .layer--bg {
-    opacity: 0.16;
+  .layer--frost :global(.sharp) {
+    opacity: 0.10;
   }
 
   /* ── Titolone SVG ──────────────────────────────────────────────────────── */
@@ -1306,7 +1306,7 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    padding: 0 14px;
+    padding: 0 14px 10px;
     opacity: 0.35;
     pointer-events: none;
     cursor: default;
@@ -1323,7 +1323,8 @@
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
     font-size: 12px;
-    line-height: 1.1;
+    line-height: 1;
+    margin-top: -4px;
     color: #161A1F;
     white-space: nowrap;
   }
@@ -1402,7 +1403,7 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    padding: 0 14px;
+    padding: 0 14px 10px;
     cursor: pointer;
     pointer-events: auto;
     white-space: nowrap;
@@ -1421,6 +1422,7 @@
       touch-action: pan-y;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
+      --mobile-cards-bottom: 68px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
     }
 
@@ -1484,7 +1486,7 @@
     /* ── Cards column: bottom of viewport ── */
     .stage__right {
       position: absolute;
-      bottom: 80px;
+      bottom: var(--mobile-cards-bottom);
       left: 0;
       right: 0;
       padding: 0 20px;
@@ -1519,26 +1521,6 @@
       position: relative;
     }
 
-    .stage__right.m-cards-visible .stage__right-scroll-wrap::after {
-      content: '';
-      position: absolute;
-      left: -16px;
-      right: -16px;
-      bottom: 0;
-      height: 20px;
-      pointer-events: none;
-      z-index: 2;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      background: linear-gradient(
-        to bottom,
-        rgba(235, 235, 235, 0) 0%,
-        rgba(235, 235, 235, 0.35) 100%
-      );
-      mask-image: linear-gradient(to bottom, transparent 0%, black 100%);
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 100%);
-    }
-
     .stage__right-scroll {
       height: var(--mobile-cards-scroll-height);
       padding: 4px 16px 14px;
@@ -1559,6 +1541,7 @@
 
     .stage__right :global(.comment-card-glass) {
       max-width: 100%;
+      box-shadow: none;
     }
 
     /* Ensure cards are visible when the cards panel is open (CSS fallback in case GSAP opacity animation is delayed) */
@@ -1571,7 +1554,7 @@
       display: none;
       position: absolute;
       right: 6px;
-      bottom: 80px;
+      bottom: var(--mobile-cards-bottom);
       height: var(--mobile-cards-scroll-height);
       width: 3px;
       background: rgba(22, 26, 31, 0.12);

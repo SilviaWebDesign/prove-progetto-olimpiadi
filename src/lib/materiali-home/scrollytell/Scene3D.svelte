@@ -64,8 +64,8 @@
   let topicsPoseSaved = false;
 
   const MODEL_FIT_FACTOR: Record<string, number> = {
-    '/oggetti/ice_skate.glb': 0.72,
-    '/oggetti/sport.glb': 0.72,
+    '/oggetti/ice_skate.glb': 0.66,
+    '/oggetti/sport.glb': 0.66,
     '/oggetti/pianta.glb': 0.92,
   };
 

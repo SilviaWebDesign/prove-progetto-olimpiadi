@@ -20,7 +20,7 @@
 
   const CARD_OBJECT_SIZE = 2.4;
   const CARD_CAMERA_Z = 3.6;
-  const ICE_SKATE_OBJECT_SIZE = 1.75;
+  const ICE_SKATE_OBJECT_SIZE = 1.62;
 
   /** @type {Record<string, { desiredSize?: number, cameraZ?: number, offsetY?: number, rotationX?: number, rotationY?: number, rotationZ?: number }>} */
   const MODEL_CONFIG = {

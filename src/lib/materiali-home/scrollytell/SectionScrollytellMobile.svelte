@@ -303,7 +303,7 @@
     background-size: cover;
     background-position: center;
     filter: grayscale(1);
-    opacity: 0.28;
+    opacity: 0.10;
     pointer-events: none;
   }
 
@@ -528,6 +528,4 @@
     width: 100%;
   }
 
-  /* ── Hero background variants ─────────────────────────────────────────────── */
-  .mobile-page--sustainability .mobile-hero__bg { opacity: 0.16; }
-</style>
+  /* ── Hero background variants ─────────────────────────────────────────────── */</style>

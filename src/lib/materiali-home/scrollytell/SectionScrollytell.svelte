@@ -283,8 +283,24 @@
 
   // ── Model 3D: adatta posizione/scala allo spazio libero tra testo e commenti (mobile) ──
   const MOBILE_MODEL_MARGIN = 28;
+  const MOBILE_CARDS_MODEL_MARGIN = 14;
   const MOBILE_CTA_RESERVE  = 100;
+  /** Gap tipico testo→commenti su iPhone: normalizza la scala al cambio altezza testo. */
+  const MOBILE_FIT_REFERENCE_GAP = 280;
+  const MOBILE_FIT_RATIO_DEFAULT = 1.16;
+  const MOBILE_CARDS_FIT_RATIO_BASE = 1.55;
+  /** Valori più bassi spostano il modello verso l'alto nel gap commenti. */
+  const MOBILE_CARDS_CENTER_BIAS = 0.40;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
+  /** Altezza viewport scroll commenti: 2 card visibili per volta. */
+  const MOBILE_CARD_AVG_HEIGHT = 96;
+  const MOBILE_CARD_STACK_GAP = 10;
+  const MOBILE_CARDS_SCROLL_PADDING = 18;
+  const MOBILE_VISIBLE_CARD_COUNT = 2;
+  const MOBILE_CARDS_SCROLL_HEIGHT =
+    MOBILE_VISIBLE_CARD_COUNT * MOBILE_CARD_AVG_HEIGHT +
+    (MOBILE_VISIBLE_CARD_COUNT - 1) * MOBILE_CARD_STACK_GAP +
+    MOBILE_CARDS_SCROLL_PADDING;
 
   const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
     sustainability: { centerBias: 0.56 },
@@ -295,15 +311,51 @@
     sport: 0.33,
   };
 
+  function computeMobileFitRatio(gapPx: number, cardsMode: boolean): number {
+    const sectionRatio = MOBILE_FIT_BY_SECTION[config.sectionId]?.ratio;
+    const base = cardsMode
+      ? MOBILE_CARDS_FIT_RATIO_BASE
+      : (sectionRatio ?? MOBILE_FIT_RATIO_DEFAULT);
+    const gapFactor = gapPx / MOBILE_FIT_REFERENCE_GAP;
+    return base * Math.max(0.6, Math.min(1.45, gapFactor));
+  }
+
   function updateMobileModelFit() {
     if (!isMobile || !scene3d || !stageTextEl) return;
+    const margin = mobileCardsVisible ? MOBILE_CARDS_MODEL_MARGIN : MOBILE_MODEL_MARGIN;
     const textRect = stageTextEl.getBoundingClientRect();
-    const topPx = textRect.bottom + MOBILE_MODEL_MARGIN;
+    const topPx = textRect.bottom + margin;
     const bottomPx = mobileCardsVisible && stageRightEl
-      ? stageRightEl.getBoundingClientRect().top - MOBILE_MODEL_MARGIN
+      ? stageRightEl.getBoundingClientRect().top - margin
       : window.innerHeight - MOBILE_CTA_RESERVE;
-    scene3d.setMobileFit(topPx, bottomPx, MOBILE_FIT_BY_SECTION[config.sectionId]);
+    const gapPx = Math.max(24, bottomPx - topPx);
+    const fitOptions = { ...MOBILE_FIT_BY_SECTION[config.sectionId] };
+    fitOptions.ratio = computeMobileFitRatio(gapPx, mobileCardsVisible);
+    if (mobileCardsVisible) {
+      fitOptions.centerBias = MOBILE_CARDS_CENTER_BIAS;
+    }
+    scene3d.setMobileFit(topPx, bottomPx, fitOptions);
+    if (mobileCardsVisible || mobileTopicsScrollComplete) {
+      scene3d.setMobileLayoutBlend(1);
+    }
   }
+
+  $effect(() => {
+    if (!isMobile || !stageTextEl) return;
+    const observer = new ResizeObserver(() => updateMobileModelFit());
+    observer.observe(stageTextEl);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    if (!isMobile || phase !== 'topics') return;
+    currentTopic;
+    mobileCardsVisible;
+    void tick().then(() => {
+      updateMobileModelFit();
+      setTimeout(updateMobileModelFit, 450);
+    });
+  });
 
   const PARTICLE_SCROLL_START = 0.58;
   const PARTICLE_SCROLL_END = 0.98;
@@ -747,7 +799,10 @@
 </svelte:head>
 
 <section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
-  <div class="scene__viewport" class:m-cards-mode={isMobile && mobileCardsVisible}>
+  <div
+    class="scene__viewport"
+    style={isMobile ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px` : undefined}
+  >
 
     <!-- Layer frost -->
     <div class="layer layer--frost">
@@ -1034,7 +1089,7 @@
     text-align: center;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: clamp(34px, 4.5vw, 68px);
+    font-size: 36px;
     line-height: 1.1;
     color: var(--color-text-primary, #000000);
     opacity: 0;
@@ -1054,7 +1109,7 @@
     width: 100%;
     max-width: 1349px;
     text-align: left;
-    font-size: clamp(28px, 4.497vw, 68px);
+    font-size: 36px;
     color: #161a1f;
   }
 
@@ -1071,7 +1126,7 @@
     width: 354px;
     max-width: min(354px, calc(100% - 36px));
     text-align: left;
-    font-size: clamp(28px, 4.497vw, 68px);
+    font-size: 36px;
     line-height: 1.1;
     color: #161a1f;
     word-break: break-word;
@@ -1090,7 +1145,7 @@
     width: 354px;
     max-width: min(354px, calc(100% - 36px));
     text-align: left;
-    font-size: clamp(28px, 4.497vw, 68px);
+    font-size: 36px;
     line-height: 1.1;
     color: #161a1f;
   }
@@ -1284,12 +1339,7 @@
       touch-action: pan-y;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
-    }
-
-    .scene__viewport.m-cards-mode :global(.scene-wrapper) {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
+      --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
     }
 
     .scene {
@@ -1404,7 +1454,7 @@
     }
 
     .stage__right-scroll {
-      height: 309px;
+      height: var(--mobile-cards-scroll-height);
       padding: 4px 16px 14px;
       margin: 0 -16px;
       overflow-y: auto;
@@ -1436,7 +1486,7 @@
       position: absolute;
       right: 6px;
       bottom: 80px;
-      height: 309px;
+      height: var(--mobile-cards-scroll-height);
       width: 3px;
       background: rgba(22, 26, 31, 0.12);
       border-radius: 2px;

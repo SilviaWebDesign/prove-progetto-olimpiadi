@@ -350,7 +350,7 @@
   .mobile-phrase__text {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: clamp(22px, 6vw, 32px);
+    font-size: 36px;
     line-height: 1.2;
     color: #161a1f;
   }

@@ -64,6 +64,7 @@
   const MODEL_FIT_FACTOR: Record<string, number> = {
     '/oggetti/ice_skate.glb': 0.72,
     '/oggetti/sport.glb': 0.72,
+    '/oggetti/pianta.glb': 0.78,
   };
 
   /** Modelli piccoli nel file GLB: crossfade sulle posizioni finali invece del volo dall'origine. */
@@ -73,8 +74,6 @@
     '/oggetti/ice_skate.glb',
     '/oggetti/infrastrutture.glb',
   ]);
-
-  const MODEL_DISABLE_IDLE_SPIN = new Set(['/oggetti/pianta.glb']);
 
   /** Scala e posizione del modello in fase feedback. */
   const DEFAULT_FEEDBACK = { scaleMul: 1.33, yOffset: 0.55, lockSettled: false };
@@ -1059,7 +1058,7 @@
       morphState === 'none' &&
       (transitionState === 'done' ||
         transitionState === 'in' ||
-        (transitionState === 'none' && !MODEL_DISABLE_IDLE_SPIN.has(modelSrc)));
+        transitionState === 'none');
 
     if (spinner && idleSpinAllowed) {
       spinner.rotation.y += IDLE_RAD_S * dt;

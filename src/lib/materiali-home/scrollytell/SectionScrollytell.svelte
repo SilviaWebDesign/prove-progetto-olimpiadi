@@ -303,7 +303,7 @@
     MOBILE_CARDS_SCROLL_PADDING;
 
   const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
-    sustainability: { centerBias: 0.56 },
+    sustainability: { ratio: 1.58, centerBias: 0.56 },
     sport: { ratio: 0.80, centerBias: 0.50 },
   };
 
@@ -703,12 +703,10 @@
         onUpdate: () => scene3d?.setOpacity(proxy.appear),
       }, 0);
 
-      if (config.sectionId !== 'sustainability') {
-        threeTl.to(proxy, {
-          rot: Math.PI * 2, ease: 'none', duration: 0.46,
-          onUpdate: () => scene3d?.setRotationY(proxy.rot),
-        }, 0.06);
-      }
+      threeTl.to(proxy, {
+        rot: Math.PI * 2, ease: 'none', duration: 0.46,
+        onUpdate: () => scene3d?.setRotationY(proxy.rot),
+      }, 0.06);
 
       threeTl.to(proxy, {
         scale: isMobile

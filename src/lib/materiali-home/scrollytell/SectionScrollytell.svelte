@@ -162,6 +162,10 @@
     return getFeedbackBody(config.sectionId, currentResultKey);
   }
 
+  function keepLastWordsTogether(text: string): string {
+    return text.replace(/(\S+)\s+(\S+)\s*$/, '$1\u00A0$2');
+  }
+
   async function exitFeedbackPhase() {
     if (phase !== 'feedback' || isTransitioning) return;
     isTransitioning = true;
@@ -195,6 +199,7 @@
   async function enterFeedbackPhase() {
     if (phase !== 'topics' || isTransitioning || !anyLiked) return;
     isTransitioning = true;
+    scene3d?.clearMobileFit();
 
     const OUT = 0.50;
     const outTl = gsap.timeline();
@@ -209,7 +214,6 @@
     if (isMobile) {
       mobileCardsVisible = false;
       mobileScrollRatio = 0;
-      scene3d?.clearMobileFit();
     }
 
     const resultModelPath = computeResult();
@@ -317,6 +321,8 @@
   const TOPICS_MODEL_MARGIN = 24;
   const TOPICS_CTA_RESERVE  = 100;
   const TOPICS_FIT_CENTER_BIAS = 0.5;
+  /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
+  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.02;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
   /** Altezza viewport scroll commenti: 2 card visibili per volta. */
   const MOBILE_CARD_AVG_HEIGHT = 96;
@@ -373,8 +379,16 @@
       bottomPx = window.innerHeight - TOPICS_CTA_RESERVE - TOPICS_MODEL_MARGIN;
     }
 
-    if (bottomPx - topPx < 48) return;
+    if (bottomPx - topPx < 48) {
+      scene3d.setModelBaseYOffset(0);
+      return;
+    }
 
+    scene3d.setModelBaseYOffset(
+      config.modelSrc === '/oggetti/pianta.glb' && phase === 'topics' && !cardsActive
+        ? PLANT_THEME_TEXT_Y_OFFSET_VH
+        : 0,
+    );
     scene3d.setMobileFit(topPx, bottomPx, { centerBias: TOPICS_FIT_CENTER_BIAS });
     scene3d.setScale(topicsScaleMul(isMobile && mobileCardsVisible));
     if (
@@ -1031,10 +1045,10 @@
     {#if phase === 'feedback'}
       <div class="feedback-overlay">
         <div class="feedback-top" style="opacity: 0">
-          <p class="feedback-title">{FEEDBACK_HEADING.line1}<br>{FEEDBACK_HEADING.line2}</p>
+          <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
         </div>
         <p class="feedback-subtitle" style="opacity: 0">
-          {getResultLabel()}
+          {keepLastWordsTogether(getResultLabel())}
         </p>
         <div
           class="feedback-bottom-cta"
@@ -1394,7 +1408,9 @@
     left: 0;
     right: 0;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
+    padding-left: clamp(24px, 5.556vw, 84px);
+    padding-right: clamp(24px, 5.556vw, 79px);
     pointer-events: none;
   }
 
@@ -1404,8 +1420,9 @@
     font-size: 36px;
     line-height: 1.25;
     color: #16181D;
-    text-align: center;
+    text-align: left;
     white-space: nowrap;
+    text-wrap: balance;
   }
 
   .feedback-subtitle {
@@ -1413,7 +1430,7 @@
     bottom: 120px;
     left: 0;
     right: 0;
-    text-align: center;
+    text-align: left;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 400;
     font-size: 24px;
@@ -1421,8 +1438,9 @@
     color: #16181D;
     pointer-events: none;
     max-width: 780px;
-    margin: 0 auto;
-    padding: 0 clamp(16px, 4vw, 48px);
+    margin: 0;
+    padding: 0 clamp(24px, 5.556vw, 84px);
+    text-wrap: pretty;
   }
 
   .feedback-bottom-cta {
@@ -1651,6 +1669,7 @@
     .feedback-title {
       font-size: 22px;
       white-space: normal;
+      text-align: left;
     }
 
     .feedback-subtitle {
@@ -1658,6 +1677,7 @@
       bottom: 128px;
       padding: 0 20px;
       max-width: 100%;
+      text-align: left;
     }
 
     .stage__cta {

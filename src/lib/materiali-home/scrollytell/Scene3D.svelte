@@ -26,6 +26,7 @@
     returnToParticles:      () => void;
     setMobileFit:           (topPx: number, bottomPx: number, options?: MobileFitOptions) => void;
     setMobileLayoutBlend:   (t: number) => void;
+    setModelBaseYOffset:    (vh: number) => void;
     clearMobileFit:         () => void;
     realignFeedback:        () => void;
   }
@@ -100,6 +101,12 @@
     return 2 * Math.tan(fov / 2) * camera.position.z;
   }
 
+  let modelBaseYOffsetVh = 0;
+
+  function getModelBaseYOffset(): number {
+    return modelBaseYOffsetVh * getCameraVisibleH();
+  }
+
   function resetFeedbackViewCamera() {
     if (!camera) return;
     camera.position.set(0, 0, 6);
@@ -110,12 +117,21 @@
     }
   }
 
-  /** Centra il modello nel viewport. */
-  function centerModelInViewport(group: THREE.Object3D) {
+  /** Centra il modello nel viewport. In feedback blocca il fit topics e preserva la posa. */
+  function centerModelInViewport(group: THREE.Object3D, feedback = false) {
     if (!spinner || !camera) return;
 
+    if (feedback || isFeedbackActive) {
+      mobileFitActive = false;
+      mobileLayoutBlend = 0;
+      modelBaseYOffsetVh = 0;
+    }
+
     spinner.position.set(0, 0, 0);
-    spinner.rotation.set(0, 0, 0);
+    if (!feedback && !isFeedbackActive) {
+      spinner.rotation.set(0, 0, 0);
+    }
+
     resetFeedbackViewCamera();
 
     group.updateMatrixWorld(true);
@@ -137,9 +153,21 @@
     spinner.position.copy(_feedbackPivot).negate();
   }
 
+  function prepareForFeedback() {
+    mobileFitActive = false;
+    mobileLayoutBlend = 0;
+    modelBaseYOffsetVh = 0;
+    if (spinner) {
+      spinner.position.set(0, 0, 0);
+      spinner.rotation.set(0, 0, 0);
+    }
+    resetFeedbackLayout();
+    resetFeedbackViewCamera();
+  }
+
   function realignFeedbackModel() {
-    if (activeResultGroup) centerModelInViewport(activeResultGroup);
-    else if (modelGroup) centerModelInViewport(modelGroup);
+    if (activeResultGroup) centerModelInViewport(activeResultGroup, true);
+    else if (modelGroup) centerModelInViewport(modelGroup, true);
   }
 
   function resetFeedbackLayout() {
@@ -365,10 +393,11 @@
       setMobileLayoutBlend: (t) => {
         mobileLayoutBlend = Math.max(0, Math.min(1, t));
       },
+      setModelBaseYOffset: (vh) => {
+        modelBaseYOffsetVh = vh;
+      },
       clearMobileFit: () => {
-        mobileFitActive = false;
-        mobileLayoutBlend = 0;
-        if (spinner) spinner.position.set(0, 0, 0);
+        prepareForFeedback();
       },
       realignFeedback: () => realignFeedbackModel(),
     };
@@ -728,8 +757,18 @@
       spinner.rotation.set(0, 0, 0);
     }
 
-    if (activeResultGroup) centerModelInViewport(activeResultGroup);
-    else if (modelGroup) centerModelInViewport(modelGroup);
+    if (activeResultGroup) centerModelInViewport(activeResultGroup, true);
+    else if (modelGroup) centerModelInViewport(modelGroup, true);
+
+    if (particleMesh) particleMesh.visible = false;
+    if (activeResultGroup) {
+      resultModelMaterials.forEach((m) => {
+        m.opacity = 1;
+        m.transparent = false;
+        m.visible = true;
+        m.needsUpdate = true;
+      });
+    }
   }
 
   function resetFeedbackCamera() {
@@ -755,7 +794,7 @@
     const center = box.getCenter(new THREE.Vector3());
     modelGroup.position.sub(center);
 
-    centerModelInViewport(modelGroup);
+    centerModelInViewport(modelGroup, true);
   }
 
   function showEnlargedSourceModel(scaleMul: number, onDone: () => void) {
@@ -882,6 +921,7 @@
   }
 
   function morphToResult(path: string, onDone: () => void) {
+    prepareForFeedback();
     resetFeedbackLayout();
     const { scaleMul } = feedbackConfig();
     if (MODEL_FEEDBACK[modelSrc] && path === modelSrc) {
@@ -1105,8 +1145,9 @@
     }
     if (controls?.enabled) controls.update(dt);
 
-    if (mobileFitActive && !isFeedbackActive && spinner) {
-      const targetY = mobileFitFinalOffsetY * mobileLayoutBlend;
+    if (spinner && !isFeedbackActive && feedbackLayoutScale === null && morphState !== 'morphing') {
+      const fitY = mobileFitActive ? mobileFitFinalOffsetY * mobileLayoutBlend : 0;
+      const targetY = fitY + getModelBaseYOffset();
       spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;
     }
 

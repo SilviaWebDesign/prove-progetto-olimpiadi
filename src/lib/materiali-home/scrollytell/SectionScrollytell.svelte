@@ -316,10 +316,6 @@
   const MOBILE_MODEL_MARGIN = 28;
   const MOBILE_CARDS_MODEL_MARGIN = 14;
   const MOBILE_CTA_RESERVE  = 100;
-  /** Gap tipico testo→commenti su iPhone: normalizza la scala al cambio altezza testo. */
-  const MOBILE_FIT_REFERENCE_GAP = 280;
-  const MOBILE_FIT_RATIO_DEFAULT = 1.16;
-  const MOBILE_CARDS_FIT_RATIO_BASE = 1.55;
   /** Valori più bassi spostano il modello verso l'alto nel gap commenti. */
   const MOBILE_CARDS_CENTER_BIAS = 0.40;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
@@ -333,32 +329,20 @@
     (MOBILE_VISIBLE_CARD_COUNT - 1) * MOBILE_CARD_STACK_GAP +
     MOBILE_CARDS_SCROLL_PADDING;
 
+  /** Scala fissa del modello in fase argomenti (stessa per tutte le sezioni). */
+  const TOPICS_SCALE_DESKTOP = 0.56;
+  const TOPICS_SCALE_MOBILE = 0.44;
+  /** Più piccolo quando i commenti sono visibili (meno spazio verticale). */
+  const TOPICS_SCALE_MOBILE_CARDS = 0.26;
+
   const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
-    sustainability: { ratio: 1.25, centerBias: 0.56 },
-    sport: { ratio: 0.80, centerBias: 0.50 },
+    sustainability: { centerBias: 0.56 },
+    sport: { centerBias: 0.50 },
   };
 
-  const MOBILE_SCROLL_SCALE_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], number>> = {
-    sport: 0.33,
-  };
-
-  function computeMobileFitRatio(gapPx: number, cardsMode: boolean): number {
-    const sectionRatio = MOBILE_FIT_BY_SECTION[config.sectionId]?.ratio;
-    const base = cardsMode
-      ? MOBILE_CARDS_FIT_RATIO_BASE
-      : (sectionRatio ?? MOBILE_FIT_RATIO_DEFAULT);
-
-    if (!cardsMode) {
-      let ratio = base;
-      if (config.sectionId === 'sustainability' && gapPx > MOBILE_FIT_REFERENCE_GAP) {
-        const excess = (gapPx - MOBILE_FIT_REFERENCE_GAP) / MOBILE_FIT_REFERENCE_GAP;
-        ratio /= 1 + excess * 0.45;
-      }
-      return ratio;
-    }
-
-    const gapFactor = gapPx / MOBILE_FIT_REFERENCE_GAP;
-    return base * Math.max(0.6, Math.min(1.45, gapFactor));
+  function topicsScaleMul(cardsMode = false): number {
+    if (!isMobile) return TOPICS_SCALE_DESKTOP;
+    return cardsMode ? TOPICS_SCALE_MOBILE_CARDS : TOPICS_SCALE_MOBILE;
   }
 
   function updateMobileModelFit() {
@@ -369,15 +353,12 @@
     const bottomPx = mobileCardsVisible && stageRightEl
       ? stageRightEl.getBoundingClientRect().top - margin
       : window.innerHeight - MOBILE_CTA_RESERVE;
-    const gapPx = Math.max(24, bottomPx - topPx);
     const fitOptions = { ...MOBILE_FIT_BY_SECTION[config.sectionId] };
-    fitOptions.ratio = computeMobileFitRatio(gapPx, mobileCardsVisible);
     if (mobileCardsVisible) {
       fitOptions.centerBias = MOBILE_CARDS_CENTER_BIAS;
-    } else {
-      fitOptions.maxScaleGap = MOBILE_FIT_REFERENCE_GAP;
     }
     scene3d.setMobileFit(topPx, bottomPx, fitOptions);
+    scene3d.setScale(topicsScaleMul(mobileCardsVisible));
     if (mobileCardsVisible || mobileTopicsScrollComplete) {
       scene3d.setMobileLayoutBlend(1);
     }
@@ -745,7 +726,7 @@
       );
       heroTl.to('.phrase, .phrase--multiline', { autoAlpha: 0, y: -20, ease: 'power2.in', duration: 0.15 }, 0.62);
 
-      const proxy = { rot: 0, scale: 1, appear: 0 };
+      const proxy = { rot: 0, scale: topicsScaleMul(), appear: 0 };
 
       const threeTl = gsap.timeline({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -784,21 +765,16 @@
 
       threeTl.fromTo(proxy, { appear: 0 }, {
         appear: 1, duration: 0.12,
-        onUpdate: () => scene3d?.setOpacity(proxy.appear),
+        onUpdate: () => {
+          scene3d?.setOpacity(proxy.appear);
+          scene3d?.setScale(proxy.scale);
+        },
       }, 0);
 
       threeTl.to(proxy, {
         rot: Math.PI * 2, ease: 'none', duration: 0.46,
         onUpdate: () => scene3d?.setRotationY(proxy.rot),
       }, 0.06);
-
-      threeTl.to(proxy, {
-        scale: isMobile
-          ? (MOBILE_SCROLL_SCALE_BY_SECTION[config.sectionId] ?? 0.44)
-          : 0.56,
-        ease: 'power2.inOut', duration: 0.28,
-        onUpdate: () => scene3d?.setScale(proxy.scale),
-      }, 0.46);
 
       threeTl.fromTo('.stage__text',
         { opacity: 0, x: -30 },
@@ -1210,33 +1186,32 @@
     align-items: flex-start;
     justify-content: flex-start;
     padding-top: clamp(200px, 52vh, 500px);
-    padding-left: 18px;
+    padding-left: clamp(24px, 5.556vw, 84px);
     padding-right: clamp(24px, 5.556vw, 79px);
     box-sizing: border-box;
   }
 
   .scene--sport .phrase {
-    width: 354px;
-    max-width: min(354px, calc(100% - 36px));
+    width: 100%;
+    max-width: 1349px;
     text-align: left;
     font-size: 36px;
     line-height: 1.1;
     color: #161a1f;
-    word-break: break-word;
   }
 
   .scene--infrastructure .phrase-container {
     align-items: flex-start;
     justify-content: flex-start;
     padding-top: clamp(200px, 52vh, 500px);
-    padding-left: 18px;
+    padding-left: clamp(24px, 5.556vw, 84px);
     padding-right: clamp(24px, 5.556vw, 79px);
     box-sizing: border-box;
   }
 
   .scene--infrastructure .phrase {
-    width: 354px;
-    max-width: min(354px, calc(100% - 36px));
+    width: 100%;
+    max-width: 1349px;
     text-align: left;
     font-size: 36px;
     line-height: 1.1;
@@ -1246,8 +1221,8 @@
   .phrase--multiline {
     display: flex;
     flex-direction: column;
-    width: min(354px, calc(100% - 40px));
-    max-width: 354px;
+    width: 100%;
+    max-width: 1349px;
   }
 
   .phrase__line {
@@ -1630,34 +1605,21 @@
       width: 100%;
     }
 
-    .scene--sport .phrase,
-    .scene--infrastructure .phrase {
-      width: min(354px, calc(100% - 40px));
-      max-width: 354px;
-      line-height: 1.1;
-      word-break: break-word;
-    }
-
     .phrase--multiline {
-      width: min(354px, calc(100% - 40px));
-      max-width: 354px;
+      width: 100%;
+      max-width: none;
     }
 
     .phrase__line {
       line-height: 1.1;
     }
 
-    .scene--sustainability .phrase-container {
-      padding-top: var(--mobile-phrase-top);
-      padding-left: 20px;
-      padding-right: 20px;
-    }
-
+    .scene--sustainability .phrase-container,
     .scene--sport .phrase-container,
     .scene--infrastructure .phrase-container {
       padding-top: var(--mobile-phrase-top);
-      padding-left: 18px;
-      padding-right: 18px;
+      padding-left: 20px;
+      padding-right: 20px;
     }
 
     /* ── Feedback overlay adapted ── */

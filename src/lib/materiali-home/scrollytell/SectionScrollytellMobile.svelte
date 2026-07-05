@@ -360,7 +360,7 @@
   .mobile-phrase__lines {
     display: flex;
     flex-direction: column;
-    max-width: 354px;
+    width: 100%;
   }
 
   .mobile-phrase__line {
@@ -375,14 +375,14 @@
   .mobile-page--sustainability .mobile-phrase,
   .mobile-page--sport .mobile-phrase,
   .mobile-page--infrastructure .mobile-phrase {
-    padding: 52px 18px 40px;
+    padding: 52px 20px 40px;
   }
 
-  .mobile-page--sport .mobile-phrase__text {
+  .mobile-page--sport .mobile-phrase__text,
+  .mobile-page--infrastructure .mobile-phrase__text {
     font-size: 36px;
     line-height: 1.1;
-    max-width: 354px;
-    word-break: break-word;
+    width: 100%;
   }
 
   /* ── Main content ────────────────────────────────────────────────────────── */

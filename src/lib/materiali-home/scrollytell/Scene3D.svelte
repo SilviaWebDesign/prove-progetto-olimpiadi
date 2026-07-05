@@ -10,10 +10,7 @@
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
   export interface MobileFitOptions {
-    ratio?: number;
     centerBias?: number;
-    /** Limita il gap usato per la scala (non per il posizionamento). */
-    maxScaleGap?: number;
   }
 
   export interface Scene3DApi {
@@ -113,11 +110,7 @@
     }
   }
 
-  /**
-   * Centra il modello nel viewport.
-   * doMorph centra la geometria sull'origine locale del gruppo: allineiamo
-   * quel pivot (non l'AABB) al centro schermo (origine mondo).
-   */
+  /** Centra il modello nel viewport. */
   function centerModelInViewport(group: THREE.Object3D) {
     if (!spinner || !camera) return;
 
@@ -164,11 +157,9 @@
   // ── Mobile viewport fit: modello riposizionato/riscalato nello spazio libero
   // tra testo e commenti, aggiornato via lerp continuo nel render loop ────────
   let mobileFitActive       = false;
-  let mobileFitTargetScale  = 1;
   let mobileFitFinalOffsetY = 0;
   let mobileLayoutBlend     = 0;
   const MOBILE_FIT_LERP = 0.1;
-  const MOBILE_FIT_RATIO = 1.16;
   /** 0.5 = centro del gap; valori più alti spostano il modello verso il basso. */
   const MOBILE_FIT_CENTER_BIAS = 0.64;
 
@@ -367,13 +358,7 @@
         const fov       = camera.fov * (Math.PI / 180);
         const visibleH  = 2 * Math.tan(fov / 2) * camera.position.z;
         const gapPx     = Math.max(24, bottomPx - topPx);
-        const scaleGap  = options.maxScaleGap != null
-          ? Math.min(gapPx, options.maxScaleGap)
-          : gapPx;
-        const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
-        const ratio     = options.ratio ?? MOBILE_FIT_RATIO;
         const centerBias = options.centerBias ?? MOBILE_FIT_CENTER_BIAS;
-        mobileFitTargetScale = (ratio * (scaleGap / vh)) / (0.9 * fitFactor);
         const centerPx = topPx + gapPx * centerBias;
         mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
@@ -383,12 +368,7 @@
       clearMobileFit: () => {
         mobileFitActive = false;
         mobileLayoutBlend = 0;
-        mobileFitTargetScale = 1;
         if (spinner) spinner.position.set(0, 0, 0);
-        if (modelGroup) {
-          const scale = topicsPoseSaved ? topicsPose.modelScale : baseScale;
-          modelGroup.scale.setScalar(scale);
-        }
       },
       realignFeedback: () => realignFeedbackModel(),
     };
@@ -1128,12 +1108,6 @@
     if (mobileFitActive && !isFeedbackActive && spinner) {
       const targetY = mobileFitFinalOffsetY * mobileLayoutBlend;
       spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;
-
-      if (modelGroup && (transitionState === 'none' || transitionState === 'done')) {
-        const currentScale = modelGroup.scale.x / baseScale;
-        const nextScale = currentScale + (mobileFitTargetScale - currentScale) * MOBILE_FIT_LERP;
-        modelGroup.scale.setScalar(baseScale * nextScale);
-      }
     }
 
     decayParticleHover(dt);
@@ -1227,6 +1201,7 @@
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    if (isFeedbackActive) realignFeedbackModel();
   }
 </script>
 

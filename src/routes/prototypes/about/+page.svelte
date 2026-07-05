@@ -5,7 +5,6 @@
   import AboutHotspotCard from '$lib/materiali-home/AboutHotspotCard.svelte';
   import Navbar from '$lib/materiali-home/Navbar.svelte';
   import { preloadMountainGltf } from '$lib/materiali-home/mountainGltf.js';
-  import { preloadAboutMarkerModels } from '$lib/materiali-home/aboutMarkerModels.js';
   import { getNextHotspot, getPrevHotspot } from '$lib/materiali-home/aboutHotspots.js';
   import { overlayVisible } from '$lib/stores/pageTransition';
   import { browser } from '$app/environment';
@@ -27,23 +26,34 @@
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }
 
-  /** @param {WheelEvent} event */
+  /** @param {WheelEvent} [event] */
   function onWheelDismiss(event) {
     if (introDismissed) return;
-    if (event.deltaY <= 0) return;
-    introProgress = Math.min(1, introProgress + event.deltaY / 700);
-    if (introProgress >= 0.72) dismissIntro();
+    if (event && event.deltaY <= 0) return;
+    const delta = event?.deltaY ?? 120;
+    introProgress = Math.min(1, introProgress + delta / 500);
+    if (introProgress >= 0.55) dismissIntro();
+  }
+
+  /** @param {KeyboardEvent} event */
+  function onIntroKeydown(event) {
+    if (introDismissed) return;
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      dismissIntro();
+    }
   }
 
   onMount(() => {
     overlayVisible.set(false);
     preloadMountainGltf();
-    preloadAboutMarkerModels();
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     window.addEventListener('wheel', onWheelDismiss, { passive: true });
+    window.addEventListener('keydown', onIntroKeydown);
 
     return () => {
       window.removeEventListener('wheel', onWheelDismiss);
+      window.removeEventListener('keydown', onIntroKeydown);
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
@@ -96,19 +106,36 @@
   {/if}
 
   {#if !introDismissed}
-    <section class="intro-screen" onwheel={onWheelDismiss}>
+    <section
+      class="intro-screen"
+      onwheel={onWheelDismiss}
+      onkeydown={onIntroKeydown}
+      tabindex="0"
+      aria-label="Introduzione about"
+    >
       <div class="intro-backdrop" style="opacity: {introBgOpacity}" aria-hidden="true"></div>
 
       <div class="intro-content" style="opacity: {introTextOpacity}">
         <p class="intro-message">
-          Esplora la montagna per avere più informazioni sul progetto
+          Esplora la montagna per avere più informazioni sul progetto.
         </p>
       </div>
 
-      <div class="scroll-hint" style="opacity: {introTextOpacity}">
-        <span class="arrow" aria-hidden="true">↓</span>
-        <span class="text">Scorri per continuare</span>
-      </div>
+      <button
+        type="button"
+        class="scroll-hint"
+        style="opacity: {introTextOpacity}"
+        onclick={(event) => {
+          event.stopPropagation();
+          dismissIntro();
+        }}
+      >
+        <span class="scroll-hint__label">Continua</span>
+        <svg class="scroll-hint__chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
+          <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </section>
   {/if}
 </div>
@@ -182,35 +209,41 @@
   }
 
   .scroll-hint {
+    font-family: 'Supreme Variable', sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.45rem;
+    gap: 10px;
+    padding: 0 14px 10px;
     flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
   }
 
-  .scroll-hint .arrow {
-    font-size: 1rem;
-    color: #000000;
-    animation: bounce 2s infinite;
-  }
-
-  .scroll-hint .text {
-    font-family: 'Supreme Variable', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+  .scroll-hint__label {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    margin-top: -4px;
+    text-align: center;
     color: #161a1f;
   }
 
-  @keyframes bounce {
+  .scroll-hint__chevron {
+    display: block;
+    width: 21px;
+    height: 9px;
+    animation: chevron-bounce 1.4s ease-in-out infinite;
+  }
+
+  @keyframes chevron-bounce {
     0%,
     100% {
       transform: translateY(0);
     }
     50% {
-      transform: translateY(6px);
+      transform: translateY(5px);
     }
   }
 

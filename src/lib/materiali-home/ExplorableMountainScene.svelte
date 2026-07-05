@@ -28,16 +28,15 @@
     panFocusToViewportX
   } from './aboutHotspots.js';
   import {
-    preloadAboutMarkerModels,
-    cloneMarkerModel,
+    createMarkerParticleSphere,
     applyMarkerMaterial,
     disposeMarkerGeometries,
-    orientMarkerTowardWorldPoint
+    orientMarkerTowardWorldPoint,
+    updateMarkerParticlePulse
   } from './aboutMarkerModels.js';
 
-  const FOCUS_CAMERA_ZOOM = 1.45;
+  const FOCUS_CAMERA_ZOOM = 1.08;
   const CAMERA_TRANSITION_MS = 900;
-  const MARKER_SPIN_SPEED = 0.65;
 
   const smogColor = '#ffffff';
 
@@ -122,12 +121,12 @@
     controls.target.copy(_heroLookAt);
   }
 
-  /** Imposta limiti verticali ampi (solo init e dopo transizioni). */
+  /** Impedisce di ruotare la camera sotto la montagna. */
   function setupOrbitPolarLimits() {
     if (!controls || !camera || !controls.target) return;
 
     controls.minPolarAngle = 0.25;
-    controls.maxPolarAngle = Math.PI / 2 + 0.62;
+    controls.maxPolarAngle = Math.PI / 2 - 0.1;
   }
 
   function applyFocusOrbitLimits() {
@@ -135,6 +134,17 @@
     const dist = focusCameraDistance(_worldBox);
     controls.minDistance = dist * 0.55;
     controls.maxDistance = dist * 1.3;
+    setupOrbitPolarLimits();
+  }
+
+  /** Mantiene la camera sopra la linea neve anche dopo drag/zoom. */
+  function clampCameraAboveSnow() {
+    if (!camera || !controls || cameraFloorY == null) return;
+    if (camera.position.y >= cameraFloorY) return;
+
+    camera.position.y = cameraFloorY;
+    camera.lookAt(controls.target);
+    controls.update();
   }
 
   /** @returns {{ cam: THREE.Vector3; target: THREE.Vector3 }} */
@@ -289,33 +299,6 @@
     }
   }
 
-  /** @param {number} now */
-  function updateMarkerSpin(now) {
-    const delta = lastAnimationTime ? Math.min((now - lastAnimationTime) / 1000, 0.05) : 0;
-    lastAnimationTime = now;
-    if (delta === 0) return;
-
-    for (const entry of markers) {
-      entry.model.rotation.y += entry.spinSpeed * delta;
-    }
-  }
-
-  function updateMarkerOrientations() {
-    if (!camera) return;
-    for (const entry of markers) {
-      const pos = entry.object.position;
-      const dx = camera.position.x - pos.x;
-      const dz = camera.position.z - pos.z;
-      if (dx * dx + dz * dz < 1e-8) continue;
-
-      if (selectedHotspot?.id === entry.hotspot.id) {
-        orientMarkerTowardWorldPoint(entry.object, entry.hotspot.modelSrc, camera.position);
-      } else {
-        entry.object.rotation.y = Math.atan2(dx, dz);
-      }
-    }
-  }
-
   /** @param {THREE.Box3} worldBox */
   async function buildMarkers(worldBox) {
     if (!scene || !markerGroup || !snowMountainModel) return;
@@ -325,8 +308,6 @@
       disposeMarkerGeometries(entry.object);
     }
     markers = [];
-
-    await preloadAboutMarkerModels();
 
     /** @type {THREE.Vector3[]} */
     const positions = [];
@@ -349,16 +330,15 @@
 
     for (let index = 0; index < ABOUT_HOTSPOT_PATH.length; index++) {
       const hotspot = ABOUT_HOTSPOT_PATH[index];
-      const model = await cloneMarkerModel(hotspot.modelSrc);
+      const model = createMarkerParticleSphere(hotspot.modelSrc);
       const root = new THREE.Group();
       root.add(model);
       root.position.copy(positions[index]);
       root.userData.hotspot = hotspot;
       markerGroup.add(root);
-      markers.push({ object: root, model, hotspot, baseScale: 1, spinSpeed: MARKER_SPIN_SPEED });
+      markers.push({ object: root, model, hotspot, baseScale: 1, spinSpeed: 0 });
     }
 
-    updateMarkerOrientations();
     updateMarkerSelection();
   }
 
@@ -409,7 +389,15 @@
     if (paused) return;
 
     const now = performance.now();
-    updateMarkerSpin(now);
+
+    for (const entry of markers) {
+      const active = selectedHotspot?.id === entry.hotspot.id;
+      updateMarkerParticlePulse(
+        entry.model,
+        now * 0.001 + entry.hotspot.azimuth * 4,
+        active
+      );
+    }
 
     if (controls && cameraReady) {
       controls.enabled = !transitionActive;
@@ -419,7 +407,7 @@
       updateCameraTransition(now);
     } else {
       controls?.update();
-      updateMarkerOrientations();
+      clampCameraAboveSnow();
     }
 
     renderer.render(scene, camera);
@@ -552,6 +540,9 @@
       window.addEventListener('resize', resizeRenderer);
       document.addEventListener('visibilitychange', onVisibilityChange);
 
+      resizeRenderer();
+      animate();
+
       try {
         const gltf = await preloadMountainGltf();
         if (gen !== initGeneration || !scene || !controls || !camera) return;
@@ -570,7 +561,12 @@
           topDownHeight
         );
         cameraFloorY = snowField.y - 0.2;
-        await buildMarkers(_worldBox);
+
+        try {
+          await buildMarkers(_worldBox);
+        } catch (markerErr) {
+          console.error('[ExplorableMountainScene] creazione marker fallita:', markerErr);
+        }
 
         applyHomeHeroCamera(camera, homeOrbitConfig, _heroLookAt);
         controls.target.copy(_heroLookAt);
@@ -582,7 +578,6 @@
         lastSelectedHotspotId = selectedHotspot?.id ?? null;
 
         resizeRenderer();
-        animate();
       } catch (err) {
         console.error('[ExplorableMountainScene] caricamento montagna fallito:', err);
       }

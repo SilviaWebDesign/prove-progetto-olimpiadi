@@ -1,136 +1,165 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { ABOUT_HOTSPOT_PATH } from './aboutHotspots.js';
 
-const DEFAULT_MARKER_SIZE = 1.85;
+const DEFAULT_MARKER_SIZE = 1.15;
+const MARKER_RADIUS = DEFAULT_MARKER_SIZE / 2;
+const PARTICLE_COUNT = 4500;
 
-/** Solo orientamento locale; la scala è uguale per tutti i modelli. */
-/** @type {Record<string, { rotationY?: number }>} */
-export const ABOUT_MARKER_MODEL_CONFIG = {
-  '/oggetti/scii.glb': { rotationY: Math.PI / 4 },
-  '/oggetti/bobsled.glb': { rotationY: -Math.PI / 2 }
-};
+/** Stessi riferimenti visivi di Scene3D / infrastrutture. */
+const INFRA_BS = 0.6405;
+const PARTICLE_RADIUS = (0.012 * INFRA_BS) / DEFAULT_MARKER_SIZE;
+const PULSE_DIR_SCALE = (8 * INFRA_BS) / DEFAULT_MARKER_SIZE;
+const IDLE_PULSE_SPEED = 0.65;
+const BASE_OPACITY = 0.85;
+const ACTIVE_OPACITY = 0.95;
 
-export const MARKER_MATERIAL = new THREE.MeshStandardMaterial({
-  color: 0x8a8d94,
-  metalness: 0.92,
-  roughness: 0.28,
-  fog: true
-});
+/**
+ * @param {number} count
+ * @param {number} radius
+ * @returns {Float32Array}
+ */
+function sampleSphereSurface(count, radius) {
+  const positions = new Float32Array(count * 3);
+  const golden = Math.PI * (3 - Math.sqrt(5));
 
-export const MARKER_MATERIAL_ACTIVE = new THREE.MeshStandardMaterial({
-  color: 0x6d7078,
-  metalness: 0.92,
-  roughness: 0.28,
-  fog: true
-});
+  for (let i = 0; i < count; i++) {
+    const t = i / Math.max(count - 1, 1);
+    const inclination = Math.acos(1 - 2 * t);
+    const azimuth = golden * i;
+    const sinInc = Math.sin(inclination);
 
-/** @type {Map<string, Promise<THREE.Object3D>>} */
-const loadCache = new Map();
+    positions[i * 3] = radius * sinInc * Math.cos(azimuth);
+    positions[i * 3 + 1] = radius * Math.cos(inclination);
+    positions[i * 3 + 2] = radius * sinInc * Math.sin(azimuth);
+  }
 
-/** @param {string} url */
-function getMarkerConfig(url) {
-  return {
-    size: DEFAULT_MARKER_SIZE,
-    rotationY: 0,
-    yOffset: 0,
-    ...ABOUT_MARKER_MODEL_CONFIG[url]
-  };
+  return positions;
 }
 
-/** @param {THREE.Object3D} object @param {string} url */
-function fitMarkerModel(object, url) {
-  const cfg = getMarkerConfig(url);
-  const box = new THREE.Box3().setFromObject(object);
-  const size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  const scaleFactor = cfg.size / Math.max(size.x, size.y, size.z);
+/**
+ * @param {boolean} active
+ * @returns {THREE.InstancedMesh}
+ */
+function buildParticleSphereMesh(active = false) {
+  const targets = sampleSphereSurface(PARTICLE_COUNT, MARKER_RADIUS * 0.96);
+  const directions = new Float32Array(PARTICLE_COUNT * 3);
 
-  object.scale.setScalar(scaleFactor);
-  object.position.set(
-    -center.x * scaleFactor,
-    -center.y * scaleFactor + cfg.yOffset,
-    -center.z * scaleFactor
-  );
-  if (cfg.rotationY) object.rotation.y = cfg.rotationY;
-  object.updateMatrixWorld(true);
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    directions[i * 3] = (Math.random() - 0.5) * PULSE_DIR_SCALE;
+    directions[i * 3 + 1] = (Math.random() - 0.5) * PULSE_DIR_SCALE;
+    directions[i * 3 + 2] = (Math.random() - 0.5) * PULSE_DIR_SCALE;
+  }
 
-  const fittedBox = new THREE.Box3().setFromObject(object);
-  const fittedCenter = fittedBox.getCenter(new THREE.Vector3());
-  object.position.x -= fittedCenter.x;
-  object.position.z -= fittedCenter.z;
-  // Appoggia la base del modello su y=0 (non il centro del bounding box)
-  object.position.y -= fittedBox.min.y;
-  object.position.y += cfg.yOffset;
+  const geo = new THREE.SphereGeometry(PARTICLE_RADIUS, 4, 4);
+  geo.setAttribute('aDirection', new THREE.InstancedBufferAttribute(directions, 3));
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uPulse: { value: 0.0 },
+      uBaseOpacity: { value: active ? ACTIVE_OPACITY : BASE_OPACITY }
+    },
+    vertexShader: /* glsl */ `
+      attribute vec3 aDirection;
+      uniform float uPulse;
+      void main() {
+        vec3 p = position + aDirection * uPulse;
+        gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uPulse;
+      uniform float uBaseOpacity;
+      void main() {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, uBaseOpacity + uPulse * 0.5);
+      }
+    `,
+    transparent: true,
+    depthWrite: false
+  });
+
+  const mesh = new THREE.InstancedMesh(geo, material, PARTICLE_COUNT);
+  mesh.frustumCulled = false;
+  mesh.userData.isMarkerParticles = true;
+
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3();
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    position.set(targets[i * 3], targets[i * 3 + 1], targets[i * 3 + 2]);
+    matrix.makeTranslation(position.x, position.y, position.z);
+    mesh.setMatrixAt(i, matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+
+  return mesh;
 }
 
-/** @param {string} url */
-export function getMarkerFrontYawOffset(url) {
-  return getMarkerConfig(url).rotationY ?? 0;
-}
-
-/** @param {THREE.Object3D} markerRoot @param {string} modelSrc @param {THREE.Vector3} worldPoint */
-export function orientMarkerTowardWorldPoint(markerRoot, modelSrc, worldPoint) {
+/** @param {THREE.Object3D} markerRoot @param {string} [_modelSrc] @param {THREE.Vector3} worldPoint */
+export function orientMarkerTowardWorldPoint(markerRoot, _modelSrc, worldPoint) {
   const pos = markerRoot.position;
   const dx = worldPoint.x - pos.x;
   const dz = worldPoint.z - pos.z;
   if (dx * dx + dz * dz < 1e-8) return;
-  markerRoot.rotation.y = Math.atan2(dx, dz) - getMarkerFrontYawOffset(modelSrc);
+  markerRoot.rotation.y = Math.atan2(dx, dz);
 }
 
 /** @param {THREE.Object3D} object @param {boolean} active */
 export function applyMarkerMaterial(object, active = false) {
-  const material = active ? MARKER_MATERIAL_ACTIVE : MARKER_MATERIAL;
   object.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) return;
-    if (child.geometry?.attributes?.color) {
-      child.geometry.deleteAttribute('color');
-    }
-    child.material = material;
+    if (!(child instanceof THREE.InstancedMesh) || !child.userData.isMarkerParticles) return;
+    const mat = child.material;
+    if (!(mat instanceof THREE.ShaderMaterial)) return;
+    mat.uniforms.uBaseOpacity.value = active ? ACTIVE_OPACITY : BASE_OPACITY;
   });
 }
 
-/** @param {string} url */
-function loadMarkerTemplate(url) {
-  if (!loadCache.has(url)) {
-    loadCache.set(
-      url,
-      new Promise((resolve, reject) => {
-        const loader = new GLTFLoader();
-        loader.load(
-          url,
-          (gltf) => {
-            const model = gltf.scene;
-            fitMarkerModel(model, url);
-            applyMarkerMaterial(model, false);
-            resolve(model);
-          },
-          undefined,
-          reject
-        );
-      })
-    );
-  }
-  return loadCache.get(url);
+/** @param {THREE.Object3D} object @param {number} elapsedSeconds @param {boolean} [active] */
+export function updateMarkerParticlePulse(object, elapsedSeconds, active = false) {
+  const pulseAmp = active ? 0.06 : 0.04;
+  const pulse = Math.abs(Math.sin(elapsedSeconds * Math.PI * IDLE_PULSE_SPEED)) * pulseAmp;
+
+  object.traverse((child) => {
+    if (!(child instanceof THREE.InstancedMesh) || !child.userData.isMarkerParticles) return;
+    const mat = child.material;
+    if (!(mat instanceof THREE.ShaderMaterial)) return;
+    mat.uniforms.uPulse.value = pulse;
+  });
 }
 
 export function preloadAboutMarkerModels() {
-  const urls = [...new Set(ABOUT_HOTSPOT_PATH.map((hotspot) => hotspot.modelSrc))];
-  return Promise.all(urls.map((url) => loadMarkerTemplate(url)));
+  return Promise.resolve();
 }
 
-/** @param {string} url @param {boolean} [active] */
-export async function cloneMarkerModel(url, active = false) {
-  const template = await loadMarkerTemplate(url);
-  const model = template.clone(true);
-  applyMarkerMaterial(model, active);
-  return model;
+/** @param {string} [_url] @param {boolean} [active] */
+export function createMarkerParticleSphere(_url, active = false) {
+  const group = new THREE.Group();
+
+  const particles = buildParticleSphereMesh(active);
+  particles.position.y = MARKER_RADIUS;
+  group.add(particles);
+
+  const hit = new THREE.Mesh(
+    new THREE.SphereGeometry(MARKER_RADIUS * 0.9, 14, 14),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hit.position.y = MARKER_RADIUS;
+  group.add(hit);
+
+  return group;
 }
+
+/** Compatibilità con il vecchio nome. */
+export const cloneMarkerModel = createMarkerParticleSphere;
 
 /** @param {THREE.Object3D} object */
 export function disposeMarkerGeometries(object) {
   object.traverse((child) => {
+    if (child instanceof THREE.InstancedMesh) {
+      child.geometry?.dispose();
+      child.material?.dispose();
+      return;
+    }
     if (!(child instanceof THREE.Mesh)) return;
     child.geometry?.dispose();
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach((m) => m.dispose());
   });
 }

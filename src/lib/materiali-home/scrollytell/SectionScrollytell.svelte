@@ -287,6 +287,7 @@
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
 
   const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
+    sustainability: { centerBias: 0.56 },
     sport: { ratio: 0.80, centerBias: 0.50 },
   };
 

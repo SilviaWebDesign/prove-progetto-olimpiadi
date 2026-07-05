@@ -983,7 +983,8 @@
 
     </div>
 
-    <!-- CTA in basso al centro -->
+    <!-- CTA in basso al centro (nascosto in feedback: usa feedback-bottom-cta) -->
+    {#if phase !== 'feedback'}
     <div class="stage__cta">
       <div
         class="stage__cta-content"
@@ -1007,6 +1008,7 @@
         </svg>
       </div>
     </div>
+    {/if}
 
     <!-- Mobile scroll indicator -->
     <div

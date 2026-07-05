@@ -8,12 +8,12 @@
     preloadMountainGltf,
     waitForContainerSize,
     buildHomeOrbitConfig,
-    applyHomeHeroCamera,
     homeOrbitDistanceLimits,
     setupMountainRenderMaterials,
     HOME_CAM_Y_LOW,
     HOME_CAMERA_Z_START,
-    HOME_HERO_ZOOM
+    HOME_HERO_ZOOM,
+    HOME_LOOK_AT_Y_OFFSET
   } from './mountainGltf.js';
   import {
     ABOUT_HOTSPOT_PATH,
@@ -35,7 +35,9 @@
     createMarkerParticleSphere,
     applyMarkerMaterial,
     disposeMarkerGeometries,
-    updateMarkerParticlePulse
+    updateMarkerParticlePulse,
+    updateMarkerParticleScatter,
+    resetMarkerParticleScatter
   } from './aboutMarkerModels.js';
 
   const FOCUS_CAMERA_ZOOM = 1.08;
@@ -43,8 +45,22 @@
   const HERO_TRANSITION_MS = 1400;
   /** Vista iniziale about: lato opposto rispetto alla home. */
   const ABOUT_HERO_ANGLE_OFFSET = Math.PI;
-  /** Zoom hero about (più basso = montagna più lontana). */
+  /** Zoom hero about (invariato). */
   const ABOUT_HERO_ZOOM = HOME_HERO_ZOOM * 0.82;
+  /**
+   * Angolo polare hero about (radianti): più basso = vista più dall'alto.
+   * La home è ~1.55–1.65; qui ~0.95 per inclinare senza zoom né avvicinamento.
+   */
+  const ABOUT_HERO_POLAR = 1.12;
+
+  const HOVER_MARKER_SCALE = 1.14;
+  const HOVER_SCALE_LERP = 0.28;
+  const MARKER_SCALE_LERP = 0.14;
+  const ACTIVE_MARKER_SCALE = 1.22;
+  const MARKER_FLOAT_AMPLITUDE = 0.24;
+  const MARKER_FLOAT_SPEED = 0.42;
+  const FOCUS_FLOAT_SPEED = 0.15;
+  const FOCUS_MOTION_PHASE_SCALE = 0.32;
 
   /** Pan viewport applicato all'ultimo focus (per smontarlo in deselezione). */
   const storedFocusPan = {
@@ -62,8 +78,8 @@
 
   const smogColor = '#ffffff';
 
-  /** @type {{ selectedHotspot?: import('./aboutHotspots.js').AboutHotspot | null }} */
-  let { selectedHotspot = $bindable(null) } = $props();
+  /** @type {{ selectedHotspot?: import('./aboutHotspots.js').AboutHotspot | null; hoveredHotspot?: import('./aboutHotspots.js').AboutHotspot | null }} */
+  let { selectedHotspot = $bindable(null), hoveredHotspot = $bindable(null) } = $props();
 
   /** @type {HTMLDivElement | undefined} */
   let container = $state(undefined);
@@ -112,8 +128,12 @@
   const _camOffset = new THREE.Vector3();
   const _camSpherical = new THREE.Spherical();
   const _centerSpherical = new THREE.Spherical();
-  const MOUNTAIN_MIN_POLAR = 0.25;
+  /** Min polare about: consente inclinazione più dall'alto rispetto alla home. */
+  const MOUNTAIN_MIN_POLAR = 0.15;
   const MOUNTAIN_MAX_POLAR = Math.PI / 2 - 0.1;
+  const _refCam = new THREE.Vector3();
+  const _refTarget = new THREE.Vector3();
+  let focusParticleHover = false;
   /** Quota minima camera (linea neve / base render). */
   /** @type {number | null} */
   let cameraFloorY = null;
@@ -152,6 +172,38 @@
     const limits = homeOrbitDistanceLimits(homeOrbitConfig);
     controls.minDistance = limits.min;
     controls.maxDistance = limits.max;
+  }
+
+  /**
+   * Pose hero about: stessa distanza/zoom, vista più dall'alto.
+   * @param {THREE.PerspectiveCamera} cam
+   * @param {ReturnType<typeof buildHomeOrbitConfig>} orbitConfig
+   * @param {THREE.Vector3} targetOut
+   */
+  function applyAboutHeroCamera(cam, orbitConfig, targetOut) {
+    const angle = orbitConfig.startAngle;
+    const lookAt = targetOut.copy(orbitConfig.center);
+
+    _refTarget.copy(orbitConfig.center).add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
+    _refCam.set(
+      orbitConfig.center.x + Math.sin(angle) * orbitConfig.radius,
+      orbitConfig.orbitY,
+      orbitConfig.center.z + Math.cos(angle) * orbitConfig.radius
+    );
+    const distance = _refCam.distanceTo(_refTarget);
+
+    _camSpherical.radius = distance;
+    _camSpherical.phi = ABOUT_HERO_POLAR;
+    _camSpherical.theta = angle;
+    _camOffset.setFromSpherical(_camSpherical);
+    cam.position.copy(lookAt).add(_camOffset);
+
+    cam.zoom = ABOUT_HERO_ZOOM;
+    cam.updateProjectionMatrix();
+    cam.up.set(0, 1, 0);
+    cam.lookAt(lookAt);
+
+    return lookAt;
   }
 
   /** @param {OrbitControls} ctrl */
@@ -361,19 +413,38 @@
     }
 
     const angle = homeOrbitConfig.startAngle;
+    const lookAt = _heroLookAt.clone().copy(homeOrbitConfig.center);
+    _refTarget.copy(homeOrbitConfig.center).add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
+    _refCam.set(
+      homeOrbitConfig.center.x + Math.sin(angle) * homeOrbitConfig.radius,
+      homeOrbitConfig.orbitY,
+      homeOrbitConfig.center.z + Math.cos(angle) * homeOrbitConfig.radius
+    );
+    const distance = _refCam.distanceTo(_refTarget);
+    _camSpherical.radius = distance;
+    _camSpherical.phi = ABOUT_HERO_POLAR;
+    _camSpherical.theta = angle;
+    _camOffset.setFromSpherical(_camSpherical);
     return {
-      cam: new THREE.Vector3(
-        homeOrbitConfig.center.x + Math.sin(angle) * homeOrbitConfig.radius,
-        homeOrbitConfig.orbitY,
-        homeOrbitConfig.center.z + Math.cos(angle) * homeOrbitConfig.radius
-      ),
-      target: _heroLookAt.clone()
+      cam: lookAt.clone().add(_camOffset),
+      target: lookAt
     };
   }
 
   /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
   function getHotspotMarkerEntry(hotspot) {
     return markers.find((m) => m.hotspot.id === hotspot?.id) ?? null;
+  }
+
+  /** @param {number} clientX @param {number} clientY @param {ReturnType<typeof getHotspotMarkerEntry>} entry */
+  function updateFocusParticleHover(clientX, clientY, entry) {
+    if (!entry || !camera || !renderer) return;
+
+    setPointerFromClient(clientX, clientY);
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObject(entry.object, true);
+
+    focusParticleHover = hits.length > 0;
   }
 
   /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
@@ -483,10 +554,26 @@
   function updateMarkerScales() {
     for (const entry of markers) {
       const active = selectedHotspot?.id === entry.hotspot.id;
-      const targetScale = active ? entry.baseScale * 1.22 : entry.baseScale;
-      const nextScale = THREE.MathUtils.lerp(entry.object.scale.x, targetScale, 0.1);
+      const hovered = hoveredHotspot?.id === entry.hotspot.id;
+      let targetScale = entry.baseScale;
+
+      if (active) targetScale = entry.baseScale * ACTIVE_MARKER_SCALE;
+      else if (hovered) targetScale = entry.baseScale * HOVER_MARKER_SCALE;
+
+      const scaleLerp = active ? MARKER_SCALE_LERP : HOVER_SCALE_LERP;
+      const nextScale = THREE.MathUtils.lerp(entry.object.scale.x, targetScale, scaleLerp);
       entry.object.scale.setScalar(nextScale);
     }
+  }
+
+  /** @param {THREE.Object3D} root @param {number} elapsedSeconds @param {boolean} [active] */
+  function updateMarkerBob(root, elapsedSeconds, active = false) {
+    const baseY = root.userData.baseY;
+    if (baseY == null) return;
+
+    const speed = active ? FOCUS_FLOAT_SPEED : MARKER_FLOAT_SPEED;
+    const floatY = Math.sin(elapsedSeconds * Math.PI * 2 * speed) * MARKER_FLOAT_AMPLITUDE;
+    root.position.y = baseY + floatY;
   }
 
   /** @param {THREE.Box3} worldBox */
@@ -534,6 +621,7 @@
       const root = new THREE.Group();
       root.add(model);
       root.position.copy(positions[index]);
+      root.userData.baseY = positions[index].y;
       root.userData.hotspot = hotspot;
       markerGroup.add(root);
       markers.push({ object: root, model, hotspot, baseScale: 1, spinSpeed: 0 });
@@ -548,6 +636,63 @@
     pointerDownY = event.clientY;
   }
 
+  /** @param {number} clientX @param {number} clientY */
+  function setPointerFromClient(clientX, clientY) {
+    if (!renderer) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  /** @param {number} clientX @param {number} clientY */
+  function pickHotspotAtClient(clientX, clientY) {
+    if (!renderer || !camera || !markerGroup || transitionActive) return null;
+
+    setPointerFromClient(clientX, clientY);
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(markerGroup.children, true);
+    if (!hits.length) return null;
+
+    return hotspotFromObject(hits[0].object);
+  }
+
+  /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
+  function updateCanvasCursor(hotspot) {
+    if (!container) return;
+    container.style.cursor = hotspot ? 'pointer' : 'grab';
+  }
+
+  /** @param {PointerEvent} event */
+  function onPointerMove(event) {
+    if (!renderer || !markerGroup || transitionActive) return;
+
+    if (selectedHotspot) {
+      const entry = getHotspotMarkerEntry(selectedHotspot);
+      updateFocusParticleHover(event.clientX, event.clientY, entry);
+      return;
+    }
+
+    focusParticleHover = false;
+    for (const entry of markers) {
+      resetMarkerParticleScatter(entry.model);
+    }
+
+    const hotspot = pickHotspotAtClient(event.clientX, event.clientY);
+    if ((hotspot?.id ?? null) !== (hoveredHotspot?.id ?? null)) {
+      hoveredHotspot = hotspot;
+    }
+    updateCanvasCursor(hotspot);
+  }
+
+  function onPointerLeave() {
+    hoveredHotspot = null;
+    focusParticleHover = false;
+    for (const entry of markers) {
+      resetMarkerParticleScatter(entry.model);
+    }
+    updateCanvasCursor(null);
+  }
+
   /** @param {PointerEvent} event */
   function onPointerClick(event) {
     if (!renderer || !camera || !markerGroup) return;
@@ -556,16 +701,22 @@
     const dy = event.clientY - pointerDownY;
     if (dx * dx + dy * dy > 36) return;
 
-    const rect = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(markerGroup.children, true);
-    if (!hits.length) return;
-
-    const hotspot = hotspotFromObject(hits[0].object);
+    const hotspot = pickHotspotAtClient(event.clientX, event.clientY);
     if (hotspot) selectedHotspot = hotspot;
+  }
+
+  function dismissFocusByCameraMove() {
+    if (!selectedHotspot || transitionActive) return;
+    selectedHotspot = null;
+  }
+
+  function onOrbitControlStart() {
+    dismissFocusByCameraMove();
+  }
+
+  /** @param {WheelEvent} _event */
+  function onCanvasWheelWhileFocused(_event) {
+    dismissFocusByCameraMove();
   }
 
   function resizeRenderer() {
@@ -600,11 +751,18 @@
 
     for (const entry of markers) {
       const active = selectedHotspot?.id === entry.hotspot.id;
-      updateMarkerParticlePulse(
-        entry.model,
-        now * 0.001 + entry.hotspot.azimuth * 4,
-        active
-      );
+      const phase = now * 0.001 + entry.hotspot.azimuth * 4;
+      const motionPhase = active ? phase * FOCUS_MOTION_PHASE_SCALE : phase;
+
+      updateMarkerParticlePulse(entry.model, motionPhase, active);
+
+      if (active) {
+        updateMarkerParticleScatter(entry.model, phase, focusParticleHover ? 1 : 0, true);
+      } else {
+        resetMarkerParticleScatter(entry.model);
+      }
+
+      updateMarkerBob(entry.object, phase, active);
     }
 
     if (controls && cameraReady) {
@@ -627,7 +785,11 @@
     window.removeEventListener('resize', resizeRenderer);
     document.removeEventListener('visibilitychange', onVisibilityChange);
     renderer?.domElement.removeEventListener('pointerdown', onPointerDown);
+    renderer?.domElement.removeEventListener('pointermove', onPointerMove);
+    renderer?.domElement.removeEventListener('pointerleave', onPointerLeave);
     renderer?.domElement.removeEventListener('pointerup', onPointerClick);
+    renderer?.domElement.removeEventListener('wheel', onCanvasWheelWhileFocused);
+    controls?.removeEventListener('start', onOrbitControlStart);
 
     for (const entry of markers) {
       markerGroup?.remove(entry.object);
@@ -671,10 +833,15 @@
     lastAnimationTime = 0;
     cameraTransition = null;
     transitionActive = false;
+    heroPoseStored = false;
   }
 
   $effect(() => {
     const hotspot = selectedHotspot;
+    if (hotspot) {
+      hoveredHotspot = null;
+      focusParticleHover = false;
+    }
     updateMarkerSelection();
     if (!cameraReady) return;
 
@@ -742,9 +909,13 @@
         ONE: THREE.TOUCH.ROTATE,
         TWO: THREE.TOUCH.DOLLY_PAN
       };
+      controls.addEventListener('start', onOrbitControlStart);
 
       renderer.domElement.addEventListener('pointerdown', onPointerDown);
+      renderer.domElement.addEventListener('pointermove', onPointerMove);
+      renderer.domElement.addEventListener('pointerleave', onPointerLeave);
       renderer.domElement.addEventListener('pointerup', onPointerClick);
+      renderer.domElement.addEventListener('wheel', onCanvasWheelWhileFocused, { passive: true });
       window.addEventListener('resize', resizeRenderer);
       document.addEventListener('visibilitychange', onVisibilityChange);
 
@@ -778,13 +949,11 @@
           console.error('[ExplorableMountainScene] creazione marker fallita:', markerErr);
         }
 
-        applyHomeHeroCamera(camera, homeOrbitConfig, _heroLookAt);
+        applyAboutHeroCamera(camera, homeOrbitConfig, _heroLookAt);
         controls.target.copy(_heroLookAt);
-        camera.zoom = ABOUT_HERO_ZOOM;
-        camera.updateProjectionMatrix();
         applyMountainOrbitLimits();
         setupOrbitPolarLimits();
-        controls.update();
+        syncControlsToCameraPose();
         _storedHeroCam.copy(camera.position);
         _storedHeroTarget.copy(_heroLookAt);
         heroPoseStored = true;

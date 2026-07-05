@@ -11,8 +11,19 @@
 
   /** @type {import('$lib/materiali-home/aboutHotspots.js').AboutHotspot | null} */
   let selectedHotspot = $state(null);
+  /** @type {import('$lib/materiali-home/aboutHotspots.js').AboutHotspot | null} */
+  let hoveredHotspot = $state(null);
   let introDismissed = $state(false);
   let introProgress = $state(0);
+  let lastHintTitle = $state('');
+
+  let hintVisible = $derived(!!hoveredHotspot);
+
+  $effect(() => {
+    if (hoveredHotspot) {
+      lastHintTitle = hoveredHotspot.title ?? hoveredHotspot.label;
+    }
+  });
 
   /** @param {number} value */
   function clamp(value, min, max) {
@@ -85,7 +96,23 @@
 
 <div class="about-page">
   {#if browser}
-    <ExplorableMountainScene bind:selectedHotspot />
+    <ExplorableMountainScene bind:selectedHotspot bind:hoveredHotspot />
+  {/if}
+
+  {#if introDismissed && !selectedHotspot}
+    <div
+      class="mountain-hover-hint"
+      class:visible={hintVisible}
+      aria-live="polite"
+      aria-hidden={!hintVisible}
+    >
+      {#key hoveredHotspot?.id ?? 'none'}
+        <p class="mountain-hover-hint__title">
+          {hoveredHotspot?.title ?? hoveredHotspot?.label ?? lastHintTitle}
+        </p>
+        <p class="mountain-hover-hint__cta">Clicca per sapere di più</p>
+      {/key}
+    </div>
   {/if}
 
   {#if selectedHotspot && introDismissed}
@@ -98,7 +125,6 @@
     {:else}
       <AboutHotspotCard
         hotspot={selectedHotspot}
-        onclose={closeHotspot}
         onprev={goPrev}
         onnext={goNext}
       />
@@ -148,6 +174,7 @@
     inset: 0;
     background: #ffffff;
     overflow: hidden;
+    --panel-padding-x: clamp(24px, 5.23vw, 79px);
   }
 
   .about-page :global(.three-canvas) {
@@ -155,6 +182,95 @@
     inset: 0;
     width: 100%;
     height: 100%;
+  }
+
+  .mountain-hover-hint {
+    position: fixed;
+    top: clamp(104px, 15vh, 148px);
+    left: 50%;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    transform: translateX(-50%);
+    pointer-events: none;
+    text-align: center;
+    color: #161a1f;
+  }
+
+  .mountain-hover-hint__title,
+  .mountain-hover-hint__cta {
+    margin: 0;
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+      opacity 480ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .mountain-hover-hint.visible .mountain-hover-hint__title {
+    animation: mountain-hint-fade-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mountain-hover-hint.visible .mountain-hover-hint__cta {
+    animation: mountain-hint-fade-in-cta 520ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+  }
+
+  .mountain-hover-hint:not(.visible) .mountain-hover-hint__cta {
+    opacity: 0;
+    transform: translateY(6px);
+    transition-delay: 0ms;
+  }
+
+  .mountain-hover-hint:not(.visible) .mountain-hover-hint__title {
+    opacity: 0;
+    transform: translateY(6px);
+    transition-delay: 100ms;
+  }
+
+  @keyframes mountain-hint-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes mountain-hint-fade-in-cta {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 0.82;
+      transform: translateY(0);
+    }
+  }
+
+  .mountain-hover-hint__title {
+    font-family: 'Supreme Variable', sans-serif;
+    font-size: clamp(1.25rem, 3.2vw, 1.75rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .mountain-hover-hint__cta {
+    font-family: 'Supreme Variable', sans-serif;
+    font-size: clamp(0.75rem, 1.6vw, 0.875rem);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
   }
 
   .intro-screen {
@@ -248,6 +364,10 @@
   }
 
   @media (max-width: 768px) {
+    .about-page {
+      --panel-padding-x: 20px;
+    }
+
     .intro-content {
       gap: 24px;
     }

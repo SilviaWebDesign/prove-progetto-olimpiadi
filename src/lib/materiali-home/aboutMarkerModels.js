@@ -9,6 +9,11 @@ const INFRA_BS = 0.6405;
 const PARTICLE_RADIUS = (0.012 * INFRA_BS) / DEFAULT_MARKER_SIZE;
 const PULSE_DIR_SCALE = (8 * INFRA_BS) / DEFAULT_MARKER_SIZE;
 const IDLE_PULSE_SPEED = 0.65;
+const HOVER_SCATTER_SCALE = PULSE_DIR_SCALE * 0.38;
+const HOVER_IN_LERP = 0.055;
+const HOVER_OUT_LERP = 0.035;
+const FOCUS_HOVER_IN_LERP = 0.09;
+const FOCUS_HOVER_OUT_LERP = 0.065;
 const BASE_OPACITY = 0.85;
 const ACTIVE_OPACITY = 0.95;
 
@@ -55,21 +60,41 @@ function buildParticleSphereMesh(active = false) {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uPulse: { value: 0.0 },
+      uHover: { value: 0.0 },
+      uTime: { value: 0.0 },
+      uHoverScatter: { value: HOVER_SCATTER_SCALE },
       uBaseOpacity: { value: active ? ACTIVE_OPACITY : BASE_OPACITY }
     },
     vertexShader: /* glsl */ `
       attribute vec3 aDirection;
       uniform float uPulse;
+      uniform float uHover;
+      uniform float uTime;
+      uniform float uHoverScatter;
+
       void main() {
-        vec3 p = position + aDirection * uPulse;
+        vec3 instPos = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        float seed = fract(sin(dot(instPos, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+        float t = uTime * 1.0 + seed * 6.28318;
+        float wobble =
+          0.55 +
+          0.22 * sin(t) +
+          0.12 * sin(t * 1.55 + seed * 4.0);
+        vec3 scatter = aDirection * uHover * uHoverScatter * wobble;
+        vec3 tangent = cross(normalize(instPos + vec3(0.001)), aDirection);
+        vec3 swirl = tangent * uHover * uHoverScatter * 0.28 * sin(t * 1.2 + seed * 5.0);
+        vec3 p = position + aDirection * uPulse + scatter + swirl;
         gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
       }
     `,
     fragmentShader: /* glsl */ `
       uniform float uPulse;
+      uniform float uHover;
       uniform float uBaseOpacity;
       void main() {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, uBaseOpacity + uPulse * 0.5);
+        float alpha = uBaseOpacity + uPulse * 0.5;
+        alpha *= mix(1.0, 0.82, uHover);
+        gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
       }
     `,
     transparent: true,
@@ -122,6 +147,39 @@ export function updateMarkerParticlePulse(object, elapsedSeconds, active = false
     if (!(mat instanceof THREE.ShaderMaterial)) return;
     mat.uniforms.uPulse.value = pulse;
   });
+}
+
+/**
+ * Scatter random delle particelle (solo in focus + hover).
+ * @param {THREE.Object3D} object
+ * @param {number} elapsedSeconds
+ * @param {number} targetStrength 0–1
+ * @param {boolean} [focusMode]
+ */
+export function updateMarkerParticleScatter(object, elapsedSeconds, targetStrength, focusMode = false) {
+  object.traverse((child) => {
+    if (!(child instanceof THREE.InstancedMesh) || !child.userData.isMarkerParticles) return;
+    const mat = child.material;
+    if (!(mat instanceof THREE.ShaderMaterial)) return;
+
+    const current = mat.uniforms.uHover.value;
+    const lerp =
+      targetStrength > current
+        ? focusMode
+          ? FOCUS_HOVER_IN_LERP
+          : HOVER_IN_LERP
+        : focusMode
+          ? FOCUS_HOVER_OUT_LERP
+          : HOVER_OUT_LERP;
+
+    mat.uniforms.uTime.value = elapsedSeconds;
+    mat.uniforms.uHover.value = THREE.MathUtils.lerp(current, targetStrength, lerp);
+  });
+}
+
+/** @param {THREE.Object3D} object */
+export function resetMarkerParticleScatter(object) {
+  updateMarkerParticleScatter(object, 0, 0);
 }
 
 export function preloadAboutMarkerModels() {

@@ -77,8 +77,6 @@
 
   <aside class="sport-panel" bind:this={panelEl} aria-labelledby="sport-detail-title">
     <div class="sport-panel-content" bind:this={contentEl}>
-      <button type="button" class="close-btn" aria-label="Chiudi" onclick={onclose}>×</button>
-
       {#key hotspot.id}
         <h1 id="sport-detail-title" class="sport-title">{title}</h1>
         <div class="sport-body">
@@ -145,42 +143,13 @@
     position: relative;
     padding: 0 0 24px;
     transform-origin: top right;
-  }
-
-  .close-btn {
-    position: absolute;
-    top: 0;
-    right: 0;
-    z-index: 2;
-    width: auto;
-    height: auto;
-    margin: 0;
-    padding: 4px;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    font-size: 1.75rem;
-    line-height: 1;
-    color: #161a1f;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .close-btn:hover {
-    opacity: 0.55;
-  }
-
-  .close-btn:focus-visible {
-    outline: 2px solid #161a1f;
-    outline-offset: 2px;
+    --sport-title-size: clamp(1.75rem, 3.2vw, 36px);
   }
 
   .sport-title {
-    margin: 0 48px 16px 0;
+    margin: 0 0 16px;
     font-family: 'Supreme Variable', sans-serif;
-    font-size: clamp(1.75rem, 3.2vw, 36px);
+    font-size: var(--sport-title-size);
     font-weight: 800;
     line-height: 1.1;
     letter-spacing: 0.2px;

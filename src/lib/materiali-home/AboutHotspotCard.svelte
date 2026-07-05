@@ -4,11 +4,10 @@
 
   /** @type {{
    *   hotspot: import('./aboutHotspots.js').AboutHotspot;
-   *   onclose: () => void;
    *   onprev?: () => void;
    *   onnext?: () => void;
    * }} */
-  let { hotspot, onclose, onprev, onnext } = $props();
+  let { hotspot, onprev, onnext } = $props();
 
   const pathIndex = $derived(getHotspotPathIndex(hotspot.id));
   const hasPrev = $derived(pathIndex > 0);
@@ -18,8 +17,6 @@
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="card-backdrop">
   <div class="card-wrap">
-    <button type="button" class="close-btn" aria-label="Chiudi" onclick={onclose}>×</button>
-
     <nav class="path-nav" aria-label="Percorso sulla montagna">
       <button
         type="button"
@@ -133,38 +130,6 @@
     height: auto;
     min-height: 280px;
     max-height: min(520px, 68vh);
-  }
-
-  .close-btn {
-    position: absolute;
-    top: calc(var(--card-nav-offset) + var(--card-inset-y) + 4px);
-    right: var(--card-inset-x);
-    z-index: 2;
-    width: 36px;
-    height: 36px;
-    margin: 0;
-    padding: 0;
-    border: 1px solid rgba(22, 26, 31, 0.2);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    font-size: 1.35rem;
-    line-height: 1;
-    color: #161a1f;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .close-btn:hover {
-    background: rgba(255, 255, 255, 0.95);
-  }
-
-  .close-btn:focus-visible {
-    outline: 2px solid #161a1f;
-    outline-offset: 2px;
   }
 
   @keyframes cardIn {

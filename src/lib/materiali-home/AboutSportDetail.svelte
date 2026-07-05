@@ -30,6 +30,10 @@
 
     contentEl.style.zoom = '1';
 
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+      return;
+    }
+
     const available = panelEl.clientHeight;
     const needed = contentEl.scrollHeight;
     if (needed <= available || available <= 0) return;
@@ -73,25 +77,30 @@
 <div class="sport-detail">
   <div class="sport-detail-gradients" aria-hidden="true">
     <div class="grad-side"></div>
+    <div class="grad-mobile-halo"></div>
   </div>
 
   <aside class="sport-panel" bind:this={panelEl} aria-labelledby="sport-detail-title">
-    <div class="sport-panel-content" bind:this={contentEl}>
-      {#key hotspot.id}
-        <h1 id="sport-detail-title" class="sport-title">{title}</h1>
-        <div class="sport-body">
-          {#each paragraphs as paragraph}
-            <p>{paragraph}</p>
-          {/each}
-        </div>
-      {/key}
+    <div class="sport-panel-scroll">
+      <div class="sport-panel-content" bind:this={contentEl}>
+        {#key hotspot.id}
+          <h1 id="sport-detail-title" class="sport-title">{title}</h1>
+          <div class="sport-body">
+            {#each paragraphs as paragraph}
+              <p>{paragraph}</p>
+            {/each}
+          </div>
+        {/key}
+      </div>
     </div>
   </aside>
 
-  <button type="button" class="continue-btn" onclick={onContinue}>
-    <span class="continue-label">Continua</span>
-    <span class="continue-chevron" aria-hidden="true"></span>
-  </button>
+  <footer class="sport-continue-wrap">
+    <button type="button" class="continue-btn" onclick={onContinue}>
+      <span class="continue-label">Continua</span>
+      <span class="continue-chevron" aria-hidden="true"></span>
+    </button>
+  </footer>
 </div>
 
 <style>
@@ -124,6 +133,10 @@
     );
   }
 
+  .grad-mobile-halo {
+    display: none;
+  }
+
   .sport-panel {
     position: absolute;
     top: calc(50% + 22px);
@@ -137,6 +150,11 @@
     box-sizing: border-box;
     pointer-events: auto;
     animation: panelIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .sport-panel-scroll {
+    height: 100%;
+    overflow: hidden;
   }
 
   .sport-panel-content {
@@ -172,11 +190,16 @@
     text-indent: 0.45em;
   }
 
-  .continue-btn {
+  .sport-continue-wrap {
     position: absolute;
     left: calc(45.83% + 40.5px);
     bottom: clamp(28px, 6vh, 48px);
     transform: translateX(-50%);
+    z-index: 51;
+    pointer-events: none;
+  }
+
+  .continue-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -235,34 +258,100 @@
     }
 
     .grad-side {
+      top: auto;
+      bottom: 0;
+      left: 0;
       width: 100%;
+      height: 72vh;
       background: linear-gradient(
         to top,
-        #f9f9fa 0%,
-        rgba(249, 249, 250, 0.96) 52%,
-        rgba(249, 249, 250, 0.55) 68%,
-        rgba(249, 249, 250, 0) 82%
+        rgba(249, 249, 250, 0.97) 0%,
+        rgba(249, 249, 250, 0.94) 38%,
+        rgba(249, 249, 250, 0.78) 50%,
+        rgba(249, 249, 250, 0.52) 60%,
+        rgba(249, 249, 250, 0.28) 68%,
+        rgba(249, 249, 250, 0.12) 74%,
+        rgba(249, 249, 250, 0.04) 80%,
+        rgba(249, 249, 250, 0) 88%
       );
+    }
+
+    .grad-mobile-halo {
+      display: block;
+      position: absolute;
+      left: -12%;
+      right: -12%;
+      bottom: 0;
+      height: 72vh;
+      background: radial-gradient(
+        ellipse 120% 112% at 50% 100%,
+        rgba(249, 249, 250, 0.98) 0%,
+        rgba(249, 249, 250, 0.92) 36%,
+        rgba(249, 249, 250, 0.72) 50%,
+        rgba(249, 249, 250, 0.44) 62%,
+        rgba(249, 249, 250, 0.2) 72%,
+        rgba(249, 249, 250, 0.06) 80%,
+        rgba(249, 249, 250, 0) 90%
+      );
+      pointer-events: none;
     }
 
     .sport-panel {
       top: auto;
       right: 0;
       left: 0;
-      bottom: 0;
+      bottom: 68px;
       transform: none;
       width: 100%;
-      max-height: min(74vh, calc(100vh - 108px));
+      height: calc(50vh - 68px);
+      max-height: calc(50vh - 68px);
+      display: block;
       overflow: hidden;
       padding: 0;
-      background: linear-gradient(to top, #f9f9fa 94%, rgba(249, 249, 250, 0.98));
-      border-radius: 20px 20px 0 0;
+      background: transparent;
+      border-radius: 0;
       animation-name: panelInMobile;
     }
 
+    .sport-panel-scroll {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
     .sport-panel-content {
-      padding: 20px var(--panel-padding-x) 28px;
+      position: relative;
+      z-index: 1;
+      padding: 20px var(--panel-padding-x) 12px;
       transform-origin: top center;
+    }
+
+    .sport-continue-wrap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      transform: none;
+      z-index: 51;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      margin: 0;
+      padding: 12px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      pointer-events: auto;
+      background: transparent;
+    }
+
+    .continue-btn {
+      min-width: 132px;
+      gap: 10px;
+      padding: 10px 18px 8px;
     }
   }
 

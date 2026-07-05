@@ -24,13 +24,18 @@
     clampFocusCameraPosition,
     focusCameraDistance,
     getMarkerFocusPoint,
+    panFocusToViewport,
     panFocusToViewportX,
+    FOCUS_VIEWPORT_X_MOBILE,
+    FOCUS_VIEWPORT_Y_MOBILE,
+    FOCUS_CAMERA_Y_LIFT_MOBILE,
     sampleSmoothCameraTransition,
     sampleUnfocusTransition,
-  getHotspotPlacement,
-  isAboutMobileLayout,
-  MIN_HOTSPOT_SPACING
-} from './aboutHotspots.js';
+    getHotspotPlacement,
+    isAboutMobileLayout,
+    isAboutPanelMobileLayout,
+    MIN_HOTSPOT_SPACING
+  } from './aboutHotspots.js';
   import {
     createMarkerParticleSphere,
     applyMarkerMaterial,
@@ -486,12 +491,26 @@
         toCam = clampFocusCameraPosition(markerPos, toCam, snowMountainModel, raycaster);
       }
 
+      if (isAboutPanelMobileLayout()) {
+        toCam.y += (_worldBox.max.y - _worldBox.min.y) * FOCUS_CAMERA_Y_LIFT_MOBILE;
+      }
+
       const savedCam = camera.position.clone();
       const savedTarget = controls.target.clone();
       _tmpTarget.copy(toTarget);
       camera.position.copy(toCam);
       camera.lookAt(_tmpTarget);
-      panFocusToViewportX(camera, _tmpTarget, focusPoint);
+      if (isAboutPanelMobileLayout()) {
+        panFocusToViewport(
+          camera,
+          _tmpTarget,
+          focusPoint,
+          FOCUS_VIEWPORT_X_MOBILE,
+          FOCUS_VIEWPORT_Y_MOBILE
+        );
+      } else {
+        panFocusToViewportX(camera, _tmpTarget, focusPoint);
+      }
       panCam.copy(camera.position).sub(toCam);
       panTarget.copy(_tmpTarget).sub(toTarget);
       camera.position.copy(savedCam);

@@ -35,8 +35,15 @@ const MOBILE_HOTSPOT_PLACEMENTS = [
 /** Breakpoint allineato al layout about mobile (pannello in basso). */
 export const ABOUT_MOBILE_BREAKPOINT = 768;
 
+/** Breakpoint layout pannello testo mobile (AboutSportDetail). */
+export const ABOUT_PANEL_MOBILE_BREAKPOINT = 900;
+
 export function isAboutMobileLayout() {
   return typeof window !== 'undefined' && window.innerWidth < ABOUT_MOBILE_BREAKPOINT;
+}
+
+export function isAboutPanelMobileLayout() {
+  return typeof window !== 'undefined' && window.innerWidth <= ABOUT_PANEL_MOBILE_BREAKPOINT;
 }
 
 /**
@@ -778,10 +785,16 @@ export function clampFocusCameraPosition(surfacePoint, desiredCamPos, mountainMo
 
 /** Frazione viewport (0–1) dove inquadrare il marker in focus — lato sinistro. */
 export const FOCUS_VIEWPORT_X = 0.32;
+/** Mobile: sfera centrata nello schermo. */
+export const FOCUS_VIEWPORT_X_MOBILE = 0.5;
+export const FOCUS_VIEWPORT_Y_MOBILE = 0.5;
+/** Sollevamento camera in focus mobile (frazione altezza montagna). */
+export const FOCUS_CAMERA_Y_LIFT_MOBILE = 0.18;
 
 const _focusProj = new THREE.Vector3();
 const _focusFwd = new THREE.Vector3();
 const _focusRight = new THREE.Vector3();
+const _focusUp = new THREE.Vector3();
 
 /**
  * Centro visivo del marker (bbox world) per il framing camera.
@@ -792,6 +805,49 @@ export function getMarkerFocusPoint(markerRoot) {
   const center = new THREE.Vector3();
   box.getCenter(center);
   return center;
+}
+
+/**
+ * Pan parallelo di camera + target per portare `worldPoint` in una posizione viewport (0–1).
+ * @param {THREE.PerspectiveCamera} camera
+ * @param {THREE.Vector3} target
+ * @param {THREE.Vector3} worldPoint
+ * @param {number} [viewportX]
+ * @param {number} [viewportY]
+ */
+export function panFocusToViewport(
+  camera,
+  target,
+  worldPoint,
+  viewportX = FOCUS_VIEWPORT_X,
+  viewportY = 0.5
+) {
+  const desiredNdcX = viewportX * 2 - 1;
+  const desiredNdcY = 1 - viewportY * 2;
+  const tanHalfFov = Math.tan((camera.fov * Math.PI) / 360);
+
+  camera.lookAt(target);
+
+  for (let i = 0; i < 8; i++) {
+    _focusProj.copy(worldPoint).project(camera);
+    const deltaX = desiredNdcX - _focusProj.x;
+    const deltaY = desiredNdcY - _focusProj.y;
+    if (Math.abs(deltaX) < 0.008 && Math.abs(deltaY) < 0.008) break;
+
+    const dist = camera.position.distanceTo(target);
+    const shiftX = deltaX * dist * tanHalfFov * camera.aspect;
+    const shiftY = deltaY * dist * tanHalfFov;
+
+    camera.getWorldDirection(_focusFwd);
+    _focusRight.crossVectors(camera.up, _focusFwd).normalize();
+    _focusUp.copy(camera.up).normalize();
+
+    camera.position.addScaledVector(_focusRight, shiftX);
+    camera.position.addScaledVector(_focusUp, shiftY);
+    target.addScaledVector(_focusRight, shiftX);
+    target.addScaledVector(_focusUp, shiftY);
+    camera.lookAt(target);
+  }
 }
 
 /**

@@ -12,6 +12,8 @@
   export interface MobileFitOptions {
     ratio?: number;
     centerBias?: number;
+    /** Limita il gap usato per la scala (non per il posizionamento). */
+    maxScaleGap?: number;
   }
 
   export interface Scene3DApi {
@@ -28,6 +30,7 @@
     setMobileFit:           (topPx: number, bottomPx: number, options?: MobileFitOptions) => void;
     setMobileLayoutBlend:   (t: number) => void;
     clearMobileFit:         () => void;
+    realignFeedback:        () => void;
   }
 
   interface Props {
@@ -35,12 +38,14 @@
     modelSrc: string;
     onModelLoaded?: () => void;
     orbitEnabled?: boolean;
+    feedbackActive?: boolean;
   }
   let {
     api = $bindable(),
     modelSrc,
     onModelLoaded,
     orbitEnabled = false,
+    feedbackActive = false,
   }: Props = $props();
 
   let wrapperEl = $state<HTMLDivElement | null>(null);
@@ -64,7 +69,7 @@
   const MODEL_FIT_FACTOR: Record<string, number> = {
     '/oggetti/ice_skate.glb': 0.72,
     '/oggetti/sport.glb': 0.72,
-    '/oggetti/pianta.glb': 0.78,
+    '/oggetti/pianta.glb': 0.92,
   };
 
   /** Modelli piccoli nel file GLB: crossfade sulle posizioni finali invece del volo dall'origine. */
@@ -86,6 +91,69 @@
   function feedbackConfig() {
     return { ...DEFAULT_FEEDBACK, ...MODEL_FEEDBACK[modelSrc] };
   }
+
+  /** Altezza max del modello in fase feedback (frazione del viewport). */
+  const FEEDBACK_MAX_VH = 0.36;
+  const _feedbackPivot = new THREE.Vector3();
+  let feedbackLayoutScale: THREE.Vector3 | null = null;
+
+  function getCameraVisibleH(): number {
+    if (!camera) return 1;
+    const fov = camera.fov * (Math.PI / 180);
+    return 2 * Math.tan(fov / 2) * camera.position.z;
+  }
+
+  function resetFeedbackViewCamera() {
+    if (!camera) return;
+    camera.position.set(0, 0, 6);
+    camera.lookAt(0, 0, 0);
+    if (controls) {
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+  }
+
+  /**
+   * Centra il modello nel viewport.
+   * doMorph centra la geometria sull'origine locale del gruppo: allineiamo
+   * quel pivot (non l'AABB) al centro schermo (origine mondo).
+   */
+  function centerModelInViewport(group: THREE.Object3D) {
+    if (!spinner || !camera) return;
+
+    spinner.position.set(0, 0, 0);
+    spinner.rotation.set(0, 0, 0);
+    resetFeedbackViewCamera();
+
+    group.updateMatrixWorld(true);
+
+    if (feedbackLayoutScale) {
+      group.scale.copy(feedbackLayoutScale);
+    } else {
+      const box = new THREE.Box3().setFromObject(group);
+      const size = box.getSize(new THREE.Vector3());
+      const maxWorldH = getCameraVisibleH() * FEEDBACK_MAX_VH;
+      if (size.y > maxWorldH && size.y > 0) {
+        group.scale.multiplyScalar(maxWorldH / size.y);
+      }
+      feedbackLayoutScale = group.scale.clone();
+    }
+
+    group.updateMatrixWorld(true);
+    group.getWorldPosition(_feedbackPivot);
+    spinner.position.copy(_feedbackPivot).negate();
+  }
+
+  function realignFeedbackModel() {
+    if (activeResultGroup) centerModelInViewport(activeResultGroup);
+    else if (modelGroup) centerModelInViewport(modelGroup);
+  }
+
+  function resetFeedbackLayout() {
+    feedbackLayoutScale = null;
+  }
+
+  let isFeedbackActive = false;
 
   let activeResultGroup: THREE.Group | null = null;
 
@@ -272,6 +340,7 @@
       morphToResult,
       returnToParticles: () => {
         if (controls) controls.enabled = false;
+        resetFeedbackLayout();
         morphState = 'none';
         morphElapsed = 0;
         morphDoneCallback = null;
@@ -298,10 +367,13 @@
         const fov       = camera.fov * (Math.PI / 180);
         const visibleH  = 2 * Math.tan(fov / 2) * camera.position.z;
         const gapPx     = Math.max(24, bottomPx - topPx);
+        const scaleGap  = options.maxScaleGap != null
+          ? Math.min(gapPx, options.maxScaleGap)
+          : gapPx;
         const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
         const ratio     = options.ratio ?? MOBILE_FIT_RATIO;
         const centerBias = options.centerBias ?? MOBILE_FIT_CENTER_BIAS;
-        mobileFitTargetScale = (ratio * (gapPx / vh)) / (0.9 * fitFactor);
+        mobileFitTargetScale = (ratio * (scaleGap / vh)) / (0.9 * fitFactor);
         const centerPx = topPx + gapPx * centerBias;
         mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
@@ -311,8 +383,14 @@
       clearMobileFit: () => {
         mobileFitActive = false;
         mobileLayoutBlend = 0;
-        if (spinner) spinner.position.y = 0;
+        mobileFitTargetScale = 1;
+        if (spinner) spinner.position.set(0, 0, 0);
+        if (modelGroup) {
+          const scale = topicsPoseSaved ? topicsPose.modelScale : baseScale;
+          modelGroup.scale.setScalar(scale);
+        }
       },
+      realignFeedback: () => realignFeedbackModel(),
     };
 
     initThree();
@@ -351,7 +429,14 @@
   });
 
   $effect(() => {
-    if (controls) controls.enabled = orbitEnabled;
+    if (!controls) return;
+    controls.enabled = orbitEnabled;
+    controls.autoRotate = !orbitEnabled;
+  });
+
+  $effect(() => {
+    isFeedbackActive = feedbackActive;
+    if (feedbackActive) realignFeedbackModel();
   });
 
   onDestroy(() => {
@@ -655,12 +740,6 @@
     root.add(particleMesh);
   }
 
-  /** Offset verticale del modello in fase feedback (più alto sullo schermo). */
-  function applyFeedbackModelYOffset() {
-    if (!spinner) return;
-    spinner.position.y = feedbackConfig().yOffset;
-  }
-
   function finalizeMorphView() {
     if (activeResultGroup && spinner) {
       // Trasferisce la rotazione idle sul modello risultato prima di azzerare lo spinner,
@@ -669,44 +748,23 @@
       spinner.rotation.set(0, 0, 0);
     }
 
-    if (camera) {
-      camera.position.set(0, 0, 6);
-      camera.lookAt(0, 0.3, 0);
-      if (controls) {
-        controls.target.set(0, 0.3, 0);
-        controls.update();
-      }
-    }
-
-    if (activeResultGroup) alignFeedbackResultToScreen(activeResultGroup);
-    else applyFeedbackModelYOffset();
-  }
-
-  function alignFeedbackResultToScreen(resultGroup: THREE.Group) {
-    if (!spinner) return;
-    const { yOffset } = feedbackConfig();
-    resultGroup.updateMatrixWorld(true);
-    const center = new THREE.Box3().setFromObject(resultGroup).getCenter(new THREE.Vector3());
-    spinner.position.set(-center.x, yOffset - center.y, -center.z);
+    if (activeResultGroup) centerModelInViewport(activeResultGroup);
+    else if (modelGroup) centerModelInViewport(modelGroup);
   }
 
   function resetFeedbackCamera() {
     if (!camera) return;
     freezeSpinnerRotation();
     if (spinner) spinner.rotation.set(0, 0, 0);
-    camera.position.set(0, 0, 6);
-    camera.lookAt(0, 0.3, 0);
-    if (controls) {
-      controls.target.set(0, 0.3, 0);
-      controls.update();
-    }
+    resetFeedbackViewCamera();
   }
 
   function centerFeedbackView(scaleMul: number) {
     if (!modelGroup || !camera) return;
 
+    resetFeedbackLayout();
     if (spinner) spinner.position.set(0, 0, 0);
-    resetFeedbackCamera();
+    resetFeedbackViewCamera();
 
     modelGroup.rotation.set(0, 0, 0);
     modelGroup.position.set(0, 0, 0);
@@ -717,7 +775,7 @@
     const center = box.getCenter(new THREE.Vector3());
     modelGroup.position.sub(center);
 
-    applyFeedbackModelYOffset();
+    centerModelInViewport(modelGroup);
   }
 
   function showEnlargedSourceModel(scaleMul: number, onDone: () => void) {
@@ -844,6 +902,7 @@
   }
 
   function morphToResult(path: string, onDone: () => void) {
+    resetFeedbackLayout();
     const { scaleMul } = feedbackConfig();
     if (MODEL_FEEDBACK[modelSrc] && path === modelSrc) {
       showEnlargedSourceModel(scaleMul, onDone);
@@ -1054,6 +1113,7 @@
     const elapsed = clock.elapsedTime;
 
     const idleSpinAllowed =
+      !isFeedbackActive &&
       !orbitEnabled &&
       morphState === 'none' &&
       (transitionState === 'done' ||
@@ -1065,7 +1125,7 @@
     }
     if (controls?.enabled) controls.update(dt);
 
-    if (mobileFitActive && spinner) {
+    if (mobileFitActive && !isFeedbackActive && spinner) {
       const targetY = mobileFitFinalOffsetY * mobileLayoutBlend;
       spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;
 

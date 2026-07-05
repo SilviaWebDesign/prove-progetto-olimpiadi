@@ -234,6 +234,20 @@ const FEEDBACK_BODIES = {
 };
 
 /**
+ * Fisher-Yates: ordine casuale degli indici commento (0..length-1).
+ * @param {number} length
+ * @returns {number[]}
+ */
+export function shuffleCommentOrder(length) {
+  const order = Array.from({ length }, (_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+/**
  * @param {boolean[][]} topicLikes
  * @returns {'positivo' | 'negativo' | 'piu-positivo' | 'piu-negativo' | 'neutro'}
  */

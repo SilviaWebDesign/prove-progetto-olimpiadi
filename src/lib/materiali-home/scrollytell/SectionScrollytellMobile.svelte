@@ -16,6 +16,7 @@
     computeResultKey,
     computeResultPath,
     getFeedbackBody,
+    shuffleCommentOrder,
   } from './scrollytellConfig.js';
 
   interface TopicData {
@@ -46,6 +47,7 @@
 
   const topics = $derived(config.topics);
   const lastTopic = $derived(config.topics.length - 1);
+  const commentOrder = config.topics.map((t) => shuffleCommentOrder(t.comments.length));
 
   let currentTopic = $state(0);
   let topicLikes = $state<boolean[][]>(config.topics.map(t => t.comments.map(() => false)));
@@ -184,12 +186,12 @@
               Metti like alle opinioni con cui sei d'accordo
             </p>
             <div class="mobile-topic__cards-list">
-              {#each topics[currentTopic].comments as comment, i}
+              {#each commentOrder[currentTopic] as commentIdx (commentIdx)}
                 <CommentCard
-                  comment={{ body: comment }}
+                  comment={{ body: topics[currentTopic].comments[commentIdx] }}
                   sectionId={config.sectionId}
-                  liked={topicLikes[currentTopic][i]}
-                  onToggleLike={() => toggleLike(currentTopic, i)}
+                  liked={topicLikes[currentTopic][commentIdx]}
+                  onToggleLike={() => toggleLike(currentTopic, commentIdx)}
                   size="lg"
                 />
               {/each}

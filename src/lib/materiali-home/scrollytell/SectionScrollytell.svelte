@@ -22,6 +22,7 @@
     computeResultKey,
     computeResultPath,
     getFeedbackBody,
+    shuffleCommentOrder,
   } from './scrollytellConfig.js';
 
   // ── Mobile detection ───────────────────────────────────────────────────────
@@ -51,6 +52,7 @@
 
   const topics    = $derived(config.topics);
   const lastTopic = $derived(config.topics.length - 1);
+  const commentOrder = config.topics.map((t) => shuffleCommentOrder(t.comments.length));
 
   let currentTopic    = $state(0);
   let topicLikes      = $state<boolean[][]>(config.topics.map(t => t.comments.map(() => false)));
@@ -64,10 +66,10 @@
   let currentResultKey = $state<'positivo' | 'negativo' | 'piu-positivo' | 'piu-negativo' | 'neutro'>('neutro');
 
   const cards: CardData[] = $derived(
-    topics[currentTopic].comments.map((body, i) => ({
-      id: i,
-      body,
-      liked: topicLikes[currentTopic][i],
+    commentOrder[currentTopic].map((commentIdx) => ({
+      id: commentIdx,
+      body: topics[currentTopic].comments[commentIdx],
+      liked: topicLikes[currentTopic][commentIdx],
     }))
   );
 
@@ -90,17 +92,42 @@
     !isTransitioning &&
     phase === 'topics' &&
     (isMobile
-      ? (!mobileCardsVisible ? mobileTopicsScrollComplete : anyLiked)
+      ? (!mobileCardsVisible || anyLiked)
       : anyLiked)
   );
 
   function handleCtaClick() {
+    handleTopicsForwardNavigation();
+  }
+
+  function handleTopicsForwardNavigation() {
     if (!ctaActive || isTransitioning) return;
     if (isMobile && !mobileCardsVisible) {
       void mobileShowCards().then(() => setTimeout(updateMobileModelFit, 450));
       return;
     }
     goNext();
+  }
+
+  function handleTopicsBackwardNavigation() {
+    if (phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
+    if (isMobile && mobileCardsVisible) {
+      void mobileHideCards().then(() => setTimeout(updateMobileModelFit, 450));
+      return;
+    }
+    if (currentTopic > 0) goPrev();
+  }
+
+  function cardsScrollAtBottom(): boolean {
+    const el = cardsScrollRef;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+  }
+
+  function cardsScrollAtTop(): boolean {
+    const el = cardsScrollRef;
+    if (!el) return true;
+    return el.scrollTop < 8;
   }
 
   const nextSectionRoute: Record<string, string> = {
@@ -179,7 +206,7 @@
     outTl.kill();
 
     if (isMobile) {
-      mobileCardsVisible = false; // CSS removes m-cards-visible
+      mobileCardsVisible = false;
       mobileScrollRatio = 0;
       scene3d?.clearMobileFit();
     }
@@ -194,6 +221,8 @@
       phase = 'feedback';
       isTransitioning = false;
       tick().then(() => {
+        scene3d?.realignFeedback();
+        requestAnimationFrame(() => scene3d?.realignFeedback());
         gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
         gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
         gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.25 });
@@ -212,6 +241,7 @@
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
       mobileScrollRatio = 0;
+      mobileTopicsScrollComplete = true;
       if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     }
 
@@ -245,6 +275,7 @@
     if (isMobile) {
       mobileCardsVisible = false; // CSS removes m-cards-visible → container hides
       mobileScrollRatio = 0;
+      mobileTopicsScrollComplete = true;
       if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     }
 
@@ -303,7 +334,7 @@
     MOBILE_CARDS_SCROLL_PADDING;
 
   const MOBILE_FIT_BY_SECTION: Partial<Record<ScrollytellConfig['sectionId'], MobileFitOptions>> = {
-    sustainability: { ratio: 1.58, centerBias: 0.56 },
+    sustainability: { ratio: 1.25, centerBias: 0.56 },
     sport: { ratio: 0.80, centerBias: 0.50 },
   };
 
@@ -316,6 +347,16 @@
     const base = cardsMode
       ? MOBILE_CARDS_FIT_RATIO_BASE
       : (sectionRatio ?? MOBILE_FIT_RATIO_DEFAULT);
+
+    if (!cardsMode) {
+      let ratio = base;
+      if (config.sectionId === 'sustainability' && gapPx > MOBILE_FIT_REFERENCE_GAP) {
+        const excess = (gapPx - MOBILE_FIT_REFERENCE_GAP) / MOBILE_FIT_REFERENCE_GAP;
+        ratio /= 1 + excess * 0.45;
+      }
+      return ratio;
+    }
+
     const gapFactor = gapPx / MOBILE_FIT_REFERENCE_GAP;
     return base * Math.max(0.6, Math.min(1.45, gapFactor));
   }
@@ -333,6 +374,8 @@
     fitOptions.ratio = computeMobileFitRatio(gapPx, mobileCardsVisible);
     if (mobileCardsVisible) {
       fitOptions.centerBias = MOBILE_CARDS_CENTER_BIAS;
+    } else {
+      fitOptions.maxScaleGap = MOBILE_FIT_REFERENCE_GAP;
     }
     scene3d.setMobileFit(topPx, bottomPx, fitOptions);
     if (mobileCardsVisible || mobileTopicsScrollComplete) {
@@ -400,10 +443,8 @@
   const modelLoadedPromise = new Promise<void>(resolve => { resolveModelLoaded = resolve; });
 
   // ── Mobile cards ──────────────────────────────────────────────────────────
-  // Su mobile l'avanzamento tra argomenti è solo a bottone ("Continua"): niente swipe per
-  // quello, che confliggerebbe con lo scroll nativo della lista commenti. Il toggle
-  // esteso/compatto del topic corrente invece è disponibile via tap o scroll gesture
-  // (mobilePreventScroll), perché non tocca mai lo scroll/la posizione della pagina.
+  // Su mobile l'avanzamento tra argomenti è a bottone o swipe verso l'alto (scroll down).
+  // Il toggle esteso/compatto del topic corrente resta disponibile via tap sul testo.
   async function mobileShowCards() {
     if (mobileCardsVisible || cardsScrollAnimating) return;
     cardsScrollAnimating = true;
@@ -446,22 +487,65 @@
   // Tap sul testo argomento (mobile): alternativa rapida per aprire/chiudere i commenti.
   let touchStartX = 0;
   let touchStartY = 0;
+  let mobileBottomScrollTriggered = false;
   const MOBILE_TAP_THRESHOLD = 12;
+  const MOBILE_SWIPE_THRESHOLD = 48;
+  const MOBILE_BOTTOM_SCROLL_THRESHOLD = 36;
+
+  function isPageScrollAtBottom(): boolean {
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    return window.scrollY >= maxScroll - 6;
+  }
 
   function mobileTouchStart(e: TouchEvent) {
-    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) return;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
+    mobileBottomScrollTriggered = false;
+  }
+
+  function mobileTouchMove(e: TouchEvent) {
+    if (!isMobile || phase !== 'topics' || mobileCardsVisible || isTransitioning || cardsScrollAnimating) return;
+    if (!isPageScrollAtBottom() || mobileBottomScrollTriggered) return;
+    const dy = touchStartY - e.touches[0].clientY;
+    if (dy > MOBILE_BOTTOM_SCROLL_THRESHOLD) {
+      mobileBottomScrollTriggered = true;
+      handleTopicsForwardNavigation();
+    }
   }
 
   function mobileTouchEnd(e: TouchEvent) {
-    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) return;
-    if (phase !== 'topics' || isTransitioning || cardsScrollAnimating || !stageTextEl) return;
+    if (isTransitioning || cardsScrollAnimating) return;
 
     const touch = e.changedTouches[0];
     const dx = touch.clientX - touchStartX;
-    const dy = touch.clientY - touchStartY;
+    const dy = touchStartY - touch.clientY;
+
+    if (phase === 'feedback') return;
+
+    if (phase !== 'topics') return;
+
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > MOBILE_SWIPE_THRESHOLD) {
+      if (dy > 0) {
+        if (mobileCardsVisible) {
+          if (cardsScrollRef?.contains(e.target as Node) && !cardsScrollAtBottom()) return;
+          handleTopicsForwardNavigation();
+        } else {
+          handleTopicsForwardNavigation();
+        }
+      } else if (dy < 0) {
+        if (mobileCardsVisible) {
+          if (cardsScrollRef?.contains(e.target as Node) && !cardsScrollAtTop()) return;
+          handleTopicsBackwardNavigation();
+        } else if (currentTopic > 0) {
+          goPrev();
+        }
+      }
+      return;
+    }
+
     if (Math.hypot(dx, dy) > MOBILE_TAP_THRESHOLD) return;
+    if (mobileCardsVisible && cardsScrollRef && cardsScrollRef.contains(e.target as Node)) return;
+    if (!stageTextEl) return;
 
     const rect = stageTextEl.getBoundingClientRect();
     if (
@@ -487,8 +571,7 @@
     topicsMode = true;
     phase = 'topics';
     if (isMobile) {
-      document.addEventListener('touchstart', mobileTouchStart, { passive: true });
-      document.addEventListener('touchend', mobileTouchEnd, { passive: true });
+      mobileTopicsScrollComplete = true;
       tick().then(updateMobileModelFit);
       setTimeout(updateMobileModelFit, 450);
     } else {
@@ -525,8 +608,6 @@
     if (!topicsMode) return;
     topicsMode = false;
     if (isMobile) {
-      document.removeEventListener('touchstart', mobileTouchStart);
-      document.removeEventListener('touchend', mobileTouchEnd);
       mobileTopicsScrollComplete = false;
       if (mobileCardsVisible) {
         mobileCardsVisible = false;
@@ -621,6 +702,9 @@
         gsap.ticker.add(lenisRaf);
       } else {
         window.addEventListener('resize', updateMobileModelFit);
+        document.addEventListener('touchstart', mobileTouchStart, { passive: true });
+        document.addEventListener('touchmove', mobileTouchMove, { passive: true });
+        document.addEventListener('touchend', mobileTouchEnd, { passive: true });
       }
 
       const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
@@ -785,6 +869,11 @@
         if (lenisRaf) gsap.ticker.remove(lenisRaf);
         if (lenis) lenis.destroy();
         if (isMobile) window.removeEventListener('resize', updateMobileModelFit);
+        if (isMobile) {
+          document.removeEventListener('touchstart', mobileTouchStart);
+          document.removeEventListener('touchmove', mobileTouchMove);
+          document.removeEventListener('touchend', mobileTouchEnd);
+        }
       };
     })();
 
@@ -799,6 +888,7 @@
 <section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
   <div
     class="scene__viewport"
+    class:scene__viewport--feedback={phase === 'feedback'}
     style={isMobile ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px` : undefined}
   >
 
@@ -856,10 +946,11 @@
       modelSrc={config.modelSrc}
       onModelLoaded={() => resolveModelLoaded()}
       orbitEnabled={phase === 'feedback'}
+      feedbackActive={phase === 'feedback'}
     />
 
     <!-- Stage: testo + card -->
-    <div class="stage">
+    <div class="stage" class:stage--hidden={phase === 'feedback'}>
 
       <div
         class="stage__text"
@@ -927,27 +1018,29 @@
 
     <!-- Overlay fase feedback -->
     {#if phase === 'feedback'}
-      <div class="feedback-top" style="opacity: 0">
-        <p class="feedback-title">{FEEDBACK_HEADING.line1}<br>{FEEDBACK_HEADING.line2}</p>
-      </div>
-      <p class="feedback-subtitle" style="opacity: 0">
-        {getResultLabel()}
-      </p>
-      <div
-        class="feedback-bottom-cta"
-        style="opacity: 0"
-        role="button"
-        tabindex="0"
-        onclick={() => { $allSectionsCompleted ? navigateToResults() : goToNextSection(); }}
-        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $allSectionsCompleted ? navigateToResults() : goToNextSection(); } }}
-      >
-        <span class="cta-label">
-          {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
-        </span>
-        <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
-          <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+      <div class="feedback-overlay">
+        <div class="feedback-top" style="opacity: 0">
+          <p class="feedback-title">{FEEDBACK_HEADING.line1}<br>{FEEDBACK_HEADING.line2}</p>
+        </div>
+        <p class="feedback-subtitle" style="opacity: 0">
+          {getResultLabel()}
+        </p>
+        <div
+          class="feedback-bottom-cta"
+          style="opacity: 0"
+          role="button"
+          tabindex="0"
+          onclick={() => { $allSectionsCompleted ? navigateToResults() : goToNextSection(); }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $allSectionsCompleted ? navigateToResults() : goToNextSection(); } }}
+        >
+          <span class="cta-label">
+            {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
+          </span>
+          <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+            <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
       </div>
     {/if}
 
@@ -1173,6 +1266,10 @@
     pointer-events: none;
   }
 
+  .stage--hidden {
+    visibility: hidden;
+  }
+
   .stage__text {
     grid-column: 1;
     justify-self: start;
@@ -1270,12 +1367,18 @@
   }
 
   /* ── Overlay feedback ────────────────────────────────────────────────── */
+  .feedback-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+
   .feedback-top {
     position: absolute;
-    top: 8vh;
+    top: 10vh;
     left: 0;
     right: 0;
-    z-index: 10;
     display: flex;
     justify-content: center;
     pointer-events: none;
@@ -1293,10 +1396,9 @@
 
   .feedback-subtitle {
     position: absolute;
-    bottom: 110px;
+    bottom: 88px;
     left: 0;
     right: 0;
-    z-index: 10;
     text-align: center;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 400;
@@ -1311,10 +1413,9 @@
 
   .feedback-bottom-cta {
     position: absolute;
-    bottom: 28px;
+    bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 10;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1338,6 +1439,10 @@
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
+    }
+
+    .scene__viewport--feedback {
+      touch-action: none;
     }
 
     .scene {
@@ -1554,22 +1659,21 @@
     }
 
     /* ── Feedback overlay adapted ── */
+    .feedback-top {
+      top: 12vh;
+      padding: 0 20px;
+    }
+
     .feedback-title {
       font-size: 22px;
       white-space: normal;
-      text-align: center;
-      padding: 0 20px;
     }
 
     .feedback-subtitle {
       font-size: 15px;
-      bottom: 140px;
+      bottom: 96px;
       padding: 0 20px;
       max-width: 100%;
-    }
-
-    .feedback-top {
-      top: 12vh;
     }
   }
 </style>

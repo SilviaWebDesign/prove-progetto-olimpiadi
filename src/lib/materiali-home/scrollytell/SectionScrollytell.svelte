@@ -434,13 +434,24 @@
   }
 
   function topicsFitOptions(cardsActive: boolean): MobileFitOptions {
-    if (isMobile && isPlantModel() && cardsActive) {
-      return { centerBias: PLANT_MOBILE_CARDS_CENTER_BIAS };
+    if (isMobile && isPlantModel()) {
+      return {
+        centerBias: cardsActive
+          ? PLANT_MOBILE_CARDS_CENTER_BIAS
+          : TOPICS_FIT_CENTER_BIAS,
+      };
     }
     if (!isMobile || !cardsActive || !isSportModel()) {
       return { centerBias: TOPICS_FIT_CENTER_BIAS };
     }
     return { centerBias: MOBILE_CARDS_FIT_CENTER_BIAS };
+  }
+
+  function lockTopicsMobileLayout() {
+    if (!isMobile || !scene3d || phase !== 'topics') return;
+    scene3d.setMobileLayoutBlend(1);
+    scene3d.snapMobileFit();
+    scene3d.lockMobileFit();
   }
 
   const FEEDBACK_MODEL_MARGIN = 20;
@@ -469,7 +480,13 @@
       let bottomBoundPx = cardsActive && cardsRect
         ? cardsRect.top
         : window.innerHeight - TOPICS_CTA_RESERVE;
-      if (cardsActive && isSportModel() && stageRightEl) {
+      if (isPlantModel() && stageRightEl) {
+        const headingEl = stageRightEl.querySelector<HTMLElement>('.stage__right-heading');
+        const headingRect = headingEl?.getBoundingClientRect();
+        if (headingRect && headingRect.top > textRect.bottom + 40) {
+          bottomBoundPx = Math.min(bottomBoundPx, headingRect.top - 12);
+        }
+      } else if (cardsActive && isSportModel() && stageRightEl) {
         const headingEl = stageRightEl.querySelector<HTMLElement>('.stage__right-heading');
         const headingRect = headingEl?.getBoundingClientRect();
         if (headingRect) bottomBoundPx = headingRect.top;
@@ -506,6 +523,9 @@
     scene3d.setMobileFit(topPx, bottomPx, topicsFitOptions(cardsActive));
     if (!options.skipScale) applyTopicsScale(false);
     syncTopicsMobileLayout(1);
+    if (isMobile && phase === 'topics') {
+      lockTopicsMobileLayout();
+    }
   }
 
   $effect(() => {
@@ -559,19 +579,24 @@
   }
 
   function currentTopicsLayoutBlend(particleT: number): number {
-    if (isMobile && (mobileCardsVisible || mobileTopicsScrollComplete)) return 1;
+    if (isMobile && (phase === 'topics' || topicsMode)) return 1;
     if (!isMobile && cardsIntroduced) return 1;
     return topicsLayoutBlendFromParticleT(particleT);
   }
 
   function syncTopicsMobileLayout(particleT = 1) {
     if (!scene3d) return;
+    if (isMobile && phase === 'topics') {
+      scene3d.setMobileLayoutBlend(1);
+      return;
+    }
     scene3d.setMobileLayoutBlend(currentTopicsLayoutBlend(particleT));
     scene3d.snapMobileFit();
   }
 
   function updateTopicsScrollLayout(particleT: number) {
     if (!scene3d) return;
+    if (isMobile && topicsMode) return;
     updateTopicsModelFit();
     syncTopicsMobileLayout(particleT);
   }
@@ -585,11 +610,23 @@
   }
 
   function updateMobileTopicsScrollComplete(progress: number, particleT: number) {
-    if (!isMobile || !topicsMode) {
-      mobileTopicsScrollComplete = false;
+    if (!isMobile) return;
+    if (topicsMode || phase === 'topics') {
+      mobileTopicsScrollComplete = true;
       return;
     }
     mobileTopicsScrollComplete = progress >= MOBILE_TOPICS_READY_PROGRESS && particleT >= 1;
+  }
+
+  let topicsScrollLockY = 0;
+
+  function lockMobileTopicsPageScroll() {
+    if (!isMobile || !topicsMode) return;
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const y = Math.min(topicsScrollLockY, maxScroll);
+    if (Math.abs(window.scrollY - y) > 1) {
+      window.scrollTo(0, y);
+    }
   }
 
   // ── Model loaded signal ───────────────────────────────────────────────────
@@ -728,8 +765,16 @@
     phase = 'topics';
     if (isMobile) {
       mobileTopicsScrollComplete = true;
-      tick().then(updateTopicsModelFit);
-      setTimeout(updateTopicsModelFit, 450);
+      topicsScrollLockY = window.scrollY;
+      window.addEventListener('scroll', lockMobileTopicsPageScroll, { passive: true });
+      tick().then(() => {
+        updateTopicsModelFit();
+        lockTopicsMobileLayout();
+      });
+      setTimeout(() => {
+        updateTopicsModelFit();
+        lockTopicsMobileLayout();
+      }, 450);
     } else {
       lenisRef?.stop();
       window.addEventListener('wheel', onTopicsWheel, { passive: false, capture: true });
@@ -768,6 +813,8 @@
     if (!topicsMode) return;
     topicsMode = false;
     if (isMobile) {
+      window.removeEventListener('scroll', lockMobileTopicsPageScroll);
+      scene3d?.unlockMobileFit();
       mobileTopicsScrollComplete = false;
       if (mobileCardsVisible) {
         mobileCardsVisible = false;
@@ -927,7 +974,7 @@
 
             if (particleT >= 1 && !topicsMode) {
               enterTopicsMode();
-            } else if (particleT < 1 && topicsMode) {
+            } else if (particleT < 1 && topicsMode && !isMobile) {
               exitTopicsMode();
             }
 
@@ -1027,6 +1074,7 @@
         window.removeEventListener('resize', updateTopicsModelFit);
         window.removeEventListener('resize', updateFeedbackModelFit);
         if (isMobile) {
+          window.removeEventListener('scroll', lockMobileTopicsPageScroll);
           document.removeEventListener('touchstart', mobileTouchStart);
           document.removeEventListener('touchmove', mobileTouchMove);
           document.removeEventListener('touchend', mobileTouchEnd);

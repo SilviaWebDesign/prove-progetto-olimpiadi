@@ -29,6 +29,8 @@
     setMobileLayoutBlend:   (t: number) => void;
     setModelBaseYOffset:    (vh: number) => void;
     snapMobileFit:          () => void;
+    lockMobileFit:          () => void;
+    unlockMobileFit:        () => void;
     clearMobileFit:         () => void;
     realignFeedback:        () => void;
   }
@@ -194,6 +196,7 @@
   let mobileFitActive       = false;
   let mobileFitFinalOffsetY = 0;
   let mobileLayoutBlend     = 0;
+  let mobileFitLocked       = false;
   const MOBILE_FIT_LERP = 0.1;
   /** 0.5 = centro del gap; valori più alti spostano il modello verso il basso. */
   const MOBILE_FIT_CENTER_BIAS = 0.5;
@@ -406,6 +409,7 @@
         feedbackFitOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
       setMobileLayoutBlend: (t) => {
+        if (mobileFitLocked) return;
         mobileLayoutBlend = Math.max(0, Math.min(1, t));
       },
       setModelBaseYOffset: (vh) => {
@@ -416,7 +420,17 @@
         const targetY = mobileFitFinalOffsetY * mobileLayoutBlend + getModelBaseYOffset();
         spinner.position.y = targetY;
       },
+      lockMobileFit: () => {
+        mobileFitLocked = true;
+        if (!spinner || !mobileFitActive) return;
+        const targetY = mobileFitFinalOffsetY * mobileLayoutBlend + getModelBaseYOffset();
+        spinner.position.y = targetY;
+      },
+      unlockMobileFit: () => {
+        mobileFitLocked = false;
+      },
       clearMobileFit: () => {
+        mobileFitLocked = false;
         prepareForFeedback();
       },
       realignFeedback: () => realignFeedbackModel(),
@@ -1165,7 +1179,7 @@
     }
     if (controls?.enabled) controls.update(dt);
 
-    if (spinner && !isFeedbackActive && feedbackLayoutScale === null && morphState !== 'morphing') {
+    if (spinner && !isFeedbackActive && feedbackLayoutScale === null && morphState !== 'morphing' && !mobileFitLocked) {
       const fitY = mobileFitActive ? mobileFitFinalOffsetY * mobileLayoutBlend : 0;
       const targetY = fitY + getModelBaseYOffset();
       spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;

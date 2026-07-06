@@ -200,16 +200,28 @@
   function completeFeedbackTransition() {
     phase = 'feedback';
     isTransitioning = false;
+    scheduleFeedbackModelFit();
     void tick().then(() => {
-      updateFeedbackModelFit();
-      requestAnimationFrame(() => {
-        updateFeedbackModelFit();
-        requestAnimationFrame(updateFeedbackModelFit);
+      gsap.fromTo('.feedback-top', { opacity: 0 }, {
+        opacity: 1,
+        duration: 0.5,
+        ease: 'power2.out',
+        onComplete: updateFeedbackModelFit,
       });
-      setTimeout(updateFeedbackModelFit, 550);
-      gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
-      gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
-      gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.25 });
+      gsap.fromTo('.feedback-subtitle', { opacity: 0 }, {
+        opacity: 1,
+        duration: 0.5,
+        ease: 'power2.out',
+        delay: 0.15,
+        onComplete: updateFeedbackModelFit,
+      });
+      gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, {
+        opacity: 1,
+        duration: 0.5,
+        ease: 'power2.out',
+        delay: 0.25,
+        onComplete: updateFeedbackModelFit,
+      });
     });
   }
 
@@ -547,6 +559,29 @@
     return viewport?.getBoundingClientRect().height ?? window.innerHeight;
   }
 
+  function scheduleFeedbackModelFit() {
+    void tick().then(() => {
+      updateFeedbackModelFit();
+      requestAnimationFrame(() => {
+        updateFeedbackModelFit();
+        requestAnimationFrame(updateFeedbackModelFit);
+      });
+      setTimeout(updateFeedbackModelFit, 550);
+      setTimeout(updateFeedbackModelFit, 900);
+      if (document.fonts?.ready) {
+        void document.fonts.ready.then(() => updateFeedbackModelFit());
+      }
+    });
+  }
+
+  function scheduleTopicsModelFit() {
+    void tick().then(() => {
+      updateTopicsModelFit({ relayout: true });
+      requestAnimationFrame(() => updateTopicsModelFit({ relayout: true }));
+      setTimeout(() => updateTopicsModelFit({ relayout: true }), 450);
+    });
+  }
+
   function updateFeedbackModelFit() {
     if (!scene3d || phase !== 'feedback') return;
     const topEl =
@@ -559,8 +594,10 @@
     const subtitleRect = subtitleEl.getBoundingClientRect();
     const margin = feedbackModelMargin();
     const gapTop = topRect.bottom + margin;
-    const gapBottom = subtitleRect.top - margin;
-    if (gapBottom - gapTop < 48) return;
+    let gapBottom = subtitleRect.top - margin;
+    if (gapBottom - gapTop < 48) {
+      gapBottom = gapTop + 48;
+    }
 
     scene3d.setFeedbackFit(gapTop, gapBottom, {
       centerBias: feedbackCenterBias(),
@@ -642,15 +679,14 @@
     }
 
     if (bottomPx - topPx < 48) {
-      if (!cardsActive) {
-        scene3d.setModelBaseYOffset(0);
-        return;
-      }
       bottomPx = topPx + 48;
     }
 
     scene3d.setModelBaseYOffset(topicsModelYOffset(cardsActive));
-    scene3d.setMobileFit(topPx, bottomPx, topicsFitOptions(cardsActive));
+    scene3d.setMobileFit(topPx, bottomPx, {
+      ...topicsFitOptions(cardsActive),
+      viewportHeightPx: mobileTopicsViewportHeightPx(),
+    });
     if (!options.skipScale) applyTopicsScale(false);
     syncTopicsMobileLayout(1);
     if (isMobile && phase === 'topics') {
@@ -662,8 +698,7 @@
   $effect(() => {
     if (!stageTextEl || phase === 'feedback') return;
     const observer = new ResizeObserver(() => {
-      if (isMobile && topicsMobileLayoutLocked) return;
-      updateTopicsModelFit();
+      updateTopicsModelFit({ relayout: isMobile });
     });
     observer.observe(stageTextEl);
     return () => observer.disconnect();
@@ -683,8 +718,7 @@
   $effect(() => {
     if (!stageRightEl || phase === 'feedback') return;
     const observer = new ResizeObserver(() => {
-      if (isMobile && topicsMobileLayoutLocked) return;
-      updateTopicsModelFit();
+      updateTopicsModelFit({ relayout: isMobile });
     });
     observer.observe(stageRightEl);
     return () => observer.disconnect();
@@ -696,17 +730,16 @@
       feedbackTopEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-top') ?? null;
     const subtitleEl =
       feedbackSubtitleEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-subtitle') ?? null;
+    const ctaEl = sceneEl?.querySelector<HTMLElement>('.feedback-bottom-cta') ?? null;
     if (!topEl || !subtitleEl) {
-      void tick().then(updateFeedbackModelFit);
+      scheduleFeedbackModelFit();
       return;
     }
     const observer = new ResizeObserver(() => updateFeedbackModelFit());
     observer.observe(topEl);
     observer.observe(subtitleEl);
-    void tick().then(() => {
-      updateFeedbackModelFit();
-      requestAnimationFrame(updateFeedbackModelFit);
-    });
+    if (ctaEl) observer.observe(ctaEl);
+    scheduleFeedbackModelFit();
     return () => observer.disconnect();
   });
 
@@ -2026,7 +2059,11 @@
 
     .feedback-subtitle {
       font-size: 15px;
-      bottom: 128px;
+      bottom: calc(
+        128px +
+        var(--mobile-browser-chrome-bottom, 0px) +
+        env(safe-area-inset-bottom, 0px)
+      );
       padding: 0 20px;
       max-width: min(780px, 100%);
       margin-left: auto;

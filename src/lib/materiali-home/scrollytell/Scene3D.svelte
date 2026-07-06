@@ -11,6 +11,7 @@
 
   export interface MobileFitOptions {
     centerBias?: number;
+    viewportHeightPx?: number;
   }
 
   export interface FeedbackFitOptions {
@@ -550,13 +551,16 @@
       setMobileFit: (topPx, bottomPx, options = {}) => {
         if (!camera) return;
         mobileFitActive = true;
-        const vh        = window.innerHeight;
-        const fov       = camera.fov * (Math.PI / 180);
-        const visibleH  = 2 * Math.tan(fov / 2) * camera.position.z;
-        const gapPx     = Math.max(24, bottomPx - topPx);
+        const vh = options.viewportHeightPx ?? window.innerHeight;
+        const visibleH = getCameraVisibleH();
+        const gapPx = Math.max(24, bottomPx - topPx);
         const centerBias = options.centerBias ?? MOBILE_FIT_CENTER_BIAS;
         const centerPx = topPx + gapPx * centerBias;
         mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
+        if (mobileFitLocked && spinner) {
+          const targetY = mobileFitFinalOffsetY * mobileLayoutBlend + getModelBaseYOffset();
+          spinner.position.y = targetY;
+        }
       },
       setFeedbackFit: (topPx, bottomPx, options = {}) => {
         if (!camera) return;
@@ -1458,7 +1462,12 @@
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    if (isFeedbackActive && feedbackFitReady) realignFeedbackModel();
+    if (isFeedbackActive && feedbackFitReady) {
+      realignFeedbackModel();
+    } else if (mobileFitActive && mobileFitLocked && spinner) {
+      const targetY = mobileFitFinalOffsetY * mobileLayoutBlend + getModelBaseYOffset();
+      spinner.position.y = targetY;
+    }
   }
 </script>
 

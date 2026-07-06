@@ -40,13 +40,35 @@
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }
 
+  /** @param {number} deltaY */
+  function applyIntroScroll(deltaY) {
+    if (introDismissed || deltaY <= 0) return;
+    introProgress = Math.min(1, introProgress + deltaY / 500);
+    if (introProgress >= 0.55) dismissIntro();
+  }
+
   /** @param {WheelEvent} [event] */
   function onWheelDismiss(event) {
     if (introDismissed) return;
     if (event && event.deltaY <= 0) return;
-    const delta = event?.deltaY ?? 120;
-    introProgress = Math.min(1, introProgress + delta / 500);
-    if (introProgress >= 0.55) dismissIntro();
+    applyIntroScroll(event?.deltaY ?? 120);
+  }
+
+  let touchStartY = 0;
+
+  /** @param {TouchEvent} event */
+  function onTouchStart(event) {
+    if (introDismissed || event.touches.length !== 1) return;
+    touchStartY = event.touches[0].clientY;
+  }
+
+  /** @param {TouchEvent} event */
+  function onTouchMove(event) {
+    if (introDismissed || event.touches.length !== 1) return;
+    const currentY = event.touches[0].clientY;
+    const deltaY = touchStartY - currentY;
+    touchStartY = currentY;
+    applyIntroScroll(deltaY);
   }
 
   /** @param {KeyboardEvent} event */
@@ -71,11 +93,15 @@
     mobileMq.addEventListener('change', syncMobileExplore);
 
     window.addEventListener('wheel', onWheelDismiss, { passive: true });
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
     window.addEventListener('keydown', onIntroKeydown);
 
     return () => {
       mobileMq.removeEventListener('change', syncMobileExplore);
       window.removeEventListener('wheel', onWheelDismiss);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('keydown', onIntroKeydown);
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
@@ -150,6 +176,8 @@
     <section
       class="intro-screen"
       onwheel={onWheelDismiss}
+      ontouchstart={onTouchStart}
+      ontouchmove={onTouchMove}
       onkeydown={onIntroKeydown}
       tabindex="0"
       aria-label="Introduzione about"

@@ -324,7 +324,11 @@
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
   const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.035;
   /** Offset verticale pianta con pannello commenti visibile (positivo = più in alto). */
-  const PLANT_CARDS_Y_OFFSET_VH = 0.06;
+  const PLANT_CARDS_Y_OFFSET_VH = 0.03;
+  /** Con opinioni aperte: ancora la pianta più in basso nello spazio libero. */
+  const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.42;
+  /** Gap extra tra testo e pianta quando le opinioni sono visibili. */
+  const PLANT_MOBILE_CARDS_TEXT_GAP_PX = 20;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
   /** Altezza viewport scroll commenti: 2 card visibili per volta. */
   const MOBILE_CARD_AVG_HEIGHT = 96;
@@ -343,7 +347,7 @@
   const MOBILE_TOPIC_COMPACT_RATIO = 24 / 36;
   const MOBILE_TEXT_SCALE_DURATION = 0.4;
   /** Riduzione extra pianta con pannello commenti visibile. */
-  const PLANT_CARDS_SCALE_MUL = 0.92;
+  const PLANT_CARDS_SCALE_MUL = 0.68;
   /** Scala base pianta su mobile (argomenti). */
   const PLANT_TOPICS_SCALE_MUL = 0.78;
   /** Riduzione extra pattini con pannello commenti visibile. */
@@ -404,6 +408,10 @@
     return isMobile ? mobileCardsVisible : cardsIntroduced;
   }
 
+  function isPlantModel(): boolean {
+    return config.modelSrc === '/oggetti/pianta.glb';
+  }
+
   function plantTopicsYOffset(cardsActive: boolean): number {
     if (config.modelSrc !== '/oggetti/pianta.glb' || phase !== 'topics') return 0;
     return cardsActive ? PLANT_CARDS_Y_OFFSET_VH : PLANT_THEME_TEXT_Y_OFFSET_VH;
@@ -423,6 +431,9 @@
   }
 
   function topicsFitOptions(cardsActive: boolean): MobileFitOptions {
+    if (isMobile && isPlantModel() && cardsActive) {
+      return { centerBias: PLANT_MOBILE_CARDS_CENTER_BIAS };
+    }
     if (!isMobile || !cardsActive || !isSportModel()) {
       return { centerBias: TOPICS_FIT_CENTER_BIAS };
     }
@@ -448,7 +459,9 @@
         if (headingRect) bottomBoundPx = headingRect.top;
       }
       const topMargin = TOPICS_MODEL_MARGIN + (cardsActive && isSportModel() ? MOBILE_CARDS_TOP_MARGIN : 0);
-      topPx = textRect.bottom + topMargin;
+      topPx = textRect.bottom + (
+        isPlantModel() && cardsActive ? PLANT_MOBILE_CARDS_TEXT_GAP_PX : topMargin
+      );
       bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
     } else if (cardsActive && cardsRect && cardsRect.height > 0) {
       const overlapTop = Math.max(textRect.top, cardsRect.top);

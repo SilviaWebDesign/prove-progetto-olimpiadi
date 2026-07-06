@@ -364,7 +364,7 @@
     font-weight: 800;
     line-height: 1.1;
     letter-spacing: 0;
-    color: #000000;
+    color: #161A1F;
     text-wrap: balance;
   }
 

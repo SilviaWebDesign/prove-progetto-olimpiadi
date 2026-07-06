@@ -48,7 +48,7 @@
     -webkit-backdrop-filter: blur(16px);
     border: var(--border-thin, 1px solid rgba(22, 24, 29, 0.5));
     border-radius: var(--radius-xs, 8px);
-    color: var(--color-text-primary, #000000);
+    color: var(--color-text-primary, #161A1F);
     box-shadow:
       0 6px 20px rgba(0, 0, 0, 0.08),
       inset 0 1px 1px rgba(255, 255, 255, 0.4);

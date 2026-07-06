@@ -166,7 +166,7 @@
     font-size: 14px;
     font-weight: 800;
     text-transform: uppercase;
-    color: #000000;
+    color: #161A1F;
     white-space: nowrap;
   }
 
@@ -183,7 +183,7 @@
     font-size: clamp(1rem, 2vw, 22px);
     font-weight: 800;
     line-height: 1.1;
-    color: #000000;
+    color: #161A1F;
     flex: 1;
     overflow: hidden;
   }
@@ -199,7 +199,7 @@
     font-size: 18px;
     font-weight: 800;
     text-transform: uppercase;
-    color: #000000;
+    color: #161A1F;
   }
 
   .fact-sources {

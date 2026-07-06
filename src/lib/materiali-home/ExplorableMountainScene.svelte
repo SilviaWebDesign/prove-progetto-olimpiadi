@@ -86,6 +86,25 @@
   const _tmpTarget = new THREE.Vector3();
 
   const smogColor = '#ffffff';
+  const MOUNTAIN_BLUR_MAX = 2.4;
+  const MOUNTAIN_BLUR_LERP = 0.1;
+  /** Quanto la montagna si schiarisce al focus (mantenendo contrasto visibile). */
+  const MOUNTAIN_FOCUS_WHITE_MAX = 0.38;
+  const MOUNTAIN_FOCUS_FOG_BASE = 0.028;
+  const MOUNTAIN_FOCUS_FOG_BOOST = 0.022;
+
+  /** @type {THREE.WebGLRenderTarget | undefined} */
+  let mountainBlurRT;
+  /** @type {THREE.Scene | undefined} */
+  let mountainBlurScene;
+  /** @type {THREE.OrthographicCamera | undefined} */
+  let mountainBlurCamera;
+  /** @type {THREE.ShaderMaterial | undefined} */
+  let mountainBlurMaterial;
+  let mountainBlurCurrent = 0;
+  const _mountainWhite = new THREE.Color(0xf4f6f8);
+  /** @type {Map<THREE.Material, THREE.Color>} */
+  const mountainBaseColors = new Map();
 
   /** @type {{ selectedHotspot?: import('./aboutHotspots.js').AboutHotspot | null; hoveredHotspot?: import('./aboutHotspots.js').AboutHotspot | null }} */
   let { selectedHotspot = $bindable(null), hoveredHotspot = $bindable(null) } = $props();
@@ -181,6 +200,192 @@
     const limits = homeOrbitDistanceLimits(homeOrbitConfig);
     controls.minDistance = limits.min;
     controls.maxDistance = limits.max;
+  }
+
+  /** Montagna opaca: occlusione corretta delle sfere dietro il mesh. */
+  function configureAboutMountainMaterials(object) {
+    object.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of mats) {
+        if (!mat) continue;
+        mat.transparent = false;
+        mat.opacity = 1;
+        mat.depthWrite = true;
+        mat.depthTest = true;
+        mat.needsUpdate = true;
+      }
+    });
+  }
+
+  /** @param {THREE.Object3D} object */
+  function cacheMountainBaseColors(object) {
+    mountainBaseColors.clear();
+    object.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of mats) {
+        if (mat?.color) mountainBaseColors.set(mat, mat.color.clone());
+      }
+    });
+  }
+
+  /** @param {number} amount 0–1 */
+  function applyMountainFocusLook(amount) {
+    const whiteMix = THREE.MathUtils.clamp(amount, 0, 1) * MOUNTAIN_FOCUS_WHITE_MAX;
+    for (const [mat, base] of mountainBaseColors) {
+      mat.color.copy(base).lerp(_mountainWhite, whiteMix);
+    }
+    if (sceneFog) {
+      sceneFog.density = MOUNTAIN_FOCUS_FOG_BASE + amount * MOUNTAIN_FOCUS_FOG_BOOST;
+    }
+    if (mountainBlurMaterial) {
+      mountainBlurMaterial.uniforms.whitenAmount.value = whiteMix;
+    }
+  }
+
+  /** @param {boolean} enabled */
+  function setMountainColorWrite(enabled) {
+    if (!snowMountainModel) return;
+    snowMountainModel.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of mats) {
+        if (mat) mat.colorWrite = enabled;
+      }
+    });
+  }
+
+  /** @param {number} w @param {number} h */
+  function initMountainBlur(w, h) {
+    disposeMountainBlur();
+    const dpr = renderer?.getPixelRatio() ?? 1;
+    const rw = Math.max(1, Math.round(w * dpr));
+    const rh = Math.max(1, Math.round(h * dpr));
+
+    mountainBlurRT = new THREE.WebGLRenderTarget(rw, rh);
+    mountainBlurScene = new THREE.Scene();
+    mountainBlurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    mountainBlurMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: mountainBlurRT.texture },
+        resolution: { value: new THREE.Vector2(rw, rh) },
+        blurRadius: { value: 0 },
+        whitenAmount: { value: 0 }
+      },
+      vertexShader: /* glsl */`
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */`
+        uniform sampler2D tDiffuse;
+        uniform vec2 resolution;
+        uniform float blurRadius;
+        uniform float whitenAmount;
+        varying vec2 vUv;
+
+        void main() {
+          vec4 color;
+          if (blurRadius < 0.01) {
+            color = texture2D(tDiffuse, vUv);
+          } else {
+            color = vec4(0.0);
+            float total = 0.0;
+            vec2 px = blurRadius / resolution;
+            for (float x = -2.0; x <= 2.0; x += 1.0) {
+              for (float y = -2.0; y <= 2.0; y += 1.0) {
+                float weight = 1.0 - length(vec2(x, y)) * 0.14;
+                color += texture2D(tDiffuse, vUv + vec2(x, y) * px) * weight;
+                total += weight;
+              }
+            }
+            color /= total;
+          }
+          color.rgb = mix(color.rgb, vec3(1.0), whitenAmount * smoothstep(0.98, 0.82, 1.0 - dot(color.rgb, vec3(0.299, 0.587, 0.114))));
+          gl_FragColor = color;
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    });
+
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mountainBlurMaterial);
+    mountainBlurScene.add(quad);
+  }
+
+  function disposeMountainBlur() {
+    mountainBlurRT?.dispose();
+    mountainBlurMaterial?.dispose();
+    mountainBlurRT = undefined;
+    mountainBlurScene = undefined;
+    mountainBlurCamera = undefined;
+    mountainBlurMaterial = undefined;
+    mountainBlurCurrent = 0;
+  }
+
+  function updateMountainBlur() {
+    if (!mountainBlurMaterial) return;
+    const target = selectedHotspot ? MOUNTAIN_BLUR_MAX : 0;
+    mountainBlurCurrent += (target - mountainBlurCurrent) * MOUNTAIN_BLUR_LERP;
+    mountainBlurMaterial.uniforms.blurRadius.value = mountainBlurCurrent;
+    const focusAmount = MOUNTAIN_BLUR_MAX > 0 ? mountainBlurCurrent / MOUNTAIN_BLUR_MAX : 0;
+    applyMountainFocusLook(focusAmount);
+  }
+
+  function renderScene() {
+    if (!renderer || !scene || !camera) return;
+
+    updateMountainBlur();
+
+    const useBlur =
+      mountainBlurCurrent > 0.05 &&
+      mountainBlurRT &&
+      mountainBlurScene &&
+      mountainBlurCamera &&
+      snowMountainModel &&
+      markerGroup;
+
+    if (!useBlur) {
+      renderer.setRenderTarget(null);
+      renderer.render(scene, camera);
+      return;
+    }
+
+    const markersWereVisible = markerGroup.visible;
+    markerGroup.visible = false;
+
+    renderer.setRenderTarget(mountainBlurRT);
+    renderer.setClearColor(0xffffff, 1);
+    renderer.clear();
+    renderer.render(scene, camera);
+
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(0xffffff, 1);
+    renderer.clear();
+    renderer.render(mountainBlurScene, mountainBlurCamera);
+
+    markerGroup.visible = markersWereVisible;
+    setMountainColorWrite(false);
+
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+
+    markerGroup.visible = false;
+    renderer.clearDepth();
+    renderer.render(scene, camera);
+
+    markerGroup.visible = markersWereVisible;
+    snowMountainModel.visible = false;
+    renderer.render(scene, camera);
+
+    snowMountainModel.visible = true;
+    setMountainColorWrite(true);
+    renderer.render(scene, camera);
+    renderer.autoClear = prevAutoClear;
   }
 
   /**
@@ -770,6 +975,7 @@
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    initMountainBlur(w, h);
 
     const nextMobileLayout = isAboutMobileLayout();
     if (nextMobileLayout !== mobileLayout && snowMountainModel) {
@@ -823,7 +1029,7 @@
       updateMarkerScales();
     }
 
-    renderer.render(scene, camera);
+    renderScene();
   }
 
   function teardown() {
@@ -869,6 +1075,10 @@
       renderer.domElement.remove();
       renderer = undefined;
     }
+
+    disposeMountainBlur();
+    mountainBaseColors.clear();
+    applyMountainFocusLook(0);
 
     scene = undefined;
     camera = undefined;
@@ -977,6 +1187,8 @@
         const { mountainCenter, snowField, orbitRadius, topDownHeight } =
           fitMountainModel(snowMountainModel);
         setupMountainRenderMaterials(snowMountainModel);
+        configureAboutMountainMaterials(snowMountainModel);
+        cacheMountainBaseColors(snowMountainModel);
         scene.add(snowMountainModel);
 
         _worldBox.setFromObject(snowMountainModel);

@@ -16,6 +16,8 @@ const FOCUS_HOVER_IN_LERP = 0.09;
 const FOCUS_HOVER_OUT_LERP = 0.065;
 const BASE_OPACITY = 0.85;
 const ACTIVE_OPACITY = 0.95;
+/** Colore particelle marker — allineato al testo UI (#161A1F). */
+const MARKER_COLOR_RGB = 'vec3(0.0862745, 0.1019608, 0.1215686)';
 
 /**
  * @param {number} count
@@ -94,7 +96,7 @@ function buildParticleSphereMesh(active = false) {
       void main() {
         float alpha = uBaseOpacity + uPulse * 0.5;
         alpha *= mix(1.0, 0.82, uHover);
-        gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+        gl_FragColor = vec4(${MARKER_COLOR_RGB}, alpha);
       }
     `,
     transparent: true,

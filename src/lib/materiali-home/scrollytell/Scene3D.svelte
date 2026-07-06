@@ -96,7 +96,6 @@
 
   /** Altezza max del modello in fase feedback (frazione del viewport). */
   const FEEDBACK_MAX_VH = 0.36;
-  const _feedbackPivot = new THREE.Vector3();
   let feedbackLayoutScale: THREE.Vector3 | null = null;
   let feedbackFitOffsetY = 0;
 
@@ -133,8 +132,9 @@
     }
 
     spinner.position.set(0, 0, 0);
-    if (!feedback && !isFeedbackActive) {
-      spinner.rotation.set(0, 0, 0);
+    spinner.rotation.set(0, 0, 0);
+    if (feedback || isFeedbackActive) {
+      group.rotation.set(0, 0, 0);
     }
 
     resetFeedbackViewCamera();
@@ -154,8 +154,9 @@
     }
 
     group.updateMatrixWorld(true);
-    group.getWorldPosition(_feedbackPivot);
-    spinner.position.copy(_feedbackPivot).negate();
+    const fitBox = new THREE.Box3().setFromObject(group);
+    const fitCenter = fitBox.getCenter(new THREE.Vector3());
+    spinner.position.set(-fitCenter.x, -fitCenter.y, -fitCenter.z);
     if (feedback || isFeedbackActive) {
       spinner.position.y += feedbackFitOffsetY;
     }
@@ -785,12 +786,11 @@
 
   function finalizeMorphView() {
     if (activeResultGroup && spinner) {
-      // Trasferisce la rotazione idle sul modello risultato prima di azzerare lo spinner,
-      // altrimenti il pattino appare capovolto/spostato a fine morph.
-      activeResultGroup.rotation.y += spinner.rotation.y;
+      activeResultGroup.rotation.set(0, 0, 0);
       spinner.rotation.set(0, 0, 0);
     }
 
+    feedbackLayoutScale = null;
     if (activeResultGroup) centerModelInViewport(activeResultGroup, true);
     else if (modelGroup) centerModelInViewport(modelGroup, true);
 
@@ -858,7 +858,7 @@
 
     freezeSpinnerRotation();
     const resultGroup = source.clone();
-    resultGroup.rotation.copy(modelGroup.rotation);
+    resultGroup.rotation.set(0, 0, 0);
 
     resultGroup.updateMatrixWorld(true);
     const box    = new THREE.Box3().setFromObject(resultGroup);

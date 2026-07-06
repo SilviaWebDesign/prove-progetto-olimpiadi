@@ -835,7 +835,6 @@
       mobileTopicsScrollComplete = true;
       topicsScrollLockY = window.scrollY;
       window.addEventListener('scroll', lockMobileTopicsPageScroll, { passive: true });
-      gsap.set('.stage__cta', { opacity: 1 });
       tick().then(() => {
         updateTopicsModelFit({ relayout: true });
         lockTopicsMobileLayout();
@@ -1056,10 +1055,6 @@
               exitTopicsMode();
             }
 
-            if (isMobile && progress >= 0.77) {
-              gsap.set('.stage__cta', { opacity: 1 });
-            }
-
             updateMobileTopicsScrollComplete(progress, particleT);
             updateMobileCardsFromScroll(progress);
           },
@@ -1174,18 +1169,12 @@
   <title>{config.pageTitle}</title>
 </svelte:head>
 
-<section
-  class="scene scene--{config.sectionId}"
-  bind:this={sceneEl}
-  style={isMobile
-    ? `--mobile-browser-chrome-bottom: ${mobileBrowserChromeBottom}px`
-    : undefined}
->
+<section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
   <div
     class="scene__viewport"
     class:scene__viewport--feedback={phase === 'feedback'}
     style={isMobile
-      ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px`
+      ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px; --mobile-browser-chrome-bottom: ${mobileBrowserChromeBottom}px`
       : undefined}
   >
 
@@ -1280,30 +1269,8 @@
 
     </div>
 
-    <!-- Mobile scroll indicator -->
-    <div
-      class="mobile-scroll-indicator"
-      class:visible={isMobile && mobileCardsVisible}
-      aria-hidden="true"
-      style="--scroll-ratio: {mobileScrollRatio}"
-    ></div>
-
-    <!-- Overlay fase feedback -->
-    {#if phase === 'feedback'}
-      <div class="feedback-overlay">
-        <div class="feedback-top" bind:this={feedbackTopEl} style="opacity: 0">
-          <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
-        </div>
-        <p class="feedback-subtitle" bind:this={feedbackSubtitleEl} style="opacity: 0">
-          {keepLastWordsTogether(getResultLabel())}
-        </p>
-      </div>
-    {/if}
-
-  </div>
-
-  <!-- CTA fuori dal viewport sticky: fixed reale su mobile, segue la barra browser -->
-  {#if phase !== 'feedback'}
+    <!-- CTA in basso al centro (nascosto in feedback: usa feedback-bottom-cta) -->
+    {#if phase !== 'feedback'}
     <div class="stage__cta">
       <div
         class="stage__cta-content"
@@ -1327,26 +1294,45 @@
         </svg>
       </div>
     </div>
-  {/if}
+    {/if}
 
-  {#if phase === 'feedback'}
+    <!-- Mobile scroll indicator -->
     <div
-      class="feedback-bottom-cta"
-      style="opacity: 0"
-      role="button"
-      tabindex="0"
-      onclick={() => { $allSectionsCompleted ? navigateToResults() : goToNextSection(); }}
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $allSectionsCompleted ? navigateToResults() : goToNextSection(); } }}
-    >
-      <span class="cta-label">
-        {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
-      </span>
-      <svg class="cta-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
-        <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-  {/if}
+      class="mobile-scroll-indicator"
+      class:visible={isMobile && mobileCardsVisible}
+      aria-hidden="true"
+      style="--scroll-ratio: {mobileScrollRatio}"
+    ></div>
+
+    <!-- Overlay fase feedback -->
+    {#if phase === 'feedback'}
+      <div class="feedback-overlay">
+        <div class="feedback-top" bind:this={feedbackTopEl} style="opacity: 0">
+          <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
+        </div>
+        <p class="feedback-subtitle" bind:this={feedbackSubtitleEl} style="opacity: 0">
+          {keepLastWordsTogether(getResultLabel())}
+        </p>
+        <div
+          class="feedback-bottom-cta"
+          style="opacity: 0"
+          role="button"
+          tabindex="0"
+          onclick={() => { $allSectionsCompleted ? navigateToResults() : goToNextSection(); }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $allSectionsCompleted ? navigateToResults() : goToNextSection(); } }}
+        >
+          <span class="cta-label">
+            {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
+          </span>
+          <svg class="cta-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
+            <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    {/if}
+
+  </div>
 </section>
 
 <style>
@@ -1614,7 +1600,7 @@
 
   /* ── CTA ─────────────────────────────────────────────────────────────── */
   .stage__cta {
-    position: fixed;
+    position: absolute;
     bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
@@ -1721,7 +1707,7 @@
   }
 
   .feedback-bottom-cta {
-    position: fixed;
+    position: absolute;
     bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
@@ -1733,7 +1719,6 @@
     cursor: pointer;
     pointer-events: auto;
     white-space: nowrap;
-    z-index: 10;
   }
 
   .feedback-bottom-cta .cta-chevron {
@@ -1752,7 +1737,7 @@
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
       --mobile-cards-bottom: 90px;
-      --mobile-cta-bottom: 12px;
+      --mobile-cta-bottom: 16px;
       --mobile-browser-chrome-bottom: 0px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
     }
@@ -1965,25 +1950,21 @@
     }
 
     .stage__cta {
-      position: fixed;
       left: 0;
       right: 0;
       width: 100%;
       transform: none;
-      opacity: 1;
-      bottom: calc(
-        var(--mobile-cta-bottom) +
-        var(--mobile-browser-chrome-bottom, 0px) +
-        env(safe-area-inset-bottom, 0px)
-      );
+      bottom: 0;
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      padding-top: 168px;
-      padding-bottom: 0;
+      padding-top: 148px;
+      padding-bottom: max(
+        var(--mobile-cta-bottom),
+        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 4px)
+      );
       box-sizing: border-box;
       background: transparent;
-      z-index: 20;
     }
 
     .stage__cta-content {
@@ -1991,23 +1972,7 @@
     }
 
     .feedback-bottom-cta {
-      position: fixed;
-      left: 0;
-      right: 0;
-      width: 100%;
-      transform: none;
-      bottom: calc(
-        var(--mobile-browser-chrome-bottom, 0px) +
-        env(safe-area-inset-bottom, 0px)
-      );
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 120px;
-      padding-bottom: 8px;
-      box-sizing: border-box;
-      background: transparent;
-      z-index: 15;
+      bottom: max(8px, calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px)));
     }
   }
 </style>

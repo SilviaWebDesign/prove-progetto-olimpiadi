@@ -25,6 +25,7 @@
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
     setMobileFit:           (topPx: number, bottomPx: number, options?: MobileFitOptions) => void;
+    setFeedbackFit:         (topPx: number, bottomPx: number) => void;
     setMobileLayoutBlend:   (t: number) => void;
     setModelBaseYOffset:    (vh: number) => void;
     snapMobileFit:          () => void;
@@ -95,6 +96,7 @@
   const FEEDBACK_MAX_VH = 0.36;
   const _feedbackPivot = new THREE.Vector3();
   let feedbackLayoutScale: THREE.Vector3 | null = null;
+  let feedbackFitOffsetY = 0;
 
   function getCameraVisibleH(): number {
     if (!camera) return 1;
@@ -152,12 +154,16 @@
     group.updateMatrixWorld(true);
     group.getWorldPosition(_feedbackPivot);
     spinner.position.copy(_feedbackPivot).negate();
+    if (feedback || isFeedbackActive) {
+      spinner.position.y += feedbackFitOffsetY;
+    }
   }
 
   function prepareForFeedback() {
     mobileFitActive = false;
     mobileLayoutBlend = 0;
     modelBaseYOffsetVh = 0;
+    feedbackFitOffsetY = 0;
     if (spinner) {
       spinner.position.set(0, 0, 0);
       spinner.rotation.set(0, 0, 0);
@@ -390,6 +396,14 @@
         const centerBias = options.centerBias ?? MOBILE_FIT_CENTER_BIAS;
         const centerPx = topPx + gapPx * centerBias;
         mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
+      },
+      setFeedbackFit: (topPx, bottomPx) => {
+        if (!camera) return;
+        const vh = window.innerHeight;
+        const visibleH = getCameraVisibleH();
+        const gapPx = Math.max(24, bottomPx - topPx);
+        const centerPx = topPx + gapPx * 0.5;
+        feedbackFitOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
       setMobileLayoutBlend: (t) => {
         mobileLayoutBlend = Math.max(0, Math.min(1, t));

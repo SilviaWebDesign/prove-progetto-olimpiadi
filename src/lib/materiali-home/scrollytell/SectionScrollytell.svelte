@@ -226,8 +226,9 @@
       phase = 'feedback';
       isTransitioning = false;
       tick().then(() => {
-        scene3d?.realignFeedback();
-        requestAnimationFrame(() => scene3d?.realignFeedback());
+        updateFeedbackModelFit();
+        requestAnimationFrame(updateFeedbackModelFit);
+        setTimeout(updateFeedbackModelFit, 550);
         gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
         gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
         gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.25 });
@@ -314,6 +315,8 @@
   // ── Mobile-specific state ─────────────────────────────────────────────────
   let cardsScrollRef = $state<HTMLElement | null>(null);
   let stageTextEl = $state<HTMLElement | null>(null);
+  let feedbackTopEl = $state<HTMLElement | null>(null);
+  let feedbackSubtitleEl = $state<HTMLElement | null>(null);
   let stageRightEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
 
@@ -440,6 +443,19 @@
     return { centerBias: MOBILE_CARDS_FIT_CENTER_BIAS };
   }
 
+  const FEEDBACK_MODEL_MARGIN = 20;
+
+  function updateFeedbackModelFit() {
+    if (!scene3d || phase !== 'feedback' || !feedbackTopEl || !feedbackSubtitleEl) return;
+    const topRect = feedbackTopEl.getBoundingClientRect();
+    const subtitleRect = feedbackSubtitleEl.getBoundingClientRect();
+    scene3d.setFeedbackFit(
+      topRect.bottom + FEEDBACK_MODEL_MARGIN,
+      subtitleRect.top - FEEDBACK_MODEL_MARGIN,
+    );
+    scene3d.realignFeedback();
+  }
+
   function updateTopicsModelFit(options: { skipScale?: boolean } = {}) {
     if (!scene3d || !stageTextEl || phase === 'feedback') return;
 
@@ -514,6 +530,15 @@
     if (!stageRightEl || phase === 'feedback') return;
     const observer = new ResizeObserver(() => updateTopicsModelFit());
     observer.observe(stageRightEl);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    if (phase !== 'feedback' || !feedbackTopEl || !feedbackSubtitleEl) return;
+    const observer = new ResizeObserver(() => updateFeedbackModelFit());
+    observer.observe(feedbackTopEl);
+    observer.observe(feedbackSubtitleEl);
+    void tick().then(updateFeedbackModelFit);
     return () => observer.disconnect();
   });
 
@@ -841,6 +866,7 @@
         document.addEventListener('touchend', mobileTouchEnd, { passive: true });
       }
       window.addEventListener('resize', updateTopicsModelFit);
+      window.addEventListener('resize', updateFeedbackModelFit);
 
       const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
       const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
@@ -999,6 +1025,7 @@
         if (lenisRaf) gsap.ticker.remove(lenisRaf);
         if (lenis) lenis.destroy();
         window.removeEventListener('resize', updateTopicsModelFit);
+        window.removeEventListener('resize', updateFeedbackModelFit);
         if (isMobile) {
           document.removeEventListener('touchstart', mobileTouchStart);
           document.removeEventListener('touchmove', mobileTouchMove);
@@ -1151,10 +1178,10 @@
     <!-- Overlay fase feedback -->
     {#if phase === 'feedback'}
       <div class="feedback-overlay">
-        <div class="feedback-top" style="opacity: 0">
+        <div class="feedback-top" bind:this={feedbackTopEl} style="opacity: 0">
           <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
         </div>
-        <p class="feedback-subtitle" style="opacity: 0">
+        <p class="feedback-subtitle" bind:this={feedbackSubtitleEl} style="opacity: 0">
           {keepLastWordsTogether(getResultLabel())}
         </p>
         <div

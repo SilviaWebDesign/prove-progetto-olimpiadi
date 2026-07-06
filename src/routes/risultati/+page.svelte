@@ -22,7 +22,13 @@
     overlayVisible.set(true);
     await new Promise(r => setTimeout(r, 400));
     visitedSections.reset();
-    window.location.href = '/';
+    window.location.href = '/prototypes/home';
+  }
+
+  async function scopriDiPiu() {
+    overlayVisible.set(true);
+    await new Promise(r => setTimeout(r, 400));
+    window.location.href = '/prototypes/about';
   }
 
   function prevSection() {
@@ -131,18 +137,34 @@
     Lo stesso evento può generare visioni differenti e soggettive, in base alle opinioni di ognuno
   </p>
 
-  <div
-    class="home-cta"
-    role="button"
-    tabindex="0"
-    onclick={tornareAllaHome}
-    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tornareAllaHome(); } }}
-  >
-    <span class="cta-label">Torna alla home</span>
-    <svg class="cta-chevron" viewBox="58 37 41 20" aria-hidden="true" fill="none">
-      <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
+  <div class="bottom-nav">
+    <div
+      class="bottom-cta"
+      role="button"
+      tabindex="0"
+      onclick={tornareAllaHome}
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tornareAllaHome(); } }}
+    >
+      <span class="cta-label">Torna alla home</span>
+      <svg class="cta-chevron cta-chevron--up" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+        <path d="M60 54L78.5 40L95 54" stroke="#161A1F" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <div
+      class="bottom-cta"
+      role="button"
+      tabindex="0"
+      onclick={scopriDiPiu}
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scopriDiPiu(); } }}
+    >
+      <span class="cta-label">Scopri di più</span>
+      <svg class="cta-chevron cta-chevron--down" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+        <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
   </div>
 </div>
 
@@ -320,18 +342,30 @@
     right: 16px;
   }
 
-  .home-cta {
+  .bottom-nav {
     position: fixed;
     left: 50%;
     bottom: 28px;
     transform: translateX(-50%);
     z-index: 1;
     display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: clamp(32px, 12vw, 80px);
+    width: min(100%, 520px);
+    padding: 0 20px;
+    box-sizing: border-box;
+  }
+
+  .bottom-cta {
+    display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
     cursor: pointer;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
   }
 
   .cta-label {
@@ -347,12 +381,24 @@
     display: block;
     width: 38px;
     height: 19px;
-    animation: chevron-bounce 1.4s ease-in-out infinite;
   }
 
-  @keyframes chevron-bounce {
+  .cta-chevron--down {
+    animation: chevron-bounce-down 1.4s ease-in-out infinite;
+  }
+
+  .cta-chevron--up {
+    animation: chevron-bounce-up 1.4s ease-in-out infinite;
+  }
+
+  @keyframes chevron-bounce-down {
     0%, 100% { transform: translateY(0); }
     50%       { transform: translateY(5px); }
+  }
+
+  @keyframes chevron-bounce-up {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-5px); }
   }
 
   @media (max-width: 768px) {

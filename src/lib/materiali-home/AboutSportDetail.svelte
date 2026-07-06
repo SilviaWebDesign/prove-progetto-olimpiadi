@@ -25,10 +25,22 @@
   let scrollEl = $state(null);
   /** @type {HTMLElement | null} */
   let contentEl = $state(null);
+  /** @type {HTMLElement | null} */
+  let titleEl = $state(null);
   let canScroll = $state(false);
   let scrollRatio = $state(0);
   let thumbRatio = $state(1);
-  let trackHeight = $state(0);
+  let sliderTop = $state(0);
+  let sliderTrackHeight = $state(0);
+
+  function measureSliderFrame() {
+    if (!scrollEl || !contentEl || !titleEl) return;
+
+    const contentStyles = getComputedStyle(contentEl);
+    const paddingTop = Number.parseFloat(contentStyles.paddingTop) || 0;
+    sliderTop = contentEl.offsetTop + paddingTop + titleEl.offsetTop;
+    sliderTrackHeight = Math.max(0, scrollEl.clientHeight - sliderTop);
+  }
 
   function syncSlider() {
     if (!scrollEl) return;
@@ -38,7 +50,7 @@
     scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 0;
     thumbRatio =
       scrollHeight > 0 ? Math.max(0.14, Math.min(1, clientHeight / scrollHeight)) : 1;
-    trackHeight = clientHeight;
+    measureSliderFrame();
   }
 
   /** @param {number} value @param {number} min @param {number} max */
@@ -67,7 +79,7 @@
     const startY = event.clientY;
     const startScroll = scrollEl.scrollTop;
     const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
-    const trackHeightPx = trackHeight;
+    const trackHeightPx = sliderTrackHeight;
     const thumbHeightPx = thumbRatio * trackHeightPx;
 
     /** @param {PointerEvent} moveEvent */
@@ -103,7 +115,7 @@
   });
 
   $effect(() => {
-    if (!panelEl || !scrollEl || !contentEl) return;
+    if (!panelEl || !scrollEl || !contentEl || !titleEl) return;
 
     const observer = new ResizeObserver(() => {
       fitPanelContent();
@@ -112,6 +124,7 @@
     observer.observe(panelEl);
     observer.observe(scrollEl);
     observer.observe(contentEl);
+    observer.observe(titleEl);
 
     return () => observer.disconnect();
   });
@@ -141,7 +154,7 @@
     <div class="sport-panel-scroll" bind:this={scrollEl} onscroll={syncSlider}>
       <div class="sport-panel-content" bind:this={contentEl}>
         {#key hotspot.id}
-          <h1 id="sport-detail-title" class="sport-title">{title}</h1>
+          <h1 id="sport-detail-title" class="sport-title" bind:this={titleEl}>{title}</h1>
           <div class="sport-body">
             {#each paragraphs as paragraph}
               <p>{paragraph}</p>
@@ -154,7 +167,8 @@
     <div
       class="sport-text-slider"
       class:sport-text-slider--active={canScroll}
-      style:height="{trackHeight}px"
+      style:top="{sliderTop}px"
+      style:height="{sliderTrackHeight}px"
       aria-hidden="true"
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -171,7 +185,15 @@
   <footer class="sport-continue-wrap">
     <button type="button" class="continue-btn" onclick={onContinue}>
       <span class="continue-label">CONTINUA</span>
-      <span class="continue-chevron" aria-hidden="true"></span>
+      <svg class="continue-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
+        <path
+          d="M1 1.35L10.5 7.65L20 1.35"
+          stroke="#161A1F"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
     </button>
   </footer>
 </div>
@@ -244,7 +266,7 @@
 
   .sport-panel-content {
     position: relative;
-    padding: 0 0 24px;
+    padding: 0 0 72px;
     transform-origin: top right;
     --sport-title-size: clamp(1.75rem, 3.2vw, 36px);
   }
@@ -324,16 +346,17 @@
     transform: translateX(-50%);
     z-index: 51;
     pointer-events: none;
-    padding-top: 24px;
+    padding-top: 64px;
   }
 
   .continue-btn {
+    font-family: 'Supreme Variable', sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 22px;
+    gap: 10px;
     margin: 0;
-    padding: 8px 14px;
+    padding: 0 14px 10px;
     border: none;
     background: transparent;
     cursor: pointer;
@@ -342,22 +365,30 @@
 
   .continue-label {
     font-family: 'Supreme Variable', sans-serif;
-    font-size: 16px;
+    font-size: 12px;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1;
+    margin-top: -4px;
     text-transform: uppercase;
     color: #161a1f;
   }
 
   .continue-chevron {
     display: block;
-    width: 25px;
-    height: 10px;
-    background-image: url("data:image/svg+xml,%3Csvg width='25' height='10' viewBox='0 0 25 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L12.5 8.5L24 1.5' stroke='%23161A1F' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-    animation: bounce 2s infinite;
+    width: 21px;
+    height: 9px;
+    animation: chevron-bounce 1.4s ease-in-out infinite;
+  }
+
+  @keyframes chevron-bounce {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(5px);
+    }
   }
 
   @keyframes panelIn {
@@ -368,16 +399,6 @@
     to {
       opacity: 1;
       transform: translateY(-50%);
-    }
-  }
-
-  @keyframes bounce {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(4px);
     }
   }
 
@@ -450,7 +471,7 @@
     .sport-panel-content {
       position: relative;
       z-index: 1;
-      padding: 20px 0 12px var(--panel-padding-x);
+      padding: 20px 0 56px var(--panel-padding-x);
       transform-origin: top center;
     }
 
@@ -471,16 +492,10 @@
       align-items: center;
       width: 100%;
       margin: 0;
-      padding: 24px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
+      padding: 64px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
       box-sizing: border-box;
       pointer-events: auto;
       background: transparent;
-    }
-
-    .continue-btn {
-      min-width: 132px;
-      gap: 10px;
-      padding: 10px 18px 8px;
     }
   }
 

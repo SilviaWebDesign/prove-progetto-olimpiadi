@@ -322,8 +322,8 @@
   let mobileScrollRatio = $state(0);
   let mobileBrowserChromeBottom = $state(0);
 
-  const MOBILE_BROWSER_CHROME_SCALE = 0.38;
-  const MOBILE_BROWSER_CHROME_MAX = 40;
+  const MOBILE_BROWSER_CHROME_SCALE = 1;
+  const MOBILE_BROWSER_CHROME_MAX = 96;
 
   function syncMobileBrowserChromeInset() {
     if (!isMobile || !browser) return;
@@ -383,12 +383,12 @@
   /** Riduzione extra pattini con pannello commenti visibile. */
   const SPORT_CARDS_SCALE_MUL = 0.74;
   /** Con commenti visibili: centro dello spazio bianco tra testo e card. */
-  const MOBILE_CARDS_FIT_CENTER_BIAS = 0.44;
+  const MOBILE_CARDS_FIT_CENTER_BIAS = 0.47;
   /** Offset verticale pattini con testo del tema visibile (positivo = più in alto). */
-  const SPORT_THEME_TEXT_Y_OFFSET_VH = 0.035;
-  const SPORT_CARDS_Y_OFFSET_VH = 0.045;
+  const SPORT_THEME_TEXT_Y_OFFSET_VH = 0.018;
+  const SPORT_CARDS_Y_OFFSET_VH = 0.028;
   /** Centro verticale pattini con solo testo tema su mobile. */
-  const SPORT_MOBILE_THEME_CENTER_BIAS = 0.44;
+  const SPORT_MOBILE_THEME_CENTER_BIAS = 0.47;
   const MOBILE_CARDS_TOP_MARGIN = 8;
   const topicsScaleTween = { value: TOPICS_SCALE_MOBILE };
 
@@ -1950,21 +1950,24 @@
     }
 
     .stage__cta {
+      position: fixed;
       left: 0;
       right: 0;
       width: 100%;
       transform: none;
-      bottom: 0;
+      bottom: calc(
+        var(--mobile-cta-bottom) +
+        var(--mobile-browser-chrome-bottom, 0px) +
+        env(safe-area-inset-bottom, 0px)
+      );
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      padding-top: 132px;
-      padding-bottom: max(
-        var(--mobile-cta-bottom),
-        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 4px)
-      );
+      padding-top: 0;
+      padding-bottom: 0;
       box-sizing: border-box;
       background: transparent;
+      z-index: 15;
     }
 
     .stage__cta-content {
@@ -1972,7 +1975,15 @@
     }
 
     .feedback-bottom-cta {
-      bottom: max(8px, calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px)));
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(
+        8px +
+        var(--mobile-browser-chrome-bottom, 0px) +
+        env(safe-area-inset-bottom, 0px)
+      );
+      z-index: 15;
     }
   }
 </style>

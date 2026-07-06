@@ -152,7 +152,7 @@
           </p>
         {/key}
       {/if}
-      <p class="mountain-hover-hint__cta">Clicca per sapere di più</p>
+      <p class="mountain-hover-hint__cta">clicca sulle sfere per sapere di più</p>
     </div>
   {/if}
 
@@ -314,6 +314,7 @@
     line-height: 1.2;
     letter-spacing: 0.02em;
     white-space: nowrap;
+    text-transform: uppercase;
   }
 
   .intro-screen {

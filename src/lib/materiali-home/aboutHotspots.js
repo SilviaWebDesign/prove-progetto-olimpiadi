@@ -519,9 +519,13 @@ export function maxCameraOrbitDistance(worldBox) {
 /**
  * Distanza camera ↔ card quando una carta è selezionata.
  * @param {THREE.Box3} worldBox
+ * @param {boolean} [mobile]
  */
-export function focusCameraDistance(worldBox) {
+export function focusCameraDistance(worldBox, mobile = false) {
   const sphere = worldBox.getBoundingSphere(new THREE.Sphere());
+  if (mobile) {
+    return THREE.MathUtils.clamp(sphere.radius * 0.42, 10.0, 14.0);
+  }
   return THREE.MathUtils.clamp(sphere.radius * 0.17, 4.0, 5.2);
 }
 
@@ -541,14 +545,15 @@ export function safeOrbitRadius(worldBox) {
  * @param {THREE.Vector3} focusPoint
  * @param {THREE.Vector3} mountainCenter
  * @param {THREE.Box3} worldBox
+ * @param {boolean} [mobile]
  */
-export function computeFocusCameraPosition(markerPos, focusPoint, mountainCenter, worldBox) {
+export function computeFocusCameraPosition(markerPos, focusPoint, mountainCenter, worldBox, mobile = false) {
   const outward = new THREE.Vector3().subVectors(markerPos, mountainCenter);
   outward.y = 0;
   if (outward.lengthSq() < 1e-6) outward.set(0, 0, 1);
   outward.normalize();
 
-  const dist = focusCameraDistance(worldBox);
+  const dist = focusCameraDistance(worldBox, mobile);
 
   return new THREE.Vector3(
     focusPoint.x + outward.x * dist,

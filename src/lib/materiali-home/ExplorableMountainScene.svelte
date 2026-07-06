@@ -46,6 +46,8 @@
   } from './aboutMarkerModels.js';
 
   const FOCUS_CAMERA_ZOOM = 1.08;
+  /** Su mobile: quasi nessuno zoom aggiuntivo al focus. */
+  const FOCUS_CAMERA_ZOOM_MOBILE = 0.99;
   const FOCUS_TRANSITION_MS = 1800;
   const HERO_TRANSITION_MS = 1400;
   /** Vista iniziale about: lato opposto rispetto alla home. */
@@ -62,6 +64,8 @@
   const HOVER_SCALE_LERP = 0.28;
   const MARKER_SCALE_LERP = 0.14;
   const ACTIVE_MARKER_SCALE = 1.22;
+  /** Sfere più grandi su mobile per facilitare il tap. */
+  const MOBILE_MARKER_BASE_SCALE = 1.55;
   const MARKER_FLOAT_AMPLITUDE = 0.24;
   const MARKER_FLOAT_SPEED = 0.42;
   const FOCUS_FLOAT_SPEED = 0.15;
@@ -334,7 +338,7 @@
 
   function applyFocusOrbitLimits() {
     if (!controls) return;
-    const dist = focusCameraDistance(_worldBox);
+    const dist = focusCameraDistance(_worldBox, isAboutPanelMobileLayout());
     controls.minDistance = dist * 0.55;
     controls.maxDistance = dist * 1.3;
     controls.minPolarAngle = MOUNTAIN_MIN_POLAR;
@@ -485,13 +489,20 @@
       const focusPoint = getHotspotFocusPoint(hotspot);
       if (!markerPos || !focusPoint) return;
 
+      const mobileFocus = isAboutPanelMobileLayout();
       toTarget = focusPoint.clone();
-      toCam = computeFocusCameraPosition(markerPos, focusPoint, homeOrbitConfig.center, _worldBox);
+      toCam = computeFocusCameraPosition(
+        markerPos,
+        focusPoint,
+        homeOrbitConfig.center,
+        _worldBox,
+        mobileFocus
+      );
       if (snowMountainModel) {
         toCam = clampFocusCameraPosition(markerPos, toCam, snowMountainModel, raycaster);
       }
 
-      if (isAboutPanelMobileLayout()) {
+      if (mobileFocus) {
         toCam.y += (_worldBox.max.y - _worldBox.min.y) * FOCUS_CAMERA_Y_LIFT_MOBILE;
       }
 
@@ -500,7 +511,7 @@
       _tmpTarget.copy(toTarget);
       camera.position.copy(toCam);
       camera.lookAt(_tmpTarget);
-      if (isAboutPanelMobileLayout()) {
+      if (mobileFocus) {
         panFocusToViewport(
           camera,
           _tmpTarget,
@@ -516,7 +527,7 @@
       camera.position.copy(savedCam);
       controls.target.copy(savedTarget);
 
-      toZoom = FOCUS_CAMERA_ZOOM;
+      toZoom = mobileFocus ? FOCUS_CAMERA_ZOOM_MOBILE : FOCUS_CAMERA_ZOOM;
     } else {
       const hero = getHeroCameraPose();
       toCam = hero.cam;
@@ -644,7 +655,9 @@
       root.userData.baseY = positions[index].y;
       root.userData.hotspot = hotspot;
       markerGroup.add(root);
-      markers.push({ object: root, model, hotspot, baseScale: 1, spinSpeed: 0 });
+      const baseScale = useMobileLayout ? MOBILE_MARKER_BASE_SCALE : 1;
+      root.scale.setScalar(baseScale);
+      markers.push({ object: root, model, hotspot, baseScale, spinSpeed: 0 });
     }
 
     updateMarkerSelection();

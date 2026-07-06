@@ -266,7 +266,7 @@
 
   .sport-panel-content {
     position: relative;
-    padding: 0 0 72px;
+    padding: 0 0 28px;
     transform-origin: top right;
     --sport-title-size: clamp(1.75rem, 3.2vw, 36px);
   }
@@ -471,7 +471,7 @@
     .sport-panel-content {
       position: relative;
       z-index: 1;
-      padding: 20px 0 56px var(--panel-padding-x);
+      padding: 20px 0 20px var(--panel-padding-x);
       transform-origin: top center;
     }
 

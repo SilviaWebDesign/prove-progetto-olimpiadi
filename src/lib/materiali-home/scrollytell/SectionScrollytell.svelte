@@ -104,7 +104,7 @@
   function handleTopicsForwardNavigation() {
     if (!ctaActive || isTransitioning) return;
     if (isMobile && !mobileCardsVisible) {
-      void mobileShowCards().then(() => setTimeout(updateTopicsModelFit, 450));
+      void mobileShowCards().then(() => setTimeout(() => updateTopicsModelFit({ relayout: true }), 450));
       return;
     }
     goNext();
@@ -113,7 +113,7 @@
   function handleTopicsBackwardNavigation() {
     if (phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
     if (isMobile && mobileCardsVisible) {
-      void mobileHideCards().then(() => setTimeout(updateTopicsModelFit, 450));
+      void mobileHideCards().then(() => setTimeout(() => updateTopicsModelFit({ relayout: true }), 450));
       return;
     }
     if (currentTopic > 0) goPrev();
@@ -187,8 +187,8 @@
     if (isMobile) {
       // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
       // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
-      updateTopicsModelFit();
-      setTimeout(updateTopicsModelFit, 450);
+      updateTopicsModelFit({ relayout: true });
+      setTimeout(() => updateTopicsModelFit({ relayout: true }), 450);
     } else {
       await cardStack?.animateIn();
     }
@@ -199,6 +199,7 @@
   async function enterFeedbackPhase() {
     if (phase !== 'topics' || isTransitioning || !anyLiked) return;
     isTransitioning = true;
+    topicsMobileLayoutLocked = false;
     scene3d?.clearMobileFit();
 
     const OUT = 0.50;
@@ -261,8 +262,8 @@
     if (isMobile) {
       // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
       // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
-      updateTopicsModelFit();
-      setTimeout(updateTopicsModelFit, 450);
+      updateTopicsModelFit({ relayout: true });
+      setTimeout(() => updateTopicsModelFit({ relayout: true }), 450);
     } else {
       await cardStack?.animateIn();
     }
@@ -295,8 +296,8 @@
     if (isMobile) {
       // Riparte sempre in modalità estesa (no cards): l'utente la rende compatta
       // col tap o con lo scroll gesture, vedi toggleMobileCardsPanel/mobilePreventScroll
-      updateTopicsModelFit();
-      setTimeout(updateTopicsModelFit, 450);
+      updateTopicsModelFit({ relayout: true });
+      setTimeout(() => updateTopicsModelFit({ relayout: true }), 450);
     } else {
       await cardStack?.animateIn();
     }
@@ -419,11 +420,11 @@
         ease: 'power2.inOut',
         onUpdate: () => {
           scene3d?.setScale(topicsScaleTween.value);
-          updateTopicsModelFit({ skipScale: true });
+          updateTopicsModelFit({ skipScale: true, relayout: true });
           scene3d?.snapMobileFit();
         },
         onComplete: () => {
-          updateTopicsModelFit({ skipScale: true });
+          updateTopicsModelFit({ skipScale: true, relayout: true });
           scene3d?.snapMobileFit();
         },
       });
@@ -482,7 +483,7 @@
 
   const FEEDBACK_MODEL_MARGIN = 20;
 
-  function mobileFixedPlantBottomBoundPx(cardsActive: boolean): number {
+  function mobileFixedTopicsBottomBoundPx(cardsActive: boolean): number {
     if (!cardsActive) {
       return window.innerHeight - TOPICS_CTA_RESERVE;
     }
@@ -497,6 +498,17 @@
     );
   }
 
+  function mobileTopicsTopPx(textRect: DOMRect, cardsActive: boolean): number {
+    if (isPlantModel() && cardsActive) {
+      return textRect.bottom + PLANT_MOBILE_CARDS_TEXT_GAP_PX;
+    }
+    const topMargin =
+      TOPICS_MODEL_MARGIN + (cardsActive && isSportModel() ? MOBILE_CARDS_TOP_MARGIN : 0);
+    return textRect.bottom + topMargin;
+  }
+
+  let topicsMobileLayoutLocked = false;
+
   function updateFeedbackModelFit() {
     if (!scene3d || phase !== 'feedback' || !feedbackTopEl || !feedbackSubtitleEl) return;
     const topRect = feedbackTopEl.getBoundingClientRect();
@@ -508,8 +520,15 @@
     scene3d.realignFeedback();
   }
 
-  function updateTopicsModelFit(options: { skipScale?: boolean } = {}) {
+  function updateTopicsModelFit(options: { skipScale?: boolean; relayout?: boolean } = {}) {
     if (!scene3d || !stageTextEl || phase === 'feedback') return;
+
+    const shouldRelayout =
+      !isMobile || phase !== 'topics' || !topicsMobileLayoutLocked || options.relayout;
+    if (!shouldRelayout) {
+      if (!options.skipScale) applyTopicsScale(false);
+      return;
+    }
 
     const textRect = stageTextEl.getBoundingClientRect();
     const cardsRect = stageRightEl?.getBoundingClientRect();
@@ -518,25 +537,9 @@
     let bottomPx: number;
 
     if (isMobile) {
-      if (isPlantModel()) {
-        const bottomBoundPx = mobileFixedPlantBottomBoundPx(cardsActive);
-        topPx = textRect.bottom + (
-          cardsActive ? PLANT_MOBILE_CARDS_TEXT_GAP_PX : TOPICS_MODEL_MARGIN
-        );
-        bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
-      } else {
-      let bottomBoundPx = cardsActive && cardsRect
-        ? cardsRect.top
-        : window.innerHeight - TOPICS_CTA_RESERVE;
-      if (cardsActive && isSportModel() && stageRightEl) {
-        const headingEl = stageRightEl.querySelector<HTMLElement>('.stage__right-heading');
-        const headingRect = headingEl?.getBoundingClientRect();
-        if (headingRect) bottomBoundPx = headingRect.top;
-      }
-      const topMargin = TOPICS_MODEL_MARGIN + (cardsActive && isSportModel() ? MOBILE_CARDS_TOP_MARGIN : 0);
-      topPx = textRect.bottom + topMargin;
+      const bottomBoundPx = mobileFixedTopicsBottomBoundPx(cardsActive);
+      topPx = mobileTopicsTopPx(textRect, cardsActive);
       bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
-      }
     } else if (cardsActive && cardsRect && cardsRect.height > 0) {
       const overlapTop = Math.max(textRect.top, cardsRect.top);
       const overlapBottom = Math.min(textRect.bottom, cardsRect.bottom);
@@ -566,12 +569,16 @@
     syncTopicsMobileLayout(1);
     if (isMobile && phase === 'topics') {
       lockTopicsMobileLayout();
+      topicsMobileLayoutLocked = true;
     }
   }
 
   $effect(() => {
     if (!stageTextEl || phase === 'feedback') return;
-    const observer = new ResizeObserver(() => updateTopicsModelFit());
+    const observer = new ResizeObserver(() => {
+      if (isMobile && topicsMobileLayoutLocked) return;
+      updateTopicsModelFit();
+    });
     observer.observe(stageTextEl);
     return () => observer.disconnect();
   });
@@ -582,14 +589,17 @@
     mobileCardsVisible;
     cardsIntroduced;
     void tick().then(() => {
-      updateTopicsModelFit();
-      setTimeout(updateTopicsModelFit, 450);
+      updateTopicsModelFit({ relayout: true });
+      setTimeout(() => updateTopicsModelFit({ relayout: true }), 450);
     });
   });
 
   $effect(() => {
     if (!stageRightEl || phase === 'feedback') return;
-    const observer = new ResizeObserver(() => updateTopicsModelFit());
+    const observer = new ResizeObserver(() => {
+      if (isMobile && topicsMobileLayoutLocked) return;
+      updateTopicsModelFit();
+    });
     observer.observe(stageRightEl);
     return () => observer.disconnect();
   });
@@ -646,7 +656,7 @@
     if (!isMobile || !topicsMode || cardsScrollAnimating) return;
 
     if (mobileCardsVisible && progress < MOBILE_CARDS_HIDE_PROGRESS) {
-      void mobileHideCards().then(() => setTimeout(updateTopicsModelFit, 450));
+      void mobileHideCards().then(() => setTimeout(() => updateTopicsModelFit({ relayout: true }), 450));
     }
   }
 
@@ -683,7 +693,7 @@
     mobileCardsVisible = true; // CSS class m-cards-visible makes container visible
     await tick();
     applyTopicsScale(true);
-    updateTopicsModelFit({ skipScale: true });
+    updateTopicsModelFit({ skipScale: true, relayout: true });
     await cardStack?.animateIn();
     cardsScrollAnimating = false;
   }
@@ -699,7 +709,7 @@
     if (cardsScrollRef) cardsScrollRef.scrollTop = 0;
     await tick();
     applyTopicsScale(true);
-    updateTopicsModelFit({ skipScale: true });
+    updateTopicsModelFit({ skipScale: true, relayout: true });
     cardsScrollAnimating = false;
   }
 
@@ -708,7 +718,7 @@
   function toggleMobileCardsPanel() {
     if (!isMobile || phase !== 'topics' || isTransitioning || cardsScrollAnimating) return;
     const action = mobileCardsVisible ? mobileHideCards() : mobileShowCards();
-    action.then(() => setTimeout(updateTopicsModelFit, 450));
+    action.then(() => setTimeout(() => updateTopicsModelFit({ relayout: true }), 450));
   }
 
   function onCardsScroll() {
@@ -809,11 +819,11 @@
       topicsScrollLockY = window.scrollY;
       window.addEventListener('scroll', lockMobileTopicsPageScroll, { passive: true });
       tick().then(() => {
-        updateTopicsModelFit();
+        updateTopicsModelFit({ relayout: true });
         lockTopicsMobileLayout();
       });
       setTimeout(() => {
-        updateTopicsModelFit();
+        updateTopicsModelFit({ relayout: true });
         lockTopicsMobileLayout();
       }, 450);
     } else {
@@ -855,6 +865,7 @@
     topicsMode = false;
     if (isMobile) {
       window.removeEventListener('scroll', lockMobileTopicsPageScroll);
+      topicsMobileLayoutLocked = false;
       scene3d?.unlockMobileFit();
       mobileTopicsScrollComplete = false;
       if (mobileCardsVisible) {
@@ -916,6 +927,11 @@
   }
 
   // ── Setup ────────────────────────────────────────────────────────────────
+  function onWindowResize() {
+    updateTopicsModelFit({ relayout: isMobile && phase === 'topics' });
+    updateFeedbackModelFit();
+  }
+
   onMount(() => {
     isMobile = window.innerWidth < 768;
 
@@ -957,8 +973,7 @@
         document.addEventListener('touchmove', mobileTouchMove, { passive: true });
         document.addEventListener('touchend', mobileTouchEnd, { passive: true });
       }
-      window.addEventListener('resize', updateTopicsModelFit);
-      window.addEventListener('resize', updateFeedbackModelFit);
+      window.addEventListener('resize', onWindowResize);
 
       const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
       const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
@@ -1116,8 +1131,7 @@
         ctx.revert();
         if (lenisRaf) gsap.ticker.remove(lenisRaf);
         if (lenis) lenis.destroy();
-        window.removeEventListener('resize', updateTopicsModelFit);
-        window.removeEventListener('resize', updateFeedbackModelFit);
+        window.removeEventListener('resize', onWindowResize);
         if (isMobile) {
           window.visualViewport?.removeEventListener('resize', syncMobileBrowserChromeInset);
           window.visualViewport?.removeEventListener('scroll', syncMobileBrowserChromeInset);

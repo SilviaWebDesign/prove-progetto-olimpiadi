@@ -200,8 +200,10 @@
   function completeFeedbackTransition() {
     phase = 'feedback';
     isTransitioning = false;
+    applyFeedbackModelFit(true);
     scheduleFeedbackModelFit();
     void tick().then(() => {
+      gsap.set('.feedback-top, .feedback-subtitle, .feedback-bottom-cta', { opacity: 0 });
       gsap.fromTo('.feedback-top', { opacity: 0 }, {
         opacity: 1,
         duration: 0.5,
@@ -268,6 +270,8 @@
       clearTimeout(morphTimeout);
       completeFeedbackTransition();
     });
+    applyFeedbackModelFit(false);
+    void tick().then(() => applyFeedbackModelFit(false));
   }
 
   async function goNext() {
@@ -505,9 +509,10 @@
   }
 
   function feedbackCenterBias(): number {
-    if (isSportModel()) return 0.6;
-    if (isInfrastructureModel()) return isMobile ? 0.63 : 0.54;
-    return 0.5;
+    if (isSportModel()) return isMobile ? 0.62 : 0.6;
+    if (isInfrastructureModel()) return isMobile ? 0.72 : 0.54;
+    if (isPlantModel()) return isMobile ? 0.58 : 0.5;
+    return isMobile ? 0.56 : 0.5;
   }
 
   function feedbackModelMargin(): number {
@@ -582,18 +587,20 @@
     });
   }
 
-  function updateFeedbackModelFit() {
-    if (!scene3d || phase !== 'feedback') return;
+  function applyFeedbackModelFit(realign = false) {
+    if (!scene3d) return;
     const topEl =
       feedbackTopEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-top') ?? null;
     const subtitleEl =
       feedbackSubtitleEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-subtitle') ?? null;
     if (!topEl || !subtitleEl) return;
 
+    const titleEl = topEl.querySelector<HTMLElement>('.feedback-title');
     const topRect = topEl.getBoundingClientRect();
+    const titleRect = titleEl?.getBoundingClientRect();
     const subtitleRect = subtitleEl.getBoundingClientRect();
     const margin = feedbackModelMargin();
-    const gapTop = topRect.bottom + margin;
+    const gapTop = (titleRect?.bottom ?? topRect.bottom) + margin;
     let gapBottom = subtitleRect.top - margin;
     if (gapBottom - gapTop < 48) {
       gapBottom = gapTop + 48;
@@ -603,7 +610,12 @@
       centerBias: feedbackCenterBias(),
       viewportHeightPx: feedbackViewportHeightPx(),
     });
-    scene3d.realignFeedback();
+    if (realign) scene3d.realignFeedback();
+  }
+
+  function updateFeedbackModelFit() {
+    if (!scene3d || phase !== 'feedback') return;
+    applyFeedbackModelFit(true);
   }
 
   function mobileTopicsViewportHeightPx(): number {
@@ -725,21 +737,21 @@
   });
 
   $effect(() => {
-    if (phase !== 'feedback') return;
+    if (!feedbackTopEl && !feedbackSubtitleEl) return;
     const topEl =
       feedbackTopEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-top') ?? null;
     const subtitleEl =
       feedbackSubtitleEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-subtitle') ?? null;
     const ctaEl = sceneEl?.querySelector<HTMLElement>('.feedback-bottom-cta') ?? null;
-    if (!topEl || !subtitleEl) {
-      scheduleFeedbackModelFit();
-      return;
-    }
-    const observer = new ResizeObserver(() => updateFeedbackModelFit());
+    if (!topEl || !subtitleEl) return;
+    const observer = new ResizeObserver(() => {
+      if (phase === 'feedback') updateFeedbackModelFit();
+      else applyFeedbackModelFit(false);
+    });
     observer.observe(topEl);
     observer.observe(subtitleEl);
     if (ctaEl) observer.observe(ctaEl);
-    scheduleFeedbackModelFit();
+    if (phase === 'feedback') scheduleFeedbackModelFit();
     return () => observer.disconnect();
   });
 
@@ -1413,15 +1425,19 @@
       style="--scroll-ratio: {mobileScrollRatio}"
     ></div>
 
-    <!-- Overlay fase feedback -->
-    {#if phase === 'feedback'}
-      <div class="feedback-overlay">
-        <div class="feedback-top" bind:this={feedbackTopEl} style="opacity: 0">
-          <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
-        </div>
-        <p class="feedback-subtitle" bind:this={feedbackSubtitleEl} style="opacity: 0">
-          {keepLastWordsTogether(getResultLabel())}
-        </p>
+    <!-- Overlay fase feedback: sempre nel DOM per misurare il fit prima del morph -->
+    <div
+      class="feedback-overlay"
+      class:feedback-overlay--active={phase === 'feedback'}
+      aria-hidden={phase !== 'feedback'}
+    >
+      <div class="feedback-top" bind:this={feedbackTopEl}>
+        <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
+      </div>
+      <p class="feedback-subtitle" bind:this={feedbackSubtitleEl}>
+        {keepLastWordsTogether(getResultLabel())}
+      </p>
+      {#if phase === 'feedback'}
         <div
           class="feedback-bottom-cta"
           style="opacity: 0"
@@ -1438,8 +1454,8 @@
                   stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
 
   </div>
 </section>
@@ -1777,6 +1793,16 @@
     inset: 0;
     z-index: 10;
     pointer-events: none;
+    visibility: hidden;
+  }
+
+  .feedback-overlay--active {
+    visibility: visible;
+  }
+
+  .feedback-overlay:not(.feedback-overlay--active) .feedback-top,
+  .feedback-overlay:not(.feedback-overlay--active) .feedback-subtitle {
+    opacity: 0;
   }
 
   .feedback-top {

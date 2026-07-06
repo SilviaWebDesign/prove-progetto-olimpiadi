@@ -169,7 +169,14 @@
 
   function getFeedbackVisualYOffset(): number {
     const vh = FEEDBACK_VISUAL_Y_OFFSET_VH[activeResultSrc];
-    return vh ? vh * getCameraVisibleH() : 0;
+    if (!vh) return 0;
+    const mobileBoost =
+      typeof window !== 'undefined' &&
+      window.innerWidth < 768 &&
+      activeResultSrc.includes('infrastrutture-')
+        ? 1.4
+        : 1;
+    return vh * mobileBoost * getCameraVisibleH();
   }
 
   function feedbackGapFill(): number {
@@ -308,11 +315,11 @@
       m.transparent = false;
       m.needsUpdate = true;
     });
-    finalizeMorphView();
 
     const cb = onDone ?? morphDoneCallback;
     morphDoneCallback = null;
     cb?.();
+    finalizeMorphView();
   }
 
   function morphFallbackToSourceModel(onDone: () => void) {

@@ -383,8 +383,12 @@
   /** Riduzione extra pattini con pannello commenti visibile. */
   const SPORT_CARDS_SCALE_MUL = 0.74;
   /** Con commenti visibili: centro dello spazio bianco tra testo e card. */
-  const MOBILE_CARDS_FIT_CENTER_BIAS = 0.51;
-  const SPORT_CARDS_Y_OFFSET_VH = 0.01;
+  const MOBILE_CARDS_FIT_CENTER_BIAS = 0.44;
+  /** Offset verticale pattini con testo del tema visibile (positivo = più in alto). */
+  const SPORT_THEME_TEXT_Y_OFFSET_VH = 0.035;
+  const SPORT_CARDS_Y_OFFSET_VH = 0.045;
+  /** Centro verticale pattini con solo testo tema su mobile. */
+  const SPORT_MOBILE_THEME_CENTER_BIAS = 0.44;
   const MOBILE_CARDS_TOP_MARGIN = 8;
   const topicsScaleTween = { value: TOPICS_SCALE_MOBILE };
 
@@ -452,8 +456,8 @@
   }
 
   function sportTopicsYOffset(cardsActive: boolean): number {
-    if (phase !== 'topics' || !cardsActive || !isMobile || !isSportModel()) return 0;
-    return SPORT_CARDS_Y_OFFSET_VH;
+    if (phase !== 'topics' || !isMobile || !isSportModel()) return 0;
+    return cardsActive ? SPORT_CARDS_Y_OFFSET_VH : SPORT_THEME_TEXT_Y_OFFSET_VH;
   }
 
   function topicsModelYOffset(cardsActive: boolean): number {
@@ -466,6 +470,13 @@
         centerBias: cardsActive
           ? PLANT_MOBILE_CARDS_CENTER_BIAS
           : TOPICS_FIT_CENTER_BIAS,
+      };
+    }
+    if (isMobile && isSportModel()) {
+      return {
+        centerBias: cardsActive
+          ? MOBILE_CARDS_FIT_CENTER_BIAS
+          : SPORT_MOBILE_THEME_CENTER_BIAS,
       };
     }
     if (!isMobile || !cardsActive || !isSportModel()) {
@@ -483,14 +494,20 @@
 
   const FEEDBACK_MODEL_MARGIN = 20;
 
+  function mobileTopicsViewportHeightPx(): number {
+    const viewport = sceneEl?.querySelector<HTMLElement>('.scene__viewport');
+    return viewport?.getBoundingClientRect().height ?? window.innerHeight;
+  }
+
   function mobileFixedTopicsBottomBoundPx(cardsActive: boolean): number {
+    const viewportHeight = mobileTopicsViewportHeightPx();
     if (!cardsActive) {
-      return window.innerHeight - TOPICS_CTA_RESERVE;
+      return viewportHeight - TOPICS_CTA_RESERVE;
     }
     const headingReserve = 24;
     const panelTopGap = 8;
     return (
-      window.innerHeight -
+      viewportHeight -
       MOBILE_CARDS_BOTTOM_BASE -
       MOBILE_CARDS_SCROLL_HEIGHT -
       headingReserve -
@@ -1715,7 +1732,8 @@
 
     .scene__viewport {
       touch-action: pan-y;
-      height: 100dvh;
+      height: 100vh;
+      height: 100lvh;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
       --mobile-cards-bottom: 80px;
@@ -1781,10 +1799,10 @@
       font-size: 12px;
     }
 
-    /* ── Cards column: posizione fissa, indipendente da CTA e barra browser ── */
+    /* ── Cards column: posizione fissa (lvh), indipendente da CTA e barra browser ── */
     .stage__right {
       position: absolute;
-      bottom: var(--mobile-cards-bottom);
+      bottom: calc(var(--mobile-cards-bottom) + env(safe-area-inset-bottom, 0px));
       left: 0;
       right: 0;
       padding: 0 20px;
@@ -1852,7 +1870,7 @@
       display: none;
       position: absolute;
       right: 6px;
-      bottom: var(--mobile-cards-bottom);
+      bottom: calc(var(--mobile-cards-bottom) + env(safe-area-inset-bottom, 0px));
       height: var(--mobile-cards-scroll-height);
       width: 3px;
       background: rgba(22, 26, 31, 0.12);

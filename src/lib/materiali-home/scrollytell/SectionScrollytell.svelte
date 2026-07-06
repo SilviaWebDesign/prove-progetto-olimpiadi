@@ -349,11 +349,11 @@
   const TOPICS_CTA_RESERVE  = 100;
   const TOPICS_FIT_CENTER_BIAS = 0.5;
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
-  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.045;
+  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.032;
   /** Offset verticale pianta con pannello commenti visibile (positivo = più in alto). */
-  const PLANT_CARDS_Y_OFFSET_VH = -0.005;
+  const PLANT_CARDS_Y_OFFSET_VH = 0.008;
   /** Con opinioni aperte: ancora la pianta più in basso nello spazio libero. */
-  const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.42;
+  const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.38;
   /** Allineato a --mobile-cards-bottom (senza chrome browser). */
   const MOBILE_CARDS_BOTTOM_BASE = 80;
   /** Gap extra tra testo e pianta quando le opinioni sono visibili. */
@@ -376,9 +376,9 @@
   const MOBILE_TOPIC_COMPACT_RATIO = 24 / 36;
   const MOBILE_TEXT_SCALE_DURATION = 0.4;
   /** Riduzione extra pianta con pannello commenti visibile. */
-  const PLANT_CARDS_SCALE_MUL = 0.72;
+  const PLANT_CARDS_SCALE_MUL = 0.76;
   /** Scala base pianta su mobile (argomenti). */
-  const PLANT_TOPICS_SCALE_MUL = 0.82;
+  const PLANT_TOPICS_SCALE_MUL = 0.87;
   /** Riduzione extra pattini con pannello commenti visibile. */
   const SPORT_CARDS_SCALE_MUL = 0.74;
   /** Con commenti visibili: centro dello spazio bianco tra testo e card. */

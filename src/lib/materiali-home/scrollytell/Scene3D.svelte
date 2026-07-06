@@ -101,6 +101,11 @@
     '/oggetti/sport-neutro.glb': -0.18,
     '/oggetti/sport-piu-negativo.glb': -0.18,
     '/oggetti/sport-piu-positivo.glb': -0.18,
+    '/oggetti/infrastrutture-positivo.glb': -0.17,
+    '/oggetti/infrastrutture-negativo.glb': -0.17,
+    '/oggetti/infrastrutture-neutro.glb': -0.17,
+    '/oggetti/infrastrutture-piu-negativo.glb': -0.17,
+    '/oggetti/infrastrutture-piu-positivo.glb': -0.17,
   };
 
   function applyModelPose(scene: THREE.Object3D, src: string) {

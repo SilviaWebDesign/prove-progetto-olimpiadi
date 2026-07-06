@@ -488,6 +488,16 @@
     return config.modelSrc === '/oggetti/sport.glb' || config.modelSrc === '/oggetti/ice_skate.glb';
   }
 
+  function isInfrastructureModel(): boolean {
+    return config.modelSrc === '/oggetti/infrastrutture.glb';
+  }
+
+  function feedbackCenterBias(): number {
+    if (isSportModel()) return 0.6;
+    if (isInfrastructureModel()) return isMobile ? 0.58 : 0.54;
+    return 0.5;
+  }
+
   function sportTopicsYOffset(cardsActive: boolean): number {
     if (phase !== 'topics' || !isMobile || !isSportModel()) return 0;
     return cardsActive ? SPORT_CARDS_Y_OFFSET_VH : SPORT_THEME_TEXT_Y_OFFSET_VH;
@@ -547,7 +557,7 @@
     if (gapBottom - gapTop < 48) return;
 
     scene3d.setFeedbackFit(gapTop, gapBottom, {
-      centerBias: isSportModel() ? 0.6 : 0.5,
+      centerBias: feedbackCenterBias(),
       viewportHeightPx: feedbackViewportHeightPx(),
     });
     scene3d.realignFeedback();

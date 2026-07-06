@@ -347,7 +347,7 @@
 
   // ── Model 3D: stessa distanza da testo sopra e card/CTA sotto (tutte le sezioni) ──
   const TOPICS_MODEL_MARGIN = 24;
-  const TOPICS_CTA_RESERVE  = 100;
+  const TOPICS_CTA_RESERVE  = 118;
   const TOPICS_FIT_CENTER_BIAS = 0.5;
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
   const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.032;
@@ -356,7 +356,7 @@
   /** Con opinioni aperte: ancora la pianta più in basso nello spazio libero. */
   const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.38;
   /** Allineato a --mobile-cards-bottom (senza chrome browser). */
-  const MOBILE_CARDS_BOTTOM_BASE = 80;
+  const MOBILE_CARDS_BOTTOM_BASE = 118;
   /** Gap extra tra testo e pianta quando le opinioni sono visibili. */
   const PLANT_MOBILE_CARDS_TEXT_GAP_PX = 20;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
@@ -1736,8 +1736,8 @@
       height: 100lvh;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
-      --mobile-cards-bottom: 80px;
-      --mobile-cta-bottom: 16px;
+      --mobile-cards-bottom: 118px;
+      --mobile-cta-bottom: 20px;
       --mobile-browser-chrome-bottom: 0px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
     }
@@ -1963,7 +1963,7 @@
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      padding-top: 132px;
+      padding-top: 168px;
       padding-bottom: 0;
       box-sizing: border-box;
       background: transparent;

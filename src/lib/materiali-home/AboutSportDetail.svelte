@@ -22,24 +22,41 @@
   /** @type {HTMLElement | null} */
   let panelEl = $state(null);
   /** @type {HTMLElement | null} */
+  let scrollEl = $state(null);
+  /** @type {HTMLElement | null} */
   let contentEl = $state(null);
+  let scrollRatio = $state(0);
+  let thumbRatio = $state(1);
+  let canScroll = $state(false);
+  let sliderViewportHeight = $state(0);
+
+  function updateScrollSlider() {
+    if (!scrollEl) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollEl;
+    const maxScroll = scrollHeight - clientHeight;
+    canScroll = maxScroll > 4;
+    scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 0;
+    thumbRatio = scrollHeight > 0 ? Math.min(1, clientHeight / scrollHeight) : 1;
+    sliderViewportHeight = clientHeight;
+  }
+
+  /** @param {Event} event */
+  function onPanelScroll(event) {
+    const target = /** @type {HTMLElement} */ (event.currentTarget);
+    const { scrollTop, scrollHeight, clientHeight } = target;
+    const maxScroll = scrollHeight - clientHeight;
+    canScroll = maxScroll > 4;
+    scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 0;
+    thumbRatio = scrollHeight > 0 ? Math.min(1, clientHeight / scrollHeight) : 1;
+    sliderViewportHeight = clientHeight;
+  }
 
   async function fitPanelContent() {
     await tick();
     if (!panelEl || !contentEl) return;
 
     contentEl.style.zoom = '1';
-
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
-      return;
-    }
-
-    const available = panelEl.clientHeight;
-    const needed = contentEl.scrollHeight;
-    if (needed <= available || available <= 0) return;
-
-    const scale = Math.max(0.76, available / needed);
-    contentEl.style.zoom = String(scale);
+    updateScrollSlider();
   }
 
   $effect(() => {
@@ -49,12 +66,14 @@
   });
 
   $effect(() => {
-    if (!panelEl) return;
+    if (!panelEl || !scrollEl) return;
 
     const observer = new ResizeObserver(() => {
       fitPanelContent();
+      updateScrollSlider();
     });
     observer.observe(panelEl);
+    observer.observe(scrollEl);
 
     return () => observer.disconnect();
   });
@@ -81,7 +100,25 @@
   </div>
 
   <aside class="sport-panel" bind:this={panelEl} aria-labelledby="sport-detail-title">
-    <div class="sport-panel-scroll">
+    <div
+      class="sport-panel-scroll"
+      bind:this={scrollEl}
+      onscroll={onPanelScroll}
+    >
+      <div
+        class="sport-text-slider"
+        class:sport-text-slider--active={canScroll}
+        style:height="{sliderViewportHeight}px"
+        aria-hidden="true"
+      >
+        <div class="sport-text-slider__track">
+          <div
+            class="sport-text-slider__thumb"
+            style="--scroll-ratio: {scrollRatio}; --thumb-ratio: {thumbRatio}"
+          ></div>
+        </div>
+      </div>
+
       <div class="sport-panel-content" bind:this={contentEl}>
         {#key hotspot.id}
           <h1 id="sport-detail-title" class="sport-title">{title}</h1>
@@ -153,13 +190,52 @@
   }
 
   .sport-panel-scroll {
+    position: relative;
     height: 100%;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .sport-text-slider {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: auto;
+    z-index: 2;
+    width: 3px;
+    opacity: 0.35;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+
+  .sport-text-slider--active {
+    opacity: 1;
+  }
+
+  .sport-text-slider__track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+    background: rgba(22, 26, 31, 0.12);
+  }
+
+  .sport-text-slider__thumb {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-radius: 2px;
+    background: rgba(22, 26, 31, 0.42);
+    height: calc(var(--thumb-ratio, 1) * 100%);
+    top: calc(var(--scroll-ratio, 0) * (100% - var(--thumb-ratio, 1) * 100%));
+    transition: top 0.12s ease;
   }
 
   .sport-panel-content {
     position: relative;
-    padding: 0 0 24px;
+    padding: 0 17px 24px 0;
     transform-origin: top right;
     --sport-title-size: clamp(1.75rem, 3.2vw, 36px);
   }
@@ -197,6 +273,7 @@
     transform: translateX(-50%);
     z-index: 51;
     pointer-events: none;
+    padding-top: 24px;
   }
 
   .continue-btn {
@@ -315,18 +392,18 @@
     }
 
     .sport-panel-scroll {
-      position: relative;
-      z-index: 1;
       height: 100%;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
+    }
+
+    .sport-text-slider {
+      right: var(--panel-padding-x);
+      left: auto;
     }
 
     .sport-panel-content {
       position: relative;
       z-index: 1;
-      padding: 20px var(--panel-padding-x) 12px;
+      padding: 20px calc(var(--panel-padding-x) + 17px) 12px var(--panel-padding-x);
       transform-origin: top center;
     }
 
@@ -343,7 +420,7 @@
       align-items: center;
       width: 100%;
       margin: 0;
-      padding: 12px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
+      padding: 24px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
       box-sizing: border-box;
       pointer-events: auto;
       background: transparent;

@@ -74,6 +74,49 @@
     '/oggetti/pianta.glb': 0.92,
   };
 
+  /** Rotazione di default per inquadrare i pattini frontalmente (sui GLB di risultato). */
+  const SPORT_FRONT_POSE = {
+    rotationY: -Math.PI / 2,
+    rotationX: 0.35,
+  } as const;
+
+  const MODEL_POSE: Record<string, Partial<typeof SPORT_FRONT_POSE>> = {
+    '/oggetti/sport-negativo.glb': SPORT_FRONT_POSE,
+    '/oggetti/sport-neutro.glb': SPORT_FRONT_POSE,
+    '/oggetti/sport-piu-negativo.glb': SPORT_FRONT_POSE,
+    '/oggetti/sport-piu-positivo.glb': SPORT_FRONT_POSE,
+  };
+
+  function isSportModelSrc(src: string): boolean {
+    return (
+      src === '/oggetti/sport.glb' ||
+      src === '/oggetti/ice_skate.glb' ||
+      src.startsWith('/oggetti/sport-')
+    );
+  }
+
+  function applyModelPose(scene: THREE.Object3D, src: string) {
+    const pose = MODEL_POSE[src];
+    if (!pose) return;
+    if (pose.rotationX !== undefined) scene.rotation.x = pose.rotationX;
+    if (pose.rotationY !== undefined) scene.rotation.y = pose.rotationY;
+    if (pose.rotationZ !== undefined) scene.rotation.z = pose.rotationZ;
+  }
+
+  function prepareModelGroup(scene: THREE.Object3D, src: string): THREE.Group {
+    applyModelPose(scene, src);
+    const group = new THREE.Group();
+    group.add(scene);
+    return group;
+  }
+
+  function snapSportFrontalRotation() {
+    if (!isSportModelSrc(modelSrc) || !modelGroup) return;
+    freezeSpinnerRotation();
+    if (spinner) spinner.rotation.y = 0;
+    modelGroup.rotation.set(0, 0, 0);
+  }
+
   /** Modelli piccoli nel file GLB: crossfade sulle posizioni finali invece del volo dall'origine. */
   const MODEL_PARTICLE_CROSSFADE = new Set([
     '/oggetti/pianta.glb',
@@ -163,6 +206,7 @@
   }
 
   function prepareForFeedback() {
+    snapSportFrontalRotation();
     mobileFitActive = false;
     mobileLayoutBlend = 0;
     modelBaseYOffsetVh = 0;
@@ -558,8 +602,7 @@
         const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
         baseScale      = (visibleH * 0.9 * fitFactor) / maxDim;
 
-        const group = new THREE.Group();
-        group.add(gltf.scene);
+        const group = prepareModelGroup(gltf.scene, modelSrc);
         group.scale.setScalar(baseScale);
 
         materials = [];
@@ -972,8 +1015,9 @@
     loader.setDRACOLoader(draco);
     loader.load(path, (gltf) => {
       draco.dispose();
-      resultModels.set(path, gltf.scene);
-      doMorph(gltf.scene, onDone);
+      const prepared = prepareModelGroup(gltf.scene, path);
+      resultModels.set(path, prepared);
+      doMorph(prepared, onDone);
     }, undefined, (err) => {
       console.error('[Scene3D] on-demand load error:', path, err);
       draco.dispose();
@@ -1114,6 +1158,7 @@
   function finalizeTransition() {
     if (!particleMesh || !particleMat) return;
     freezeSpinnerRotation();
+    snapSportFrontalRotation();
     captureTopicsPose();
     transitionState = 'done';
     transitionProgress = 1;
@@ -1173,8 +1218,10 @@
       (transitionState === 'done' ||
         transitionState === 'in' ||
         transitionState === 'none');
+    const sportFrontalHold =
+      isSportModelSrc(modelSrc) && transitionState === 'done';
 
-    if (spinner && idleSpinAllowed) {
+    if (spinner && idleSpinAllowed && !sportFrontalHold) {
       spinner.rotation.y += IDLE_RAD_S * dt;
     }
     if (controls?.enabled) controls.update(dt);

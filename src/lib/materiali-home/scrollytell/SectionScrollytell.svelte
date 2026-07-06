@@ -356,7 +356,7 @@
   /** Con opinioni aperte: ancora la pianta più in basso nello spazio libero. */
   const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.38;
   /** Allineato a --mobile-cards-bottom (senza chrome browser). */
-  const MOBILE_CARDS_BOTTOM_BASE = 100;
+  const MOBILE_CARDS_BOTTOM_BASE = 90;
   /** Gap extra tra testo e pianta quando le opinioni sono visibili. */
   const PLANT_MOBILE_CARDS_TEXT_GAP_PX = 20;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
@@ -383,12 +383,12 @@
   /** Riduzione extra pattini con pannello commenti visibile. */
   const SPORT_CARDS_SCALE_MUL = 0.74;
   /** Con commenti visibili: centro dello spazio bianco tra testo e card. */
-  const MOBILE_CARDS_FIT_CENTER_BIAS = 0.47;
+  const MOBILE_CARDS_FIT_CENTER_BIAS = 0.42;
   /** Offset verticale pattini con testo del tema visibile (positivo = più in alto). */
-  const SPORT_THEME_TEXT_Y_OFFSET_VH = 0.018;
-  const SPORT_CARDS_Y_OFFSET_VH = 0.028;
+  const SPORT_THEME_TEXT_Y_OFFSET_VH = -0.008;
+  const SPORT_CARDS_Y_OFFSET_VH = 0.038;
   /** Centro verticale pattini con solo testo tema su mobile. */
-  const SPORT_MOBILE_THEME_CENTER_BIAS = 0.47;
+  const SPORT_MOBILE_THEME_CENTER_BIAS = 0.52;
   const MOBILE_CARDS_TOP_MARGIN = 8;
   const topicsScaleTween = { value: TOPICS_SCALE_MOBILE };
 
@@ -1169,12 +1169,18 @@
   <title>{config.pageTitle}</title>
 </svelte:head>
 
-<section class="scene scene--{config.sectionId}" bind:this={sceneEl}>
+<section
+  class="scene scene--{config.sectionId}"
+  bind:this={sceneEl}
+  style={isMobile
+    ? `--mobile-browser-chrome-bottom: ${mobileBrowserChromeBottom}px`
+    : undefined}
+>
   <div
     class="scene__viewport"
     class:scene__viewport--feedback={phase === 'feedback'}
     style={isMobile
-      ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px; --mobile-browser-chrome-bottom: ${mobileBrowserChromeBottom}px`
+      ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px`
       : undefined}
   >
 
@@ -1269,8 +1275,30 @@
 
     </div>
 
-    <!-- CTA in basso al centro (nascosto in feedback: usa feedback-bottom-cta) -->
-    {#if phase !== 'feedback'}
+    <!-- Mobile scroll indicator -->
+    <div
+      class="mobile-scroll-indicator"
+      class:visible={isMobile && mobileCardsVisible}
+      aria-hidden="true"
+      style="--scroll-ratio: {mobileScrollRatio}"
+    ></div>
+
+    <!-- Overlay fase feedback -->
+    {#if phase === 'feedback'}
+      <div class="feedback-overlay">
+        <div class="feedback-top" bind:this={feedbackTopEl} style="opacity: 0">
+          <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
+        </div>
+        <p class="feedback-subtitle" bind:this={feedbackSubtitleEl} style="opacity: 0">
+          {keepLastWordsTogether(getResultLabel())}
+        </p>
+      </div>
+    {/if}
+
+  </div>
+
+  <!-- CTA fuori dal viewport sticky: fixed reale su mobile, segue la barra browser -->
+  {#if phase !== 'feedback'}
     <div class="stage__cta">
       <div
         class="stage__cta-content"
@@ -1294,45 +1322,26 @@
         </svg>
       </div>
     </div>
-    {/if}
+  {/if}
 
-    <!-- Mobile scroll indicator -->
+  {#if phase === 'feedback'}
     <div
-      class="mobile-scroll-indicator"
-      class:visible={isMobile && mobileCardsVisible}
-      aria-hidden="true"
-      style="--scroll-ratio: {mobileScrollRatio}"
-    ></div>
-
-    <!-- Overlay fase feedback -->
-    {#if phase === 'feedback'}
-      <div class="feedback-overlay">
-        <div class="feedback-top" bind:this={feedbackTopEl} style="opacity: 0">
-          <p class="feedback-title">{keepLastWordsTogether(FEEDBACK_HEADING.line1)}<br>{keepLastWordsTogether(FEEDBACK_HEADING.line2)}</p>
-        </div>
-        <p class="feedback-subtitle" bind:this={feedbackSubtitleEl} style="opacity: 0">
-          {keepLastWordsTogether(getResultLabel())}
-        </p>
-        <div
-          class="feedback-bottom-cta"
-          style="opacity: 0"
-          role="button"
-          tabindex="0"
-          onclick={() => { $allSectionsCompleted ? navigateToResults() : goToNextSection(); }}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $allSectionsCompleted ? navigateToResults() : goToNextSection(); } }}
-        >
-          <span class="cta-label">
-            {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
-          </span>
-          <svg class="cta-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
-            <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
-                  stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </div>
-    {/if}
-
-  </div>
+      class="feedback-bottom-cta"
+      style="opacity: 0"
+      role="button"
+      tabindex="0"
+      onclick={() => { $allSectionsCompleted ? navigateToResults() : goToNextSection(); }}
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $allSectionsCompleted ? navigateToResults() : goToNextSection(); } }}
+    >
+      <span class="cta-label">
+        {$allSectionsCompleted ? 'Scopri i tuoi risultati' : 'Passa al prossimo argomento'}
+      </span>
+      <svg class="cta-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
+        <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -1600,7 +1609,7 @@
 
   /* ── CTA ─────────────────────────────────────────────────────────────── */
   .stage__cta {
-    position: absolute;
+    position: fixed;
     bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
@@ -1707,7 +1716,7 @@
   }
 
   .feedback-bottom-cta {
-    position: absolute;
+    position: fixed;
     bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
@@ -1719,6 +1728,7 @@
     cursor: pointer;
     pointer-events: auto;
     white-space: nowrap;
+    z-index: 10;
   }
 
   .feedback-bottom-cta .cta-chevron {
@@ -1736,7 +1746,7 @@
       height: 100lvh;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
-      --mobile-cards-bottom: 100px;
+      --mobile-cards-bottom: 90px;
       --mobile-cta-bottom: 16px;
       --mobile-browser-chrome-bottom: 0px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);

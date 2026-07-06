@@ -13,6 +13,10 @@
     centerBias?: number;
   }
 
+  export interface FeedbackFitOptions {
+    centerBias?: number;
+  }
+
   export interface Scene3DApi {
     setRotationY:           (rad: number) => void;
     setScale:               (factor: number) => void;
@@ -25,7 +29,7 @@
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
     setMobileFit:           (topPx: number, bottomPx: number, options?: MobileFitOptions) => void;
-    setFeedbackFit:         (topPx: number, bottomPx: number) => void;
+    setFeedbackFit:         (topPx: number, bottomPx: number, options?: FeedbackFitOptions) => void;
     setMobileLayoutBlend:   (t: number) => void;
     setModelBaseYOffset:    (vh: number) => void;
     snapMobileFit:          () => void;
@@ -124,8 +128,16 @@
 
   /** Altezza max del modello in fase feedback (frazione del viewport). */
   const FEEDBACK_MAX_VH = 0.36;
+  const SPORT_FEEDBACK_MAX_VH = 0.28;
   let feedbackLayoutScale: THREE.Vector3 | null = null;
   let feedbackFitOffsetY = 0;
+
+  function feedbackMaxVh(): number {
+    if (modelSrc === '/oggetti/sport.glb' || modelSrc === '/oggetti/ice_skate.glb') {
+      return SPORT_FEEDBACK_MAX_VH;
+    }
+    return FEEDBACK_MAX_VH;
+  }
 
   function getCameraVisibleH(): number {
     if (!camera) return 1;
@@ -174,7 +186,7 @@
     } else {
       const box = new THREE.Box3().setFromObject(group);
       const size = box.getSize(new THREE.Vector3());
-      const maxWorldH = getCameraVisibleH() * FEEDBACK_MAX_VH;
+      const maxWorldH = getCameraVisibleH() * feedbackMaxVh();
       if (size.y > maxWorldH && size.y > 0) {
         group.scale.multiplyScalar(maxWorldH / size.y);
       }
@@ -429,13 +441,15 @@
         const centerPx = topPx + gapPx * centerBias;
         mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
-      setFeedbackFit: (topPx, bottomPx) => {
+      setFeedbackFit: (topPx, bottomPx, options = {}) => {
         if (!camera) return;
         const vh = window.innerHeight;
         const visibleH = getCameraVisibleH();
         const gapPx = Math.max(24, bottomPx - topPx);
-        const centerPx = topPx + gapPx * 0.5;
+        const centerBias = options.centerBias ?? 0.5;
+        const centerPx = topPx + gapPx * centerBias;
         feedbackFitOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
+        feedbackLayoutScale = null;
       },
       setMobileLayoutBlend: (t) => {
         if (mobileFitLocked) return;

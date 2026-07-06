@@ -227,7 +227,8 @@
       isTransitioning = false;
       tick().then(() => {
         updateFeedbackModelFit();
-        requestAnimationFrame(updateFeedbackModelFit);
+        requestAnimationFrame(() => updateFeedbackModelFit());
+        requestAnimationFrame(() => requestAnimationFrame(() => updateFeedbackModelFit()));
         setTimeout(updateFeedbackModelFit, 550);
         gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
         gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
@@ -492,6 +493,8 @@
   }
 
   const FEEDBACK_MODEL_MARGIN = 20;
+  /** Centro verticale pattini nel feedback: più basso = più in alto nello spazio libero. */
+  const SPORT_FEEDBACK_CENTER_BIAS = 0.32;
 
   function mobileTopicsViewportHeightPx(): number {
     const viewport = sceneEl?.querySelector<HTMLElement>('.scene__viewport');
@@ -529,9 +532,12 @@
     if (!scene3d || phase !== 'feedback' || !feedbackTopEl || !feedbackSubtitleEl) return;
     const topRect = feedbackTopEl.getBoundingClientRect();
     const subtitleRect = feedbackSubtitleEl.getBoundingClientRect();
+    const centerBias =
+      config.sectionId === 'sport' ? SPORT_FEEDBACK_CENTER_BIAS : 0.5;
     scene3d.setFeedbackFit(
       topRect.bottom + FEEDBACK_MODEL_MARGIN,
       subtitleRect.top - FEEDBACK_MODEL_MARGIN,
+      { centerBias },
     );
     scene3d.realignFeedback();
   }

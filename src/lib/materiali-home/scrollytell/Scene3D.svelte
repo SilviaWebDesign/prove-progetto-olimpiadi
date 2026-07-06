@@ -9,6 +9,10 @@
   import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+  export interface MobileFitOptions {
+    centerBias?: number;
+  }
+
   export interface Scene3DApi {
     setRotationY:           (rad: number) => void;
     setScale:               (factor: number) => void;
@@ -20,8 +24,12 @@
     resetPulse:             () => void;
     morphToResult:          (path: string, onDone: () => void) => void;
     returnToParticles:      () => void;
-    setMobileFit:           (topPx: number, bottomPx: number, scaleBoost?: number, anchor?: 'center' | 'top' | 'bottom') => void;
+    setMobileFit:           (topPx: number, bottomPx: number, options?: MobileFitOptions) => void;
+    setMobileLayoutBlend:   (t: number) => void;
+    setModelBaseYOffset:    (vh: number) => void;
+    snapMobileFit:          () => void;
     clearMobileFit:         () => void;
+    realignFeedback:        () => void;
   }
 
   interface Props {
@@ -29,12 +37,14 @@
     modelSrc: string;
     onModelLoaded?: () => void;
     orbitEnabled?: boolean;
+    feedbackActive?: boolean;
   }
   let {
     api = $bindable(),
     modelSrc,
     onModelLoaded,
     orbitEnabled = false,
+    feedbackActive = false,
   }: Props = $props();
 
   let wrapperEl = $state<HTMLDivElement | null>(null);
@@ -56,25 +66,118 @@
   let topicsPoseSaved = false;
 
   const MODEL_FIT_FACTOR: Record<string, number> = {
-    '/oggetti/ice_skate.glb': 0.72,
-    '/oggetti/sport.glb': 0.72,
+    '/oggetti/ice_skate.glb': 0.66,
+    '/oggetti/sport.glb': 0.66,
+    '/oggetti/pianta.glb': 0.92,
   };
 
   /** Modelli piccoli nel file GLB: crossfade sulle posizioni finali invece del volo dall'origine. */
   const MODEL_PARTICLE_CROSSFADE = new Set([
-    '/oggetti/sostenibilita.glb',
+    '/oggetti/pianta.glb',
     '/oggetti/sport.glb',
     '/oggetti/ice_skate.glb',
     '/oggetti/infrastrutture.glb',
   ]);
 
-  const MODEL_DISABLE_IDLE_SPIN = new Set(['/oggetti/sostenibilita.glb']);
-
-  /** Scala del modello in fase feedback (moltiplicatore su baseScale). */
-  const MODEL_RESULT_SCALE: Record<string, number> = {
-    '/oggetti/sostenibilita.glb': 0.5,
+  /** Scala e posizione del modello in fase feedback. */
+  const DEFAULT_FEEDBACK = { scaleMul: 1.33, yOffset: 0.55, lockSettled: false };
+  const MODEL_FEEDBACK: Record<string, Partial<typeof DEFAULT_FEEDBACK>> = {
+    '/oggetti/sport.glb':          { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
+    '/oggetti/pianta.glb':         { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
+    '/oggetti/infrastrutture.glb': { scaleMul: 0.38, yOffset: 0.45, lockSettled: true },
   };
-  const DEFAULT_RESULT_SCALE = 1.33;
+
+  function feedbackConfig() {
+    return { ...DEFAULT_FEEDBACK, ...MODEL_FEEDBACK[modelSrc] };
+  }
+
+  /** Altezza max del modello in fase feedback (frazione del viewport). */
+  const FEEDBACK_MAX_VH = 0.36;
+  const _feedbackPivot = new THREE.Vector3();
+  let feedbackLayoutScale: THREE.Vector3 | null = null;
+
+  function getCameraVisibleH(): number {
+    if (!camera) return 1;
+    const fov = camera.fov * (Math.PI / 180);
+    return 2 * Math.tan(fov / 2) * camera.position.z;
+  }
+
+  let modelBaseYOffsetVh = 0;
+
+  function getModelBaseYOffset(): number {
+    return modelBaseYOffsetVh * getCameraVisibleH();
+  }
+
+  function resetFeedbackViewCamera() {
+    if (!camera) return;
+    camera.position.set(0, 0, 6);
+    camera.lookAt(0, 0, 0);
+    if (controls) {
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+  }
+
+  /** Centra il modello nel viewport. In feedback blocca il fit topics e preserva la posa. */
+  function centerModelInViewport(group: THREE.Object3D, feedback = false) {
+    if (!spinner || !camera) return;
+
+    if (feedback || isFeedbackActive) {
+      mobileFitActive = false;
+      mobileLayoutBlend = 0;
+      modelBaseYOffsetVh = 0;
+    }
+
+    spinner.position.set(0, 0, 0);
+    if (!feedback && !isFeedbackActive) {
+      spinner.rotation.set(0, 0, 0);
+    }
+
+    resetFeedbackViewCamera();
+
+    group.updateMatrixWorld(true);
+
+    if (feedbackLayoutScale) {
+      group.scale.copy(feedbackLayoutScale);
+    } else {
+      const box = new THREE.Box3().setFromObject(group);
+      const size = box.getSize(new THREE.Vector3());
+      const maxWorldH = getCameraVisibleH() * FEEDBACK_MAX_VH;
+      if (size.y > maxWorldH && size.y > 0) {
+        group.scale.multiplyScalar(maxWorldH / size.y);
+      }
+      feedbackLayoutScale = group.scale.clone();
+    }
+
+    group.updateMatrixWorld(true);
+    group.getWorldPosition(_feedbackPivot);
+    spinner.position.copy(_feedbackPivot).negate();
+  }
+
+  function prepareForFeedback() {
+    mobileFitActive = false;
+    mobileLayoutBlend = 0;
+    modelBaseYOffsetVh = 0;
+    if (spinner) {
+      spinner.position.set(0, 0, 0);
+      spinner.rotation.set(0, 0, 0);
+    }
+    resetFeedbackLayout();
+    resetFeedbackViewCamera();
+  }
+
+  function realignFeedbackModel() {
+    if (activeResultGroup) centerModelInViewport(activeResultGroup, true);
+    else if (modelGroup) centerModelInViewport(modelGroup, true);
+  }
+
+  function resetFeedbackLayout() {
+    feedbackLayoutScale = null;
+  }
+
+  let isFeedbackActive = false;
+
+  let activeResultGroup: THREE.Group | null = null;
 
   let rafId:    number | null = null;
   let spinner:  THREE.Group | null = null;
@@ -83,10 +186,11 @@
   // ── Mobile viewport fit: modello riposizionato/riscalato nello spazio libero
   // tra testo e commenti, aggiornato via lerp continuo nel render loop ────────
   let mobileFitActive       = false;
-  let mobileFitTargetScale  = 1;
-  let mobileFitTargetOffsetY = 0;
+  let mobileFitFinalOffsetY = 0;
+  let mobileLayoutBlend     = 0;
   const MOBILE_FIT_LERP = 0.1;
-  const MOBILE_FIT_RATIO = 1.28;
+  /** 0.5 = centro del gap; valori più alti spostano il modello verso il basso. */
+  const MOBILE_FIT_CENTER_BIAS = 0.5;
 
   const clock      = new THREE.Clock();
   const IDLE_RAD_S = THREE.MathUtils.degToRad(7);
@@ -138,6 +242,7 @@
   const _hoverTarget = new THREE.Vector3();
   const _hoverCenter = new THREE.Vector3();
   let lastPointerMoveMs = 0;
+  let particleHoverRadius = 1.2;
 
   function particlesHoverActive() {
     return (
@@ -146,6 +251,18 @@
       !orbitEnabled &&
       transitionState !== 'none'
     );
+  }
+
+  function computeParticleHoverRadius() {
+    let maxDistSq = 0;
+    for (let i = 0; i < COUNT; i++) {
+      const x = particleTargets[i * 3];
+      const y = particleTargets[i * 3 + 1];
+      const z = particleTargets[i * 3 + 2];
+      const d = x * x + y * y + z * z;
+      if (d > maxDistSq) maxDistSq = d;
+    }
+    particleHoverRadius = Math.sqrt(maxDistSq) * 1.1;
   }
 
   function resetParticleHover() {
@@ -171,11 +288,22 @@
 
     modelGroup.worldToLocal(_hoverHit);
     _hoverTarget.copy(_hoverHit);
-    particleMat.uniforms.uPointer.value.lerp(_hoverTarget, 0.42);
+
+    const distToCenter = _hoverTarget.length();
+    if (distToCenter > particleHoverRadius) {
+      particleMat.uniforms.uHoverStrength.value = THREE.MathUtils.lerp(
+        particleMat.uniforms.uHoverStrength.value,
+        0,
+        0.22,
+      );
+      return;
+    }
+
+    particleMat.uniforms.uPointer.value.lerp(_hoverTarget, 0.28);
     particleMat.uniforms.uHoverStrength.value = THREE.MathUtils.lerp(
       particleMat.uniforms.uHoverStrength.value,
       1,
-      0.38,
+      0.16,
     );
     lastPointerMoveMs = performance.now();
   }
@@ -190,8 +318,8 @@
 
   function decayParticleHover(dt: number) {
     if (!particleMat || !particlesHoverActive()) return;
-    if (performance.now() - lastPointerMoveMs < 120) return;
-    const decay = Math.pow(0.04, dt);
+    if (performance.now() - lastPointerMoveMs < 140) return;
+    const decay = Math.pow(0.06, dt);
     particleMat.uniforms.uHoverStrength.value *= decay;
     if (particleMat.uniforms.uHoverStrength.value < 0.01) {
       particleMat.uniforms.uHoverStrength.value = 0;
@@ -232,34 +360,52 @@
       morphToResult,
       returnToParticles: () => {
         if (controls) controls.enabled = false;
+        resetFeedbackLayout();
+        morphState = 'none';
+        morphElapsed = 0;
+        morphDoneCallback = null;
+        if (spinner) {
+          spinner.children
+            .filter((child) => child !== modelGroup)
+            .forEach((child) => spinner!.remove(child));
+        }
+        resultModelMaterials = [];
+        activeResultGroup = null;
         restoreTopicsPose();
+        if (spinner) spinner.position.y = 0;
         materials.forEach(m => { m.opacity = 0; m.visible = false; });
         if (particleMesh) particleMesh.visible = true;
         if (particleMat) {
           particleMat.uniforms.uBaseOpacity.value = 0.85;
           particleMat.uniforms.uPulse.value = 0;
         }
-        resultModelMaterials.forEach(m => { m.opacity = 0; m.visible = false; });
       },
-      setMobileFit: (topPx, bottomPx, scaleBoost = 1, anchor = 'center') => {
+      setMobileFit: (topPx, bottomPx, options = {}) => {
         if (!camera) return;
         mobileFitActive = true;
         const vh        = window.innerHeight;
         const fov       = camera.fov * (Math.PI / 180);
         const visibleH  = 2 * Math.tan(fov / 2) * camera.position.z;
         const gapPx     = Math.max(24, bottomPx - topPx);
-        const fitFactor = MODEL_FIT_FACTOR[modelSrc] ?? 1;
-        const fitScale  = (MOBILE_FIT_RATIO * scaleBoost * (gapPx / vh)) / (0.9 * fitFactor);
-        mobileFitTargetScale = fitScale;
-        const visualHeightPx = gapPx * MOBILE_FIT_RATIO * scaleBoost * 0.92;
-        const centerPx = anchor === 'top'
-          ? Math.min(topPx + visualHeightPx * 0.5, bottomPx - visualHeightPx * 0.5 - 4)
-          : anchor === 'bottom'
-          ? topPx + gapPx * 0.82
-          : (topPx + bottomPx) / 2;
-        mobileFitTargetOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
+        const centerBias = options.centerBias ?? MOBILE_FIT_CENTER_BIAS;
+        const centerPx = topPx + gapPx * centerBias;
+        mobileFitFinalOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
       },
-      clearMobileFit: () => { mobileFitActive = false; },
+      setMobileLayoutBlend: (t) => {
+        mobileLayoutBlend = Math.max(0, Math.min(1, t));
+      },
+      setModelBaseYOffset: (vh) => {
+        modelBaseYOffsetVh = vh;
+      },
+      snapMobileFit: () => {
+        if (!spinner || !mobileFitActive) return;
+        const targetY = mobileFitFinalOffsetY * mobileLayoutBlend + getModelBaseYOffset();
+        spinner.position.y = targetY;
+      },
+      clearMobileFit: () => {
+        prepareForFeedback();
+      },
+      realignFeedback: () => realignFeedbackModel(),
     };
 
     initThree();
@@ -298,7 +444,14 @@
   });
 
   $effect(() => {
-    if (controls) controls.enabled = orbitEnabled;
+    if (!controls) return;
+    controls.enabled = orbitEnabled;
+    controls.autoRotate = !orbitEnabled;
+  });
+
+  $effect(() => {
+    isFeedbackActive = feedbackActive;
+    if (feedbackActive) realignFeedbackModel();
   });
 
   onDestroy(() => {
@@ -522,6 +675,7 @@
     if (!scene || !spinner) return;
 
     sampleParticleTargets(root);
+    computeParticleHoverRadius();
 
     // Match infrastrutture's world-space visual exactly.
     // Measured from infrastrutture.glb: baseScale=0.6405, radius=0.012, dirRange=8
@@ -546,8 +700,9 @@
         uPulse:         { value: 0.0 },
         uBaseOpacity:   { value: 0.0 },
         uPointer:       { value: new THREE.Vector3() },
-        uHoverRadius:   { value: 0.9 * INFRA_BS / baseScale },
-        uHoverPush:     { value: 0.75 * INFRA_BS / baseScale },
+        uHoverRadius:   { value: 1.35 * INFRA_BS / baseScale },
+        uHoverPush:     { value: 0.85 * INFRA_BS / baseScale },
+        uHoverExpand:   { value: 0.55 * INFRA_BS / baseScale },
         uHoverStrength: { value: 0.0 },
       },
       vertexShader: /* glsl */`
@@ -556,14 +711,16 @@
         uniform vec3 uPointer;
         uniform float uHoverRadius;
         uniform float uHoverPush;
+        uniform float uHoverExpand;
         uniform float uHoverStrength;
 
         void main() {
-          vec3 local = position + aDirection * uPulse;
+          float expand = uHoverStrength * uHoverExpand;
+          vec3 local = position + aDirection * (uPulse + expand);
           vec3 instPos = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
           vec3 toPart = instPos - uPointer;
           float dist = length(toPart);
-          float infl = smoothstep(uHoverRadius, uHoverRadius * 0.28, dist) * uHoverStrength;
+          float infl = smoothstep(uHoverRadius, uHoverRadius * 0.18, dist) * uHoverStrength;
           vec3 repel = dist > 0.0001 ? normalize(toPart) * infl * uHoverPush : vec3(0.0);
           vec3 p = local + repel;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
@@ -598,14 +755,41 @@
     root.add(particleMesh);
   }
 
+  function finalizeMorphView() {
+    if (activeResultGroup && spinner) {
+      // Trasferisce la rotazione idle sul modello risultato prima di azzerare lo spinner,
+      // altrimenti il pattino appare capovolto/spostato a fine morph.
+      activeResultGroup.rotation.y += spinner.rotation.y;
+      spinner.rotation.set(0, 0, 0);
+    }
+
+    if (activeResultGroup) centerModelInViewport(activeResultGroup, true);
+    else if (modelGroup) centerModelInViewport(modelGroup, true);
+
+    if (particleMesh) particleMesh.visible = false;
+    if (activeResultGroup) {
+      resultModelMaterials.forEach((m) => {
+        m.opacity = 1;
+        m.transparent = false;
+        m.visible = true;
+        m.needsUpdate = true;
+      });
+    }
+  }
+
+  function resetFeedbackCamera() {
+    if (!camera) return;
+    freezeSpinnerRotation();
+    if (spinner) spinner.rotation.set(0, 0, 0);
+    resetFeedbackViewCamera();
+  }
+
   function centerFeedbackView(scaleMul: number) {
     if (!modelGroup || !camera) return;
 
-    freezeSpinnerRotation();
-    if (spinner) {
-      spinner.position.set(0, 0, 0);
-      spinner.rotation.set(0, 0, 0);
-    }
+    resetFeedbackLayout();
+    if (spinner) spinner.position.set(0, 0, 0);
+    resetFeedbackViewCamera();
 
     modelGroup.rotation.set(0, 0, 0);
     modelGroup.position.set(0, 0, 0);
@@ -616,12 +800,7 @@
     const center = box.getCenter(new THREE.Vector3());
     modelGroup.position.sub(center);
 
-    camera.position.set(0, 0, 6);
-    camera.lookAt(0, 0, 0);
-    if (controls) {
-      controls.target.set(0, 0, 0);
-      controls.update();
-    }
+    centerModelInViewport(modelGroup, true);
   }
 
   function showEnlargedSourceModel(scaleMul: number, onDone: () => void) {
@@ -649,7 +828,9 @@
   function doMorph(source: THREE.Group, onDone: () => void) {
     if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) { onDone(); return; }
 
+    freezeSpinnerRotation();
     const resultGroup = source.clone();
+    resultGroup.rotation.copy(modelGroup.rotation);
 
     resultGroup.updateMatrixWorld(true);
     const box    = new THREE.Box3().setFromObject(resultGroup);
@@ -662,13 +843,12 @@
     const maxDim     = Math.max(size.x, size.y, size.z);
     const resultBase = (visibleH * 0.9) / maxDim;
     const settled    = modelGroup.scale.x / baseScale;
-    const resultMul  = MODEL_RESULT_SCALE[modelSrc] ?? DEFAULT_RESULT_SCALE;
-
-    if (modelSrc in MODEL_RESULT_SCALE) {
-      resultGroup.scale.setScalar(baseScale * resultMul);
-    } else {
-      resultGroup.scale.setScalar(resultBase * settled * resultMul);
-    }
+    const fb         = feedbackConfig();
+    const morphSettled = fb.lockSettled ? 1 : settled;
+    const resultMul    = fb.scaleMul;
+    // Adatta sempre il modello di risultato al suo bounding box (non riusare baseScale
+    // del modello sorgente: per sostenibilità causava scale errate con i GLB di feedback).
+    resultGroup.scale.setScalar(resultBase * morphSettled * resultMul);
 
     resultModelMaterials = [];
     resultGroup.traverse(node => {
@@ -685,6 +865,7 @@
     });
 
     spinner.add(resultGroup);
+    activeResultGroup = resultGroup;
     scene.updateMatrixWorld();
 
     const modelGroupWorldInv = new THREE.Matrix4().copy(modelGroup.matrixWorld).invert();
@@ -746,9 +927,11 @@
   }
 
   function morphToResult(path: string, onDone: () => void) {
-    const feedbackScale = MODEL_RESULT_SCALE[modelSrc];
-    if (feedbackScale !== undefined && path === modelSrc) {
-      showEnlargedSourceModel(feedbackScale, onDone);
+    prepareForFeedback();
+    resetFeedbackLayout();
+    const { scaleMul } = feedbackConfig();
+    if (MODEL_FEEDBACK[modelSrc] && path === modelSrc) {
+      showEnlargedSourceModel(scaleMul, onDone);
       return;
     }
 
@@ -840,6 +1023,8 @@
 
     scrollDrivenTransition = false;
     transitionPrepared = false;
+    if (spinner) spinner.position.y = 0;
+    mobileLayoutBlend = 0;
   }
 
   function ensureTransitionPrepared() {
@@ -954,23 +1139,22 @@
     const elapsed = clock.elapsedTime;
 
     const idleSpinAllowed =
+      !isFeedbackActive &&
       !orbitEnabled &&
       morphState === 'none' &&
       (transitionState === 'done' ||
         transitionState === 'in' ||
-        (transitionState === 'none' && !MODEL_DISABLE_IDLE_SPIN.has(modelSrc)));
+        transitionState === 'none');
 
     if (spinner && idleSpinAllowed) {
       spinner.rotation.y += IDLE_RAD_S * dt;
     }
     if (controls?.enabled) controls.update(dt);
 
-    if (mobileFitActive && modelGroup && spinner &&
-        (transitionState === 'none' || transitionState === 'done')) {
-      const currentScale = modelGroup.scale.x / baseScale;
-      const nextScale = currentScale + (mobileFitTargetScale - currentScale) * MOBILE_FIT_LERP;
-      modelGroup.scale.setScalar(baseScale * nextScale);
-      spinner.position.y += (mobileFitTargetOffsetY - spinner.position.y) * MOBILE_FIT_LERP;
+    if (spinner && !isFeedbackActive && feedbackLayoutScale === null && morphState !== 'morphing') {
+      const fitY = mobileFitActive ? mobileFitFinalOffsetY * mobileLayoutBlend : 0;
+      const targetY = fitY + getModelBaseYOffset();
+      spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;
     }
 
     decayParticleHover(dt);
@@ -1047,6 +1231,7 @@
         morphState = 'none';
         particleMesh.visible = false;
         resultModelMaterials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
+        finalizeMorphView();
         const cb = morphDoneCallback;
         morphDoneCallback = null;
         cb?.();
@@ -1063,6 +1248,7 @@
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    if (isFeedbackActive) realignFeedbackModel();
   }
 </script>
 

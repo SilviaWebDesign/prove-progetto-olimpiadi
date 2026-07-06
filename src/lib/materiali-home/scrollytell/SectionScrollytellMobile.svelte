@@ -11,9 +11,15 @@
   import './tokens.css';
   import { visitedSections, allSectionsCompleted } from '$lib/stores/visitedSections';
   import { overlayVisible } from '$lib/stores/pageTransition';
+  import {
+    FEEDBACK_HEADING,
+    computeResultKey,
+    computeResultPath,
+    getFeedbackBody,
+    shuffleCommentOrder,
+  } from './scrollytellConfig.js';
 
   interface TopicData {
-    counter: string;
     title: string;
     body: string;
     source?: string;
@@ -28,8 +34,9 @@
     heroAriaLabel: string;
     frostSrc: string;
     bgSrc: string;
+    bgPosition?: string;
     phrase: string;
-    phraseMobileLines?: string[];
+    phraseLines?: string[];
     modelSrc: string;
     resultPaths: string[];
     sectionId: 'infrastructure' | 'sport' | 'sustainability';
@@ -41,12 +48,14 @@
 
   const topics = $derived(config.topics);
   const lastTopic = $derived(config.topics.length - 1);
+  const commentOrder = config.topics.map((t) => shuffleCommentOrder(t.comments.length));
 
   let currentTopic = $state(0);
   let topicLikes = $state<boolean[][]>(config.topics.map(t => t.comments.map(() => false)));
   let phase = $state<'topics' | 'feedback'>('topics');
   let isTransitioning = $state(false);
   let currentResultPath = $state('');
+  let currentResultKey = $state<'positivo' | 'negativo' | 'piu-positivo' | 'piu-negativo' | 'neutro'>('neutro');
   let topicsEl = $state<HTMLDivElement | null>(null);
 
   const anyLikedInCurrent = $derived(topicLikes[currentTopic].some(l => l));
@@ -64,25 +73,11 @@
   }
 
   function computeResult(): string {
-    let totalPositive = 0, totalNegative = 0;
-    for (const tl of topicLikes) {
-      totalPositive += tl.slice(0, 3).filter(Boolean).length;
-      totalNegative += tl.slice(3, 6).filter(Boolean).length;
-    }
-    const [pos, neg, piuPos, piuNeg, neutro] = config.resultPaths;
-    if (totalPositive > 0 && totalNegative === 0) return pos;
-    if (totalNegative > 0 && totalPositive === 0) return neg;
-    if (totalPositive > totalNegative)            return piuPos;
-    if (totalNegative > totalPositive)            return piuNeg;
-    return neutro;
+    return computeResultPath(config.sectionId, topicLikes);
   }
 
-  function getResultLabel(path: string): string {
-    if (path.includes('piu-positivo')) return 'La tua visione è prevalentemente ottimista con qualche riserva.';
-    if (path.includes('piu-negativo')) return 'La tua visione è prevalentemente critica con qualche apertura.';
-    if (path.includes('positivo'))    return 'Il tuo punto di vista guarda alle opportunità di questo grande evento.';
-    if (path.includes('negativo'))    return 'Il tuo punto di vista si concentra sulle criticità di questo grande evento.';
-    return 'La tua visione è equilibrata tra aspetti positivi e negativi.';
+  function getResultLabel(): string {
+    return getFeedbackBody(config.sectionId, currentResultKey);
   }
 
   async function goNext() {
@@ -96,6 +91,7 @@
     } else {
       const resultPath = computeResult();
       currentResultPath = resultPath;
+      currentResultKey = computeResultKey(topicLikes);
       visitedSections.markCompleted(config.sectionId, resultPath);
       phase = 'feedback';
       await tick();
@@ -130,7 +126,7 @@
   <div class="mobile-hero">
     <div
       class="mobile-hero__bg"
-      style="background-image: url('{config.bgSrc}')"
+      style="background-image: url('{config.bgSrc}'); background-position: {config.bgPosition ?? 'center'}"
       aria-hidden="true"
     ></div>
     <div class="mobile-hero__frost" aria-hidden="true"></div>
@@ -153,10 +149,12 @@
 
   <!-- ── Frase intro ────────────────────────────────────────────────────────── -->
   <div class="mobile-phrase">
-    {#if config.phraseMobileLines?.length}
-      {#each config.phraseMobileLines as line}
-        <p class="mobile-phrase__line">{line}</p>
-      {/each}
+    {#if config.phraseLines?.length}
+      <div class="mobile-phrase__lines">
+        {#each config.phraseLines as line}
+          <p class="mobile-phrase__line">{line}</p>
+        {/each}
+      </div>
     {:else}
       <p class="mobile-phrase__text">{config.phrase}</p>
     {/if}
@@ -172,7 +170,6 @@
           <!-- Testo del topic -->
           <div class="mobile-topic__text">
             <SectionFactBlock
-              counter={topics[currentTopic].counter}
               title={topics[currentTopic].title}
               body={topics[currentTopic].body}
               source={topics[currentTopic].source ?? ''}
@@ -190,12 +187,12 @@
               Metti like alle opinioni con cui sei d'accordo
             </p>
             <div class="mobile-topic__cards-list">
-              {#each topics[currentTopic].comments as comment, i}
+              {#each commentOrder[currentTopic] as commentIdx (commentIdx)}
                 <CommentCard
-                  comment={{ body: comment }}
+                  comment={{ body: topics[currentTopic].comments[commentIdx] }}
                   sectionId={config.sectionId}
-                  liked={topicLikes[currentTopic][i]}
-                  onToggleLike={() => toggleLike(currentTopic, i)}
+                  liked={topicLikes[currentTopic][commentIdx]}
+                  onToggleLike={() => toggleLike(currentTopic, commentIdx)}
                   size="lg"
                 />
               {/each}
@@ -229,8 +226,8 @@
       <div class="mobile-feedback" in:fade={{ duration: 400 }}>
 
         <p class="mobile-feedback__headline">
-          Fatti unici, molteplici sguardi.<br>
-          Questa è la realtà, plasmata dalla tua opinione.
+          {FEEDBACK_HEADING.line1}<br>
+          {FEEDBACK_HEADING.line2}
         </p>
 
         <div class="mobile-feedback__model" aria-hidden="true">
@@ -238,7 +235,7 @@
         </div>
 
         <p class="mobile-feedback__subtitle">
-          {getResultLabel(currentResultPath)}
+          {getResultLabel()}
         </p>
 
         <button
@@ -306,7 +303,7 @@
     background-size: cover;
     background-position: center;
     filter: grayscale(1);
-    opacity: 0.28;
+    opacity: 0.10;
     pointer-events: none;
   }
 
@@ -334,16 +331,6 @@
     overflow: hidden;
   }
 
-  .mobile-hero__title :global(.section-hero-title),
-  .mobile-hero__title :global(.section-hero-title--spread) {
-    font-size: 68px;
-    letter-spacing: 4.76px;
-    line-height: 1.3;
-    text-align: center;
-    padding: 0;
-    margin: 0;
-  }
-
   .mobile-hero__scroll-hint {
     position: relative;
     z-index: 2;
@@ -357,28 +344,46 @@
     50%       { transform: translateY(6px); }
   }
 
-  /* ── Frase — Figma 875:6669 ── */
+  /* ── Frase ───────────────────────────────────────────────────────────────── */
   .mobile-phrase {
-    display: flex;
-    justify-content: center;
-    padding: 52px 18px 40px;
+    padding: 52px 28px 40px;
     background: #ffffff;
   }
 
-  .mobile-phrase__text,
+  .mobile-phrase__text {
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1.2;
+    color: #161a1f;
+  }
+
+  .mobile-phrase__lines {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
   .mobile-phrase__line {
-    width: min(354px, calc(100% - 36px));
     margin: 0;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
     font-size: 36px;
     line-height: 1.1;
     color: #161a1f;
-    text-align: left;
   }
 
-  .mobile-phrase__line + .mobile-phrase__line {
-    margin-top: 0;
+  .mobile-page--sustainability .mobile-phrase,
+  .mobile-page--sport .mobile-phrase,
+  .mobile-page--infrastructure .mobile-phrase {
+    padding: 52px 20px 40px;
+  }
+
+  .mobile-page--sport .mobile-phrase__text,
+  .mobile-page--infrastructure .mobile-phrase__text {
+    font-size: 36px;
+    line-height: 1.1;
+    width: 100%;
   }
 
   /* ── Main content ────────────────────────────────────────────────────────── */
@@ -395,33 +400,9 @@
     gap: 0;
   }
 
-  /* Text block — Figma 875:6920 */
+  /* Text block */
   .mobile-topic__text {
-    padding: 0 22px 40px;
-  }
-
-  .mobile-topic__text :global(.section-fact-block) {
-    width: 100%;
-    gap: 30px;
-  }
-
-  .mobile-topic__text :global(.section-fact-block__counter) {
-    font-size: 14px;
-  }
-
-  .mobile-topic__text :global(.section-fact-block__title) {
-    font-size: 36px;
-    font-weight: 800;
-  }
-
-  .mobile-topic__text :global(.section-fact-block__body) {
-    font-size: 20px;
-    font-weight: 700;
-  }
-
-  .mobile-topic__text :global(.section-fact-block__source) {
-    font-size: 18px;
-    font-weight: 700;
+    padding: 0 28px 40px;
   }
 
   /* 3D Model */
@@ -440,9 +421,9 @@
   .mobile-topic__cards-heading {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: 11px;
-    line-height: 1.1;
-    color: #333333;
+    font-size: 14px;
+    line-height: 1.3;
+    color: #161a1f;
     margin-bottom: 16px;
   }
 
@@ -542,6 +523,9 @@
     animation: bounce 1.4s ease-in-out infinite;
   }
 
-  /* ── Hero background variants ─────────────────────────────────────────────── */
-  .mobile-page--sustainability .mobile-hero__bg { opacity: 0.16; }
-</style>
+  /* Override SectionFactBlock width on mobile */
+  .mobile-topic__text :global(.section-fact-block) {
+    width: 100%;
+  }
+
+  /* ── Hero background variants ─────────────────────────────────────────────── */</style>

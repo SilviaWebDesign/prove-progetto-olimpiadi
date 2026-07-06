@@ -46,7 +46,6 @@
   } from './aboutMarkerModels.js';
 
   const FOCUS_CAMERA_ZOOM = 1.08;
-  const FOCUS_CAMERA_ZOOM_MOBILE = 1.0;
   const FOCUS_TRANSITION_MS = 1800;
   const HERO_TRANSITION_MS = 1400;
   /** Vista iniziale about: lato opposto rispetto alla home. */
@@ -486,21 +485,13 @@
       const focusPoint = getHotspotFocusPoint(hotspot);
       if (!markerPos || !focusPoint) return;
 
-      const mobileFocus = isAboutPanelMobileLayout();
-
       toTarget = focusPoint.clone();
-      toCam = computeFocusCameraPosition(
-        markerPos,
-        focusPoint,
-        homeOrbitConfig.center,
-        _worldBox,
-        { mobile: mobileFocus }
-      );
+      toCam = computeFocusCameraPosition(markerPos, focusPoint, homeOrbitConfig.center, _worldBox);
       if (snowMountainModel) {
         toCam = clampFocusCameraPosition(markerPos, toCam, snowMountainModel, raycaster);
       }
 
-      if (mobileFocus) {
+      if (isAboutPanelMobileLayout()) {
         toCam.y += (_worldBox.max.y - _worldBox.min.y) * FOCUS_CAMERA_Y_LIFT_MOBILE;
       }
 
@@ -509,7 +500,7 @@
       _tmpTarget.copy(toTarget);
       camera.position.copy(toCam);
       camera.lookAt(_tmpTarget);
-      if (mobileFocus) {
+      if (isAboutPanelMobileLayout()) {
         panFocusToViewport(
           camera,
           _tmpTarget,
@@ -525,7 +516,7 @@
       camera.position.copy(savedCam);
       controls.target.copy(savedTarget);
 
-      toZoom = mobileFocus ? FOCUS_CAMERA_ZOOM_MOBILE : FOCUS_CAMERA_ZOOM;
+      toZoom = FOCUS_CAMERA_ZOOM;
     } else {
       const hero = getHeroCameraPose();
       toCam = hero.cam;

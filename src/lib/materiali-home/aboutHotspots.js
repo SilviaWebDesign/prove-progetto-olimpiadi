@@ -542,16 +542,13 @@ export function safeOrbitRadius(worldBox) {
  * @param {THREE.Vector3} mountainCenter
  * @param {THREE.Box3} worldBox
  */
-export function computeFocusCameraPosition(markerPos, focusPoint, mountainCenter, worldBox, options = {}) {
-  const { mobile = false } = options;
+export function computeFocusCameraPosition(markerPos, focusPoint, mountainCenter, worldBox) {
   const outward = new THREE.Vector3().subVectors(markerPos, mountainCenter);
   outward.y = 0;
   if (outward.lengthSq() < 1e-6) outward.set(0, 0, 1);
   outward.normalize();
 
-  const dist =
-    focusCameraDistance(worldBox) *
-    (mobile ? FOCUS_CAMERA_DISTANCE_MOBILE_SCALE : 1);
+  const dist = focusCameraDistance(worldBox);
 
   return new THREE.Vector3(
     focusPoint.x + outward.x * dist,
@@ -788,13 +785,11 @@ export function clampFocusCameraPosition(surfacePoint, desiredCamPos, mountainMo
 
 /** Frazione viewport (0–1) dove inquadrare il marker in focus — lato sinistro. */
 export const FOCUS_VIEWPORT_X = 0.32;
-/** Mobile: sfera centrata nella metà superiore (0 = alto, 0.5 = centro schermo). */
+/** Mobile: sfera centrata nello schermo. */
 export const FOCUS_VIEWPORT_X_MOBILE = 0.5;
 export const FOCUS_VIEWPORT_Y_MOBILE = 0.3;
 /** Sollevamento camera in focus mobile (frazione altezza montagna). */
-export const FOCUS_CAMERA_Y_LIFT_MOBILE = 0.1;
-/** Leggero allontanamento camera su mobile. */
-export const FOCUS_CAMERA_DISTANCE_MOBILE_SCALE = 1.04;
+export const FOCUS_CAMERA_Y_LIFT_MOBILE = 0.18;
 
 const _focusProj = new THREE.Vector3();
 const _focusFwd = new THREE.Vector3();

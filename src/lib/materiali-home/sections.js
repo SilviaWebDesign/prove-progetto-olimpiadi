@@ -78,23 +78,6 @@ const SUSTAINABILITY_INTRO_CLAIM = [
   'tempo.'
 ];
 
-/** A capo mobile frase intro — Figma node 875:6669 (354px) */
-export const SUSTAINABILITY_PHRASE_MOBILE_LINES = [
-  'Le Olimpiadi sono',
-  'accompagnate da',
-  'scelte che',
-  'riguardano ambiente',
-  'e risorse. Questi',
-  'interventi possono',
-  'essere letti come',
-  'attenzione al',
-  'territorio oppure',
-  'come iniziative dal',
-  'valore limitato,',
-  'misurabile solo nel',
-  'tempo.'
-];
-
 const SUSTAINABILITY_FACT_1_BODY =
   'Milano-Cortina 2026 è stata progettata intorno a un uso esteso di sedi già esistenti o temporanee, al fine di non lasciare “cattedrali nel deserto”, come spesso accade. Secondo la comunicazione ufficiale, circa il 90% delle sedi di gara rientra in questa logica di riuso. Alcuni degli esempi sono lo stadio di San Siro, l’Unipol Forum, e Rho Fiera.';
 
@@ -118,7 +101,6 @@ export const sections = {
       background: '/images/frost-sustainability.png'
     },
     introClaim: SUSTAINABILITY_INTRO_CLAIM,
-    phraseMobileLines: SUSTAINABILITY_PHRASE_MOBILE_LINES,
     facts: [
       {
         id: 'fact-1',

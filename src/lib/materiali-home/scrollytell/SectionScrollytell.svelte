@@ -1767,10 +1767,10 @@
       font-size: 12px;
     }
 
-    /* ── Cards column: bottom of viewport ── */
+    /* ── Cards column: posizione fissa, indipendente da CTA e barra browser ── */
     .stage__right {
       position: absolute;
-      bottom: calc(var(--mobile-cards-bottom) + var(--mobile-browser-chrome-bottom, 0px));
+      bottom: var(--mobile-cards-bottom);
       left: 0;
       right: 0;
       padding: 0 20px;
@@ -1838,7 +1838,7 @@
       display: none;
       position: absolute;
       right: 6px;
-      bottom: calc(var(--mobile-cards-bottom) + var(--mobile-browser-chrome-bottom, 0px));
+      bottom: var(--mobile-cards-bottom);
       height: var(--mobile-cards-scroll-height);
       width: 3px;
       background: rgba(22, 26, 31, 0.12);

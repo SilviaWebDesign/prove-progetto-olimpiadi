@@ -225,10 +225,12 @@
     scene3d?.morphToResult(resultModelPath, () => {
       phase = 'feedback';
       isTransitioning = false;
-      tick().then(() => {
+      void tick().then(() => {
         updateFeedbackModelFit();
-        requestAnimationFrame(() => updateFeedbackModelFit());
-        requestAnimationFrame(() => requestAnimationFrame(() => updateFeedbackModelFit()));
+        requestAnimationFrame(() => {
+          updateFeedbackModelFit();
+          requestAnimationFrame(updateFeedbackModelFit);
+        });
         setTimeout(updateFeedbackModelFit, 550);
         gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
         gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
@@ -323,7 +325,8 @@
   let mobileBrowserChromeBottom = $state(0);
 
   const MOBILE_BROWSER_CHROME_SCALE = 1;
-  const MOBILE_BROWSER_CHROME_MAX = 96;
+  const MOBILE_BROWSER_CHROME_MAX = 120;
+  const MOBILE_CTA_ABOVE_CHROME = 8;
 
   function syncMobileBrowserChromeInset() {
     if (!isMobile || !browser) return;
@@ -332,7 +335,15 @@
       mobileBrowserChromeBottom = 0;
       return;
     }
-    const raw = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+
+    const viewportEl = sceneEl?.querySelector<HTMLElement>('.scene__viewport');
+    const layoutRect = viewportEl?.getBoundingClientRect();
+    const layoutBottom = layoutRect
+      ? layoutRect.top + layoutRect.height
+      : window.innerHeight;
+    const visualBottom = vv.offsetTop + vv.height;
+    const raw = Math.max(0, layoutBottom - visualBottom);
+
     mobileBrowserChromeBottom = Math.min(
       MOBILE_BROWSER_CHROME_MAX,
       Math.round(raw * MOBILE_BROWSER_CHROME_SCALE),
@@ -341,6 +352,7 @@
     void tick().then(() => {
       requestAnimationFrame(() => {
         if (phase === 'feedback') updateFeedbackModelFit();
+        else if (phase === 'topics') updateTopicsModelFit({ relayout: true });
       });
     });
   }
@@ -348,6 +360,8 @@
   // ── Model 3D: stessa distanza da testo sopra e card/CTA sotto (tutte le sezioni) ──
   const TOPICS_MODEL_MARGIN = 24;
   const TOPICS_CTA_RESERVE  = 100;
+  /** Gap extra tra fondo viewport e zona CTA quando la barra browser è visibile. */
+  const TOPICS_CTA_CHROME_RESERVE = 8;
   const TOPICS_FIT_CENTER_BIAS = 0.5;
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
   const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.032;
@@ -493,8 +507,31 @@
   }
 
   const FEEDBACK_MODEL_MARGIN = 20;
-  /** Centro verticale pattini nel feedback: più basso = più in alto nello spazio libero. */
-  const SPORT_FEEDBACK_CENTER_BIAS = 0.32;
+
+  function feedbackViewportHeightPx(): number {
+    const viewport = sceneEl?.querySelector<HTMLElement>('.scene__viewport');
+    return viewport?.getBoundingClientRect().height ?? window.innerHeight;
+  }
+
+  function updateFeedbackModelFit() {
+    if (!scene3d || phase !== 'feedback') return;
+    const topEl =
+      feedbackTopEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-top') ?? null;
+    const subtitleEl =
+      feedbackSubtitleEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-subtitle') ?? null;
+    if (!topEl || !subtitleEl) return;
+
+    const topRect = topEl.getBoundingClientRect();
+    const subtitleRect = subtitleEl.getBoundingClientRect();
+    const gapTop = topRect.bottom + FEEDBACK_MODEL_MARGIN;
+    const gapBottom = subtitleRect.top - FEEDBACK_MODEL_MARGIN;
+    if (gapBottom - gapTop < 48) return;
+
+    scene3d.setFeedbackFit(gapTop, gapBottom, {
+      viewportHeightPx: feedbackViewportHeightPx(),
+    });
+    scene3d.realignFeedback();
+  }
 
   function mobileTopicsViewportHeightPx(): number {
     const viewport = sceneEl?.querySelector<HTMLElement>('.scene__viewport');
@@ -504,7 +541,12 @@
   function mobileFixedTopicsBottomBoundPx(cardsActive: boolean): number {
     const viewportHeight = mobileTopicsViewportHeightPx();
     if (!cardsActive) {
-      return viewportHeight - TOPICS_CTA_RESERVE;
+      return (
+        viewportHeight -
+        TOPICS_CTA_RESERVE -
+        mobileBrowserChromeBottom -
+        TOPICS_CTA_CHROME_RESERVE
+      );
     }
     const headingReserve = 24;
     const panelTopGap = 8;
@@ -527,20 +569,6 @@
   }
 
   let topicsMobileLayoutLocked = false;
-
-  function updateFeedbackModelFit() {
-    if (!scene3d || phase !== 'feedback' || !feedbackTopEl || !feedbackSubtitleEl) return;
-    const topRect = feedbackTopEl.getBoundingClientRect();
-    const subtitleRect = feedbackSubtitleEl.getBoundingClientRect();
-    const centerBias =
-      config.sectionId === 'sport' ? SPORT_FEEDBACK_CENTER_BIAS : 0.5;
-    scene3d.setFeedbackFit(
-      topRect.bottom + FEEDBACK_MODEL_MARGIN,
-      subtitleRect.top - FEEDBACK_MODEL_MARGIN,
-      { centerBias },
-    );
-    scene3d.realignFeedback();
-  }
 
   function updateTopicsModelFit(options: { skipScale?: boolean; relayout?: boolean } = {}) {
     if (!scene3d || !stageTextEl || phase === 'feedback') return;
@@ -627,11 +655,22 @@
   });
 
   $effect(() => {
-    if (phase !== 'feedback' || !feedbackTopEl || !feedbackSubtitleEl) return;
+    if (phase !== 'feedback') return;
+    const topEl =
+      feedbackTopEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-top') ?? null;
+    const subtitleEl =
+      feedbackSubtitleEl ?? sceneEl?.querySelector<HTMLElement>('.feedback-subtitle') ?? null;
+    if (!topEl || !subtitleEl) {
+      void tick().then(updateFeedbackModelFit);
+      return;
+    }
     const observer = new ResizeObserver(() => updateFeedbackModelFit());
-    observer.observe(feedbackTopEl);
-    observer.observe(feedbackSubtitleEl);
-    void tick().then(updateFeedbackModelFit);
+    observer.observe(topEl);
+    observer.observe(subtitleEl);
+    void tick().then(() => {
+      updateFeedbackModelFit();
+      requestAnimationFrame(updateFeedbackModelFit);
+    });
     return () => observer.disconnect();
   });
 
@@ -842,10 +881,12 @@
       window.addEventListener('scroll', lockMobileTopicsPageScroll, { passive: true });
       tick().then(() => {
         updateTopicsModelFit({ relayout: true });
+        syncMobileBrowserChromeInset();
         lockTopicsMobileLayout();
       });
       setTimeout(() => {
         updateTopicsModelFit({ relayout: true });
+        syncMobileBrowserChromeInset();
         lockTopicsMobileLayout();
       }, 450);
     } else {
@@ -1179,7 +1220,7 @@
     class="scene__viewport"
     class:scene__viewport--feedback={phase === 'feedback'}
     style={isMobile
-      ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px; --mobile-browser-chrome-bottom: ${mobileBrowserChromeBottom}px`
+      ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px; --mobile-browser-chrome-bottom: ${mobileBrowserChromeBottom}px; --mobile-cta-above-chrome: ${MOBILE_CTA_ABOVE_CHROME}px`
       : undefined}
   >
 
@@ -1696,6 +1737,11 @@
     bottom: 120px;
     left: 0;
     right: 0;
+    width: 100%;
+    max-width: 780px;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
     text-align: left;
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 400;
@@ -1703,8 +1749,6 @@
     line-height: 1.5;
     color: #16181D;
     pointer-events: none;
-    max-width: 780px;
-    margin: 0;
     padding: 0 clamp(24px, 5.556vw, 84px);
     text-wrap: pretty;
   }
@@ -1948,7 +1992,9 @@
       font-size: 15px;
       bottom: 128px;
       padding: 0 20px;
-      max-width: 100%;
+      max-width: min(780px, 100%);
+      margin-left: auto;
+      margin-right: auto;
       text-align: left;
     }
 
@@ -1957,27 +2003,33 @@
       right: 0;
       width: 100%;
       transform: none;
-      bottom: 0;
+      bottom: calc(
+        var(--mobile-browser-chrome-bottom, 0px) +
+        env(safe-area-inset-bottom, 0px) +
+        var(--mobile-cta-above-chrome, 8px)
+      );
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      padding-top: 148px;
-      padding-bottom: max(
-        calc(var(--mobile-cta-bottom) + 10px),
-        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 10px)
-      );
+      padding: 0;
       box-sizing: border-box;
       background: transparent;
       overflow: visible;
       z-index: 15;
+      transition: bottom 0.2s ease-out;
     }
 
     .stage__cta-content {
-      padding: 18px 24px 18px;
+      padding: 12px 24px 10px;
     }
 
     .feedback-bottom-cta {
-      bottom: max(8px, calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px)));
+      bottom: calc(
+        var(--mobile-browser-chrome-bottom, 0px) +
+        env(safe-area-inset-bottom, 0px) +
+        var(--mobile-cta-above-chrome, 8px)
+      );
+      transition: bottom 0.2s ease-out;
     }
   }
 </style>

@@ -15,6 +15,7 @@
 
   export interface FeedbackFitOptions {
     centerBias?: number;
+    viewportHeightPx?: number;
   }
 
   export interface Scene3DApi {
@@ -85,10 +86,20 @@
   } as const;
 
   const MODEL_POSE: Record<string, Partial<typeof SPORT_FRONT_POSE>> = {
+    '/oggetti/sport-positivo.glb': SPORT_FRONT_POSE,
     '/oggetti/sport-negativo.glb': SPORT_FRONT_POSE,
     '/oggetti/sport-neutro.glb': SPORT_FRONT_POSE,
     '/oggetti/sport-piu-negativo.glb': SPORT_FRONT_POSE,
     '/oggetti/sport-piu-positivo.glb': SPORT_FRONT_POSE,
+  };
+
+  /** Correzione visiva Y dopo il fit bbox (frazione dell'altezza camera). */
+  const FEEDBACK_VISUAL_Y_OFFSET_VH: Record<string, number> = {
+    '/oggetti/sport-positivo.glb': -0.06,
+    '/oggetti/sport-negativo.glb': -0.06,
+    '/oggetti/sport-neutro.glb': -0.06,
+    '/oggetti/sport-piu-negativo.glb': -0.06,
+    '/oggetti/sport-piu-positivo.glb': -0.06,
   };
 
   function applyModelPose(scene: THREE.Object3D, src: string) {
@@ -128,16 +139,13 @@
 
   /** Altezza max del modello in fase feedback (frazione del viewport). */
   const FEEDBACK_MAX_VH = 0.36;
-  const SPORT_FEEDBACK_MAX_VH = 0.28;
+  const FEEDBACK_GAP_FILL = 0.88;
   let feedbackLayoutScale: THREE.Vector3 | null = null;
   let feedbackFitOffsetY = 0;
-
-  function feedbackMaxVh(): number {
-    if (modelSrc === '/oggetti/sport.glb' || modelSrc === '/oggetti/ice_skate.glb') {
-      return SPORT_FEEDBACK_MAX_VH;
-    }
-    return FEEDBACK_MAX_VH;
-  }
+  let feedbackFitGapPx = 0;
+  let feedbackFitViewportH = 0;
+  let feedbackFitReady = false;
+  let activeResultSrc = '';
 
   function getCameraVisibleH(): number {
     if (!camera) return 1;
@@ -149,6 +157,19 @@
 
   function getModelBaseYOffset(): number {
     return modelBaseYOffsetVh * getCameraVisibleH();
+  }
+
+  function getFeedbackVisualYOffset(): number {
+    const vh = FEEDBACK_VISUAL_Y_OFFSET_VH[activeResultSrc];
+    return vh ? vh * getCameraVisibleH() : 0;
+  }
+
+  function feedbackMaxWorldHeight(): number {
+    const visibleH = getCameraVisibleH();
+    const viewportCap = visibleH * FEEDBACK_MAX_VH;
+    if (feedbackFitGapPx <= 0 || feedbackFitViewportH <= 0) return viewportCap;
+    const gapWorldH = (feedbackFitGapPx / feedbackFitViewportH) * visibleH;
+    return Math.min(viewportCap, gapWorldH * FEEDBACK_GAP_FILL);
   }
 
   function resetFeedbackViewCamera() {
@@ -186,7 +207,9 @@
     } else {
       const box = new THREE.Box3().setFromObject(group);
       const size = box.getSize(new THREE.Vector3());
-      const maxWorldH = getCameraVisibleH() * feedbackMaxVh();
+      const maxWorldH = (feedback || isFeedbackActive)
+        ? feedbackMaxWorldHeight()
+        : getCameraVisibleH() * FEEDBACK_MAX_VH;
       if (size.y > maxWorldH && size.y > 0) {
         group.scale.multiplyScalar(maxWorldH / size.y);
       }
@@ -198,7 +221,7 @@
     const fitCenter = fitBox.getCenter(new THREE.Vector3());
     spinner.position.set(-fitCenter.x, -fitCenter.y, -fitCenter.z);
     if (feedback || isFeedbackActive) {
-      spinner.position.y += feedbackFitOffsetY;
+      spinner.position.y += feedbackFitOffsetY + getFeedbackVisualYOffset();
     }
   }
 
@@ -207,6 +230,10 @@
     mobileLayoutBlend = 0;
     modelBaseYOffsetVh = 0;
     feedbackFitOffsetY = 0;
+    feedbackFitGapPx = 0;
+    feedbackFitViewportH = 0;
+    feedbackFitReady = false;
+    activeResultSrc = '';
     if (spinner) {
       spinner.position.set(0, 0, 0);
       spinner.rotation.set(0, 0, 0);
@@ -216,6 +243,7 @@
   }
 
   function realignFeedbackModel() {
+    feedbackLayoutScale = null;
     if (activeResultGroup) centerModelInViewport(activeResultGroup, true);
     else if (modelGroup) centerModelInViewport(modelGroup, true);
   }
@@ -421,7 +449,9 @@
         }
         resultModelMaterials = [];
         activeResultGroup = null;
+        activeResultSrc = '';
         restoreTopicsPose();
+        if (modelGroup) modelGroup.visible = true;
         if (spinner) spinner.position.y = 0;
         materials.forEach(m => { m.opacity = 0; m.visible = false; });
         if (particleMesh) particleMesh.visible = true;
@@ -443,13 +473,15 @@
       },
       setFeedbackFit: (topPx, bottomPx, options = {}) => {
         if (!camera) return;
-        const vh = window.innerHeight;
+        const vh = options.viewportHeightPx ?? window.innerHeight;
         const visibleH = getCameraVisibleH();
         const gapPx = Math.max(24, bottomPx - topPx);
         const centerBias = options.centerBias ?? 0.5;
         const centerPx = topPx + gapPx * centerBias;
+        feedbackFitGapPx = gapPx;
+        feedbackFitViewportH = vh;
         feedbackFitOffsetY = ((vh / 2 - centerPx) / vh) * visibleH;
-        feedbackLayoutScale = null;
+        feedbackFitReady = true;
       },
       setMobileLayoutBlend: (t) => {
         if (mobileFitLocked) return;
@@ -522,7 +554,6 @@
 
   $effect(() => {
     isFeedbackActive = feedbackActive;
-    if (feedbackActive) realignFeedbackModel();
   });
 
   onDestroy(() => {
@@ -845,6 +876,12 @@
         m.needsUpdate = true;
       });
     }
+    if (modelGroup) modelGroup.visible = false;
+    materials.forEach((m) => {
+      m.opacity = 0;
+      m.visible = false;
+      m.needsUpdate = true;
+    });
   }
 
   function resetFeedbackCamera() {
@@ -999,6 +1036,7 @@
   function morphToResult(path: string, onDone: () => void) {
     prepareForFeedback();
     resetFeedbackLayout();
+    activeResultSrc = path;
     const { scaleMul } = feedbackConfig();
     if (MODEL_FEEDBACK[modelSrc] && path === modelSrc) {
       showEnlargedSourceModel(scaleMul, onDone);
@@ -1318,7 +1356,7 @@
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    if (isFeedbackActive) realignFeedbackModel();
+    if (isFeedbackActive && feedbackFitReady) realignFeedbackModel();
   }
 </script>
 

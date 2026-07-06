@@ -25,30 +25,67 @@
   let scrollEl = $state(null);
   /** @type {HTMLElement | null} */
   let contentEl = $state(null);
+  let canScroll = $state(false);
   let scrollRatio = $state(0);
   let thumbRatio = $state(1);
-  let canScroll = $state(false);
-  let sliderViewportHeight = $state(0);
+  let trackHeight = $state(0);
 
-  function updateScrollSlider() {
+  function syncSlider() {
     if (!scrollEl) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollEl;
     const maxScroll = scrollHeight - clientHeight;
     canScroll = maxScroll > 4;
     scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 0;
-    thumbRatio = scrollHeight > 0 ? Math.min(1, clientHeight / scrollHeight) : 1;
-    sliderViewportHeight = clientHeight;
+    thumbRatio =
+      scrollHeight > 0 ? Math.max(0.14, Math.min(1, clientHeight / scrollHeight)) : 1;
+    trackHeight = clientHeight;
   }
 
-  /** @param {Event} event */
-  function onPanelScroll(event) {
-    const target = /** @type {HTMLElement} */ (event.currentTarget);
-    const { scrollTop, scrollHeight, clientHeight } = target;
-    const maxScroll = scrollHeight - clientHeight;
-    canScroll = maxScroll > 4;
-    scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 0;
-    thumbRatio = scrollHeight > 0 ? Math.min(1, clientHeight / scrollHeight) : 1;
-    sliderViewportHeight = clientHeight;
+  /** @param {number} value @param {number} min @param {number} max */
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /** @param {PointerEvent} event */
+  function onTrackPointerDown(event) {
+    if (!scrollEl || !canScroll || event.target !== event.currentTarget) return;
+    const track = /** @type {HTMLElement} */ (event.currentTarget);
+    const rect = track.getBoundingClientRect();
+    const thumbHeight = thumbRatio * rect.height;
+    const y = event.clientY - rect.top - thumbHeight / 2;
+    const ratio = clamp(y / Math.max(rect.height - thumbHeight, 1), 0, 1);
+    scrollEl.scrollTop = ratio * (scrollEl.scrollHeight - scrollEl.clientHeight);
+    syncSlider();
+  }
+
+  /** @param {PointerEvent} event */
+  function onThumbPointerDown(event) {
+    if (!scrollEl || !canScroll) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startY = event.clientY;
+    const startScroll = scrollEl.scrollTop;
+    const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
+    const trackHeightPx = trackHeight;
+    const thumbHeightPx = thumbRatio * trackHeightPx;
+
+    /** @param {PointerEvent} moveEvent */
+    const onMove = (moveEvent) => {
+      const delta = moveEvent.clientY - startY;
+      const scrollDelta =
+        (delta / Math.max(trackHeightPx - thumbHeightPx, 1)) * maxScroll;
+      scrollEl.scrollTop = clamp(startScroll + scrollDelta, 0, maxScroll);
+      syncSlider();
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   }
 
   async function fitPanelContent() {
@@ -56,7 +93,7 @@
     if (!panelEl || !contentEl) return;
 
     contentEl.style.zoom = '1';
-    updateScrollSlider();
+    syncSlider();
   }
 
   $effect(() => {
@@ -66,14 +103,15 @@
   });
 
   $effect(() => {
-    if (!panelEl || !scrollEl) return;
+    if (!panelEl || !scrollEl || !contentEl) return;
 
     const observer = new ResizeObserver(() => {
       fitPanelContent();
-      updateScrollSlider();
+      syncSlider();
     });
     observer.observe(panelEl);
     observer.observe(scrollEl);
+    observer.observe(contentEl);
 
     return () => observer.disconnect();
   });
@@ -100,25 +138,7 @@
   </div>
 
   <aside class="sport-panel" bind:this={panelEl} aria-labelledby="sport-detail-title">
-    <div
-      class="sport-panel-scroll"
-      bind:this={scrollEl}
-      onscroll={onPanelScroll}
-    >
-      <div
-        class="sport-text-slider"
-        class:sport-text-slider--active={canScroll}
-        style:height="{sliderViewportHeight}px"
-        aria-hidden="true"
-      >
-        <div class="sport-text-slider__track">
-          <div
-            class="sport-text-slider__thumb"
-            style="--scroll-ratio: {scrollRatio}; --thumb-ratio: {thumbRatio}"
-          ></div>
-        </div>
-      </div>
-
+    <div class="sport-panel-scroll" bind:this={scrollEl} onscroll={syncSlider}>
       <div class="sport-panel-content" bind:this={contentEl}>
         {#key hotspot.id}
           <h1 id="sport-detail-title" class="sport-title">{title}</h1>
@@ -128,6 +148,22 @@
             {/each}
           </div>
         {/key}
+      </div>
+    </div>
+
+    <div
+      class="sport-text-slider"
+      class:sport-text-slider--active={canScroll}
+      style:height="{trackHeight}px"
+      aria-hidden="true"
+    >
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="sport-text-slider__track" onpointerdown={onTrackPointerDown}>
+        <div
+          class="sport-text-slider__thumb"
+          style="--scroll-ratio: {scrollRatio}; --thumb-ratio: {thumbRatio}"
+          onpointerdown={onThumbPointerDown}
+        ></div>
       </div>
     </div>
   </aside>
@@ -196,15 +232,29 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-right: 17px;
+    box-sizing: border-box;
+  }
+
+  .sport-panel-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sport-panel-content {
+    position: relative;
+    padding: 0 0 24px;
+    transform-origin: top right;
+    --sport-title-size: clamp(1.75rem, 3.2vw, 36px);
   }
 
   .sport-text-slider {
     position: absolute;
     top: 0;
     right: 0;
-    left: auto;
-    z-index: 2;
     width: 3px;
+    z-index: 2;
     opacity: 0.35;
     transition: opacity 0.2s ease;
     pointer-events: none;
@@ -212,6 +262,7 @@
 
   .sport-text-slider--active {
     opacity: 1;
+    pointer-events: auto;
   }
 
   .sport-text-slider__track {
@@ -220,6 +271,8 @@
     height: 100%;
     border-radius: 2px;
     background: rgba(22, 26, 31, 0.12);
+    cursor: pointer;
+    touch-action: none;
   }
 
   .sport-text-slider__thumb {
@@ -230,14 +283,12 @@
     background: rgba(22, 26, 31, 0.42);
     height: calc(var(--thumb-ratio, 1) * 100%);
     top: calc(var(--scroll-ratio, 0) * (100% - var(--thumb-ratio, 1) * 100%));
-    transition: top 0.12s ease;
+    cursor: grab;
+    touch-action: none;
   }
 
-  .sport-panel-content {
-    position: relative;
-    padding: 0 17px 24px 0;
-    transform-origin: top right;
-    --sport-title-size: clamp(1.75rem, 3.2vw, 36px);
+  .sport-text-slider__thumb:active {
+    cursor: grabbing;
   }
 
   .sport-title {
@@ -393,18 +444,18 @@
 
     .sport-panel-scroll {
       height: 100%;
-    }
-
-    .sport-text-slider {
-      right: var(--panel-padding-x);
-      left: auto;
+      padding-right: calc(17px + var(--panel-padding-x));
     }
 
     .sport-panel-content {
       position: relative;
       z-index: 1;
-      padding: 20px calc(var(--panel-padding-x) + 17px) 12px var(--panel-padding-x);
+      padding: 20px 0 12px var(--panel-padding-x);
       transform-origin: top center;
+    }
+
+    .sport-text-slider {
+      right: var(--panel-padding-x);
     }
 
     .sport-continue-wrap {

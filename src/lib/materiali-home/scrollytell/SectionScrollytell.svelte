@@ -321,6 +321,9 @@
   let mobileScrollRatio = $state(0);
   let mobileBrowserChromeBottom = $state(0);
 
+  const MOBILE_BROWSER_CHROME_SCALE = 0.38;
+  const MOBILE_BROWSER_CHROME_MAX = 40;
+
   function syncMobileBrowserChromeInset() {
     if (!isMobile || !browser) return;
     const vv = window.visualViewport;
@@ -328,9 +331,10 @@
       mobileBrowserChromeBottom = 0;
       return;
     }
-    mobileBrowserChromeBottom = Math.max(
-      0,
-      Math.round(window.innerHeight - vv.height - vv.offsetTop),
+    const raw = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    mobileBrowserChromeBottom = Math.min(
+      MOBILE_BROWSER_CHROME_MAX,
+      Math.round(raw * MOBILE_BROWSER_CHROME_SCALE),
     );
   }
 
@@ -1678,7 +1682,7 @@
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
       --mobile-cards-bottom: 80px;
-      --mobile-cta-bottom: 28px;
+      --mobile-cta-bottom: 16px;
       --mobile-browser-chrome-bottom: 0px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
     }
@@ -1902,7 +1906,7 @@
       padding-top: 132px;
       padding-bottom: max(
         var(--mobile-cta-bottom),
-        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 12px)
+        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 4px)
       );
       box-sizing: border-box;
       background: transparent;
@@ -1913,7 +1917,7 @@
     }
 
     .feedback-bottom-cta {
-      bottom: max(12px, calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px)));
+      bottom: max(8px, calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px)));
     }
   }
 </style>

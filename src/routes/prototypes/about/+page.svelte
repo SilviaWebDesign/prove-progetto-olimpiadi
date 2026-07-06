@@ -4,6 +4,7 @@
   import AboutSportDetail from '$lib/materiali-home/AboutSportDetail.svelte';
   import AboutHotspotCard from '$lib/materiali-home/AboutHotspotCard.svelte';
   import Navbar from '$lib/materiali-home/Navbar.svelte';
+  import AboutFooter from '$lib/materiali-home/AboutFooter.svelte';
   import { preloadMountainGltf } from '$lib/materiali-home/mountainGltf.js';
   import { getNextHotspot, getPrevHotspot } from '$lib/materiali-home/aboutHotspots.js';
   import { overlayVisible } from '$lib/stores/pageTransition';
@@ -17,10 +18,17 @@
   let introProgress = $state(0);
   let lastHintTitle = $state('');
   let isMobileExplore = $state(false);
+  let footerVisible = $state(false);
+  let footerHeight = $state(0);
 
   let hintVisible = $derived(!!hoveredHotspot && !isMobileExplore);
+  let showDesktopFooter = $derived(introDismissed && !isMobileExplore && !selectedHotspot);
   let showMobileExploreHint = $derived(isMobileExplore && introDismissed && !selectedHotspot);
   let showHintOverlay = $derived(showMobileExploreHint || hintVisible);
+
+  $effect(() => {
+    if (!showDesktopFooter) footerVisible = false;
+  });
 
   $effect(() => {
     if (hoveredHotspot) {
@@ -132,7 +140,11 @@
   <title>About — Quante facce ha una medaglia?</title>
 </svelte:head>
 
-<div class="about-page">
+<div
+  class="about-page"
+  class:footer-open={footerVisible}
+  style="--mountain-lift: {footerVisible ? footerHeight : 0}px"
+>
   {#if browser}
     <ExplorableMountainScene bind:selectedHotspot bind:hoveredHotspot />
   {/if}
@@ -207,6 +219,17 @@
       </button>
     </section>
   {/if}
+
+  {#if showDesktopFooter}
+    {#if footerVisible}
+      <div
+        class="about-footer-scrim"
+        style:bottom="{footerHeight}px"
+        aria-hidden="true"
+      ></div>
+    {/if}
+    <AboutFooter enabled bind:visible={footerVisible} bind:height={footerHeight} />
+  {/if}
 </div>
 
 <Navbar alwaysVisible />
@@ -225,6 +248,43 @@
     inset: 0;
     width: 100%;
     height: 100%;
+    z-index: 1;
+    transform: translateY(calc(-1 * var(--mountain-lift, 0px)));
+    transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .about-footer-scrim {
+    position: fixed;
+    left: 0;
+    right: 0;
+    height: 120px;
+    z-index: 7;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(255, 255, 255, 0.2) 50%,
+      rgba(255, 255, 255, 0.55) 72%,
+      rgba(255, 255, 255, 0.85) 88%,
+      #ffffff 100%
+    );
+    animation: footer-scrim-in 380ms ease both;
+  }
+
+  @keyframes footer-scrim-in {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  .about-page.footer-open .mountain-hover-hint {
+    transform: translateX(-50%) translateY(calc(-1 * var(--mountain-lift, 0px)));
+    transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .mountain-hover-hint {
@@ -242,6 +302,7 @@
     pointer-events: none;
     text-align: center;
     color: #161a1f;
+    transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .mountain-hover-hint__title,

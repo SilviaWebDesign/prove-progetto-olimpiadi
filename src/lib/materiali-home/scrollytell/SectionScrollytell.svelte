@@ -559,8 +559,10 @@
   }
 
   function currentTopicsLayoutBlend(particleT: number): number {
-    if (isMobile && (mobileCardsVisible || mobileTopicsScrollComplete)) return 1;
-    if (!isMobile && cardsIntroduced) return 1;
+    // Su mobile testo e card sono position:absolute nel viewport sticky: il blend
+    // legato allo scroll spostava il modello 3D senza muovere il testo (overlap al reverse).
+    if (isMobile) return 1;
+    if (cardsIntroduced) return 1;
     return topicsLayoutBlendFromParticleT(particleT);
   }
 
@@ -585,11 +587,17 @@
   }
 
   function updateMobileTopicsScrollComplete(progress: number, particleT: number) {
-    if (!isMobile || !topicsMode) {
-      mobileTopicsScrollComplete = false;
+    if (!isMobile) return;
+    if (topicsMode || phase === 'topics') {
+      mobileTopicsScrollComplete = true;
       return;
     }
     mobileTopicsScrollComplete = progress >= MOBILE_TOPICS_READY_PROGRESS && particleT >= 1;
+  }
+
+  function onMobileTopicsScroll() {
+    if (!isMobile || phase !== 'topics') return;
+    updateTopicsModelFit({ skipScale: true });
   }
 
   // ── Model loaded signal ───────────────────────────────────────────────────
@@ -867,6 +875,9 @@
       }
       window.addEventListener('resize', updateTopicsModelFit);
       window.addEventListener('resize', updateFeedbackModelFit);
+      if (isMobile) {
+        window.addEventListener('scroll', onMobileTopicsScroll, { passive: true });
+      }
 
       const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
       const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
@@ -927,7 +938,7 @@
 
             if (particleT >= 1 && !topicsMode) {
               enterTopicsMode();
-            } else if (particleT < 1 && topicsMode) {
+            } else if (particleT < 1 && topicsMode && !isMobile) {
               exitTopicsMode();
             }
 
@@ -1027,6 +1038,7 @@
         window.removeEventListener('resize', updateTopicsModelFit);
         window.removeEventListener('resize', updateFeedbackModelFit);
         if (isMobile) {
+          window.removeEventListener('scroll', onMobileTopicsScroll);
           document.removeEventListener('touchstart', mobileTouchStart);
           document.removeEventListener('touchmove', mobileTouchMove);
           document.removeEventListener('touchend', mobileTouchEnd);
@@ -1603,10 +1615,24 @@
 
     .scene__viewport {
       touch-action: pan-y;
+      height: 100dvh;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
       --mobile-cards-bottom: 68px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
+    }
+
+    /* Sfondo halftone più tenue: il canvas frost copre già l'immagine */
+    .layer--bg {
+      opacity: 0.04;
+    }
+
+    .layer--frost :global(.sharp) {
+      opacity: 0.08;
+    }
+
+    .layer--frost :global(.frost-wrap.mobile canvas) {
+      filter: none;
     }
 
     .scene__viewport--feedback {

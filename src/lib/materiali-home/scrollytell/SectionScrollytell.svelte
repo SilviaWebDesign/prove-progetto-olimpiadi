@@ -339,17 +339,9 @@
 
     void tick().then(() => {
       requestAnimationFrame(() => {
-        if (phase === 'topics') updateTopicsModelFit({ skipScale: true });
         if (phase === 'feedback') updateFeedbackModelFit();
       });
     });
-  }
-
-  function mobileCtaTopPx(): number | null {
-    const ctaEl = sceneEl?.querySelector<HTMLElement>('.stage__cta');
-    if (!ctaEl) return null;
-    const top = ctaEl.getBoundingClientRect().top;
-    return Number.isFinite(top) ? top : null;
   }
 
   // ── Model 3D: stessa distanza da testo sopra e card/CTA sotto (tutte le sezioni) ──
@@ -357,11 +349,13 @@
   const TOPICS_CTA_RESERVE  = 100;
   const TOPICS_FIT_CENTER_BIAS = 0.5;
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
-  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.055;
+  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.045;
   /** Offset verticale pianta con pannello commenti visibile (positivo = più in alto). */
-  const PLANT_CARDS_Y_OFFSET_VH = -0.012;
+  const PLANT_CARDS_Y_OFFSET_VH = -0.005;
   /** Con opinioni aperte: ancora la pianta più in basso nello spazio libero. */
-  const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.48;
+  const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.42;
+  /** Allineato a --mobile-cards-bottom (senza chrome browser). */
+  const MOBILE_CARDS_BOTTOM_BASE = 80;
   /** Gap extra tra testo e pianta quando le opinioni sono visibili. */
   const PLANT_MOBILE_CARDS_TEXT_GAP_PX = 20;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
@@ -488,6 +482,21 @@
 
   const FEEDBACK_MODEL_MARGIN = 20;
 
+  function mobileFixedPlantBottomBoundPx(cardsActive: boolean): number {
+    if (!cardsActive) {
+      return window.innerHeight - TOPICS_CTA_RESERVE;
+    }
+    const headingReserve = 24;
+    const panelTopGap = 8;
+    return (
+      window.innerHeight -
+      MOBILE_CARDS_BOTTOM_BASE -
+      MOBILE_CARDS_SCROLL_HEIGHT -
+      headingReserve -
+      panelTopGap
+    );
+  }
+
   function updateFeedbackModelFit() {
     if (!scene3d || phase !== 'feedback' || !feedbackTopEl || !feedbackSubtitleEl) return;
     const topRect = feedbackTopEl.getBoundingClientRect();
@@ -509,29 +518,25 @@
     let bottomPx: number;
 
     if (isMobile) {
-      const ctaTopPx = mobileCtaTopPx();
+      if (isPlantModel()) {
+        const bottomBoundPx = mobileFixedPlantBottomBoundPx(cardsActive);
+        topPx = textRect.bottom + (
+          cardsActive ? PLANT_MOBILE_CARDS_TEXT_GAP_PX : TOPICS_MODEL_MARGIN
+        );
+        bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
+      } else {
       let bottomBoundPx = cardsActive && cardsRect
         ? cardsRect.top
-        : (ctaTopPx ?? window.innerHeight - TOPICS_CTA_RESERVE - mobileBrowserChromeBottom);
-      if (cardsActive && ctaTopPx) {
-        bottomBoundPx = Math.min(bottomBoundPx, ctaTopPx);
-      }
-      if (isPlantModel() && stageRightEl) {
-        const headingEl = stageRightEl.querySelector<HTMLElement>('.stage__right-heading');
-        const headingRect = headingEl?.getBoundingClientRect();
-        if (headingRect && headingRect.top > textRect.bottom + 40) {
-          bottomBoundPx = Math.min(bottomBoundPx, headingRect.top - 12);
-        }
-      } else if (cardsActive && isSportModel() && stageRightEl) {
+        : window.innerHeight - TOPICS_CTA_RESERVE;
+      if (cardsActive && isSportModel() && stageRightEl) {
         const headingEl = stageRightEl.querySelector<HTMLElement>('.stage__right-heading');
         const headingRect = headingEl?.getBoundingClientRect();
         if (headingRect) bottomBoundPx = headingRect.top;
       }
       const topMargin = TOPICS_MODEL_MARGIN + (cardsActive && isSportModel() ? MOBILE_CARDS_TOP_MARGIN : 0);
-      topPx = textRect.bottom + (
-        isPlantModel() && cardsActive ? PLANT_MOBILE_CARDS_TEXT_GAP_PX : topMargin
-      );
+      topPx = textRect.bottom + topMargin;
       bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
+      }
     } else if (cardsActive && cardsRect && cardsRect.height > 0) {
       const overlapTop = Math.max(textRect.top, cardsRect.top);
       const overlapBottom = Math.min(textRect.bottom, cardsRect.bottom);

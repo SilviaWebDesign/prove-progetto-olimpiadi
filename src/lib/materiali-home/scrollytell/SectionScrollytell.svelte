@@ -336,6 +336,20 @@
       MOBILE_BROWSER_CHROME_MAX,
       Math.round(raw * MOBILE_BROWSER_CHROME_SCALE),
     );
+
+    void tick().then(() => {
+      requestAnimationFrame(() => {
+        if (phase === 'topics') updateTopicsModelFit({ skipScale: true });
+        if (phase === 'feedback') updateFeedbackModelFit();
+      });
+    });
+  }
+
+  function mobileCtaTopPx(): number | null {
+    const ctaEl = sceneEl?.querySelector<HTMLElement>('.stage__cta');
+    if (!ctaEl) return null;
+    const top = ctaEl.getBoundingClientRect().top;
+    return Number.isFinite(top) ? top : null;
   }
 
   // ── Model 3D: stessa distanza da testo sopra e card/CTA sotto (tutte le sezioni) ──
@@ -495,9 +509,13 @@
     let bottomPx: number;
 
     if (isMobile) {
+      const ctaTopPx = mobileCtaTopPx();
       let bottomBoundPx = cardsActive && cardsRect
         ? cardsRect.top
-        : window.innerHeight - TOPICS_CTA_RESERVE;
+        : (ctaTopPx ?? window.innerHeight - TOPICS_CTA_RESERVE - mobileBrowserChromeBottom);
+      if (cardsActive && ctaTopPx) {
+        bottomBoundPx = Math.min(bottomBoundPx, ctaTopPx);
+      }
       if (isPlantModel() && stageRightEl) {
         const headingEl = stageRightEl.querySelector<HTMLElement>('.stage__right-heading');
         const headingRect = headingEl?.getBoundingClientRect();

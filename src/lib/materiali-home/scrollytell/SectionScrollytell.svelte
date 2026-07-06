@@ -319,6 +319,20 @@
   let feedbackSubtitleEl = $state<HTMLElement | null>(null);
   let stageRightEl = $state<HTMLElement | null>(null);
   let mobileScrollRatio = $state(0);
+  let mobileBrowserChromeBottom = $state(0);
+
+  function syncMobileBrowserChromeInset() {
+    if (!isMobile || !browser) return;
+    const vv = window.visualViewport;
+    if (!vv) {
+      mobileBrowserChromeBottom = 0;
+      return;
+    }
+    mobileBrowserChromeBottom = Math.max(
+      0,
+      Math.round(window.innerHeight - vv.height - vv.offsetTop),
+    );
+  }
 
   // ── Model 3D: stessa distanza da testo sopra e card/CTA sotto (tutte le sezioni) ──
   const TOPICS_MODEL_MARGIN = 24;
@@ -908,6 +922,10 @@
         lenisRaf = (t: number) => lenis!.raf(t * 1000);
         gsap.ticker.add(lenisRaf);
       } else {
+        syncMobileBrowserChromeInset();
+        window.visualViewport?.addEventListener('resize', syncMobileBrowserChromeInset);
+        window.visualViewport?.addEventListener('scroll', syncMobileBrowserChromeInset);
+        window.addEventListener('resize', syncMobileBrowserChromeInset);
         document.addEventListener('touchstart', mobileTouchStart, { passive: true });
         document.addEventListener('touchmove', mobileTouchMove, { passive: true });
         document.addEventListener('touchend', mobileTouchEnd, { passive: true });
@@ -1074,6 +1092,9 @@
         window.removeEventListener('resize', updateTopicsModelFit);
         window.removeEventListener('resize', updateFeedbackModelFit);
         if (isMobile) {
+          window.visualViewport?.removeEventListener('resize', syncMobileBrowserChromeInset);
+          window.visualViewport?.removeEventListener('scroll', syncMobileBrowserChromeInset);
+          window.removeEventListener('resize', syncMobileBrowserChromeInset);
           window.removeEventListener('scroll', lockMobileTopicsPageScroll);
           document.removeEventListener('touchstart', mobileTouchStart);
           document.removeEventListener('touchmove', mobileTouchMove);
@@ -1094,7 +1115,9 @@
   <div
     class="scene__viewport"
     class:scene__viewport--feedback={phase === 'feedback'}
-    style={isMobile ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px` : undefined}
+    style={isMobile
+      ? `--mobile-cards-scroll-height: ${MOBILE_CARDS_SCROLL_HEIGHT}px; --mobile-browser-chrome-bottom: ${mobileBrowserChromeBottom}px`
+      : undefined}
   >
 
     <!-- Layer frost -->
@@ -1651,10 +1674,12 @@
 
     .scene__viewport {
       touch-action: pan-y;
+      height: 100dvh;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
       --mobile-cards-bottom: 80px;
       --mobile-cta-bottom: 28px;
+      --mobile-browser-chrome-bottom: 0px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
     }
 
@@ -1718,7 +1743,7 @@
     /* ── Cards column: bottom of viewport ── */
     .stage__right {
       position: absolute;
-      bottom: var(--mobile-cards-bottom);
+      bottom: calc(var(--mobile-cards-bottom) + var(--mobile-browser-chrome-bottom, 0px));
       left: 0;
       right: 0;
       padding: 0 20px;
@@ -1786,7 +1811,7 @@
       display: none;
       position: absolute;
       right: 6px;
-      bottom: var(--mobile-cards-bottom);
+      bottom: calc(var(--mobile-cards-bottom) + var(--mobile-browser-chrome-bottom, 0px));
       height: var(--mobile-cards-scroll-height);
       width: 3px;
       background: rgba(22, 26, 31, 0.12);
@@ -1875,7 +1900,10 @@
       justify-content: center;
       align-items: flex-end;
       padding-top: 132px;
-      padding-bottom: max(var(--mobile-cta-bottom), calc(env(safe-area-inset-bottom, 0px) + 12px));
+      padding-bottom: max(
+        var(--mobile-cta-bottom),
+        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 12px)
+      );
       box-sizing: border-box;
       background: transparent;
     }
@@ -1885,7 +1913,7 @@
     }
 
     .feedback-bottom-cta {
-      bottom: max(12px, env(safe-area-inset-bottom, 0px));
+      bottom: max(12px, calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px)));
     }
   }
 </style>

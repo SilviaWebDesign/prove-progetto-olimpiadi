@@ -142,6 +142,11 @@
     if (hasNext) onnext?.();
     else onclose();
   }
+
+  /** @param {TouchEvent} event */
+  function stopTouchPropagation(event) {
+    event.stopPropagation();
+  }
 </script>
 
 <div class="sport-detail">
@@ -150,8 +155,20 @@
     <div class="grad-mobile-halo"></div>
   </div>
 
-  <aside class="sport-panel" bind:this={panelEl} aria-labelledby="sport-detail-title">
-    <div class="sport-panel-scroll" bind:this={scrollEl} onscroll={syncSlider}>
+  <aside
+    class="sport-panel"
+    bind:this={panelEl}
+    aria-labelledby="sport-detail-title"
+    ontouchstart={stopTouchPropagation}
+    ontouchmove={stopTouchPropagation}
+  >
+    <div
+      class="sport-panel-scroll"
+      bind:this={scrollEl}
+      onscroll={syncSlider}
+      ontouchstart={stopTouchPropagation}
+      ontouchmove={stopTouchPropagation}
+    >
       <div class="sport-panel-content" bind:this={contentEl}>
         {#key hotspot.id}
           <h1 id="sport-detail-title" class="sport-title" bind:this={titleEl}>{title}</h1>
@@ -360,6 +377,10 @@
   @media (max-width: 900px) {
     .sport-detail {
       --panel-padding-x: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      pointer-events: none;
     }
 
     .grad-side {
@@ -402,24 +423,32 @@
     }
 
     .sport-panel {
+      position: relative;
       top: auto;
       right: 0;
       left: 0;
-      bottom: 68px;
+      bottom: auto;
       transform: none;
       width: 100%;
-      height: calc(50vh - 68px);
-      max-height: calc(50vh - 68px);
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: min(62vh, calc(100dvh - 132px));
+      height: auto;
       display: block;
       overflow: hidden;
       padding: 0;
       background: transparent;
       border-radius: 0;
+      pointer-events: auto;
       animation-name: panelInMobile;
     }
 
     .sport-panel-scroll {
       height: 100%;
+      max-height: inherit;
+      min-height: 0;
+      overflow-y: scroll;
+      touch-action: pan-y;
       padding-right: calc(17px + var(--panel-padding-x));
       scrollbar-width: none;
       -ms-overflow-style: none;
@@ -475,15 +504,15 @@
     .sport-panel-content {
       position: relative;
       z-index: 1;
-      padding: 20px 0 20px var(--panel-padding-x);
+      padding: 20px 0 32px var(--panel-padding-x);
       transform-origin: top center;
     }
 
     .sport-continue-wrap {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      position: relative;
+      left: auto;
+      right: auto;
+      bottom: auto;
       transform: none;
       z-index: 51;
       flex-shrink: 0;
@@ -492,7 +521,7 @@
       align-items: center;
       width: 100%;
       margin: 0;
-      padding: 64px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
+      padding: 8px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
       box-sizing: border-box;
       pointer-events: auto;
       background: transparent;

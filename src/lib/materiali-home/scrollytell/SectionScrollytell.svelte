@@ -1966,13 +1966,7 @@
       padding-top: 132px;
       padding-bottom: 0;
       box-sizing: border-box;
-      background: linear-gradient(
-        to top,
-        rgba(255, 255, 255, 0.98) 0%,
-        rgba(255, 255, 255, 0.98) 28%,
-        rgba(255, 255, 255, 0.82) 62%,
-        rgba(255, 255, 255, 0) 100%
-      );
+      background: transparent;
       z-index: 15;
     }
 
@@ -1996,13 +1990,7 @@
       padding-top: 120px;
       padding-bottom: 8px;
       box-sizing: border-box;
-      background: linear-gradient(
-        to top,
-        rgba(255, 255, 255, 0.98) 0%,
-        rgba(255, 255, 255, 0.98) 28%,
-        rgba(255, 255, 255, 0.82) 62%,
-        rgba(255, 255, 255, 0) 100%
-      );
+      background: transparent;
       z-index: 15;
     }
   }

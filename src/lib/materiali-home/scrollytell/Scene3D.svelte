@@ -101,11 +101,11 @@
     '/oggetti/sport-neutro.glb': -0.18,
     '/oggetti/sport-piu-negativo.glb': -0.18,
     '/oggetti/sport-piu-positivo.glb': -0.18,
-    '/oggetti/infrastrutture-positivo.glb': -0.17,
-    '/oggetti/infrastrutture-negativo.glb': -0.17,
-    '/oggetti/infrastrutture-neutro.glb': -0.17,
-    '/oggetti/infrastrutture-piu-negativo.glb': -0.17,
-    '/oggetti/infrastrutture-piu-positivo.glb': -0.17,
+    '/oggetti/infrastrutture-positivo.glb': -0.24,
+    '/oggetti/infrastrutture-negativo.glb': -0.24,
+    '/oggetti/infrastrutture-neutro.glb': -0.24,
+    '/oggetti/infrastrutture-piu-negativo.glb': -0.24,
+    '/oggetti/infrastrutture-piu-positivo.glb': -0.24,
   };
 
   function applyModelPose(scene: THREE.Object3D, src: string) {
@@ -146,6 +146,7 @@
   /** Altezza max del modello in fase feedback (frazione del viewport). */
   const FEEDBACK_MAX_VH = 0.36;
   const FEEDBACK_GAP_FILL = 0.78;
+  const FEEDBACK_GAP_FILL_INFRASTRUCTURE = 0.62;
   let feedbackLayoutScale: THREE.Vector3 | null = null;
   let feedbackFitOffsetY = 0;
   let feedbackFitGapPx = 0;
@@ -170,12 +171,17 @@
     return vh ? vh * getCameraVisibleH() : 0;
   }
 
+  function feedbackGapFill(): number {
+    if (activeResultSrc.includes('infrastrutture-')) return FEEDBACK_GAP_FILL_INFRASTRUCTURE;
+    return FEEDBACK_GAP_FILL;
+  }
+
   function feedbackMaxWorldHeight(): number {
     const visibleH = getCameraVisibleH();
     const viewportCap = visibleH * FEEDBACK_MAX_VH;
     if (feedbackFitGapPx <= 0 || feedbackFitViewportH <= 0) return viewportCap;
     const gapWorldH = (feedbackFitGapPx / feedbackFitViewportH) * visibleH;
-    return Math.min(viewportCap, gapWorldH * FEEDBACK_GAP_FILL);
+    return Math.min(viewportCap, gapWorldH * feedbackGapFill());
   }
 
   function resetFeedbackViewCamera() {

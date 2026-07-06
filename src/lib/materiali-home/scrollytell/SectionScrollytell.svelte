@@ -494,8 +494,13 @@
 
   function feedbackCenterBias(): number {
     if (isSportModel()) return 0.6;
-    if (isInfrastructureModel()) return isMobile ? 0.58 : 0.54;
+    if (isInfrastructureModel()) return isMobile ? 0.63 : 0.54;
     return 0.5;
+  }
+
+  function feedbackModelMargin(): number {
+    if (isMobile && isInfrastructureModel()) return 36;
+    return FEEDBACK_MODEL_MARGIN;
   }
 
   function sportTopicsYOffset(cardsActive: boolean): number {
@@ -552,8 +557,9 @@
 
     const topRect = topEl.getBoundingClientRect();
     const subtitleRect = subtitleEl.getBoundingClientRect();
-    const gapTop = topRect.bottom + FEEDBACK_MODEL_MARGIN;
-    const gapBottom = subtitleRect.top - FEEDBACK_MODEL_MARGIN;
+    const margin = feedbackModelMargin();
+    const gapTop = topRect.bottom + margin;
+    const gapBottom = subtitleRect.top - margin;
     if (gapBottom - gapTop < 48) return;
 
     scene3d.setFeedbackFit(gapTop, gapBottom, {

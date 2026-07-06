@@ -325,11 +325,11 @@
   const TOPICS_CTA_RESERVE  = 100;
   const TOPICS_FIT_CENTER_BIAS = 0.5;
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
-  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.035;
+  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.045;
   /** Offset verticale pianta con pannello commenti visibile (positivo = più in alto). */
-  const PLANT_CARDS_Y_OFFSET_VH = 0.03;
+  const PLANT_CARDS_Y_OFFSET_VH = 0.005;
   /** Con opinioni aperte: ancora la pianta più in basso nello spazio libero. */
-  const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.42;
+  const PLANT_MOBILE_CARDS_CENTER_BIAS = 0.45;
   /** Gap extra tra testo e pianta quando le opinioni sono visibili. */
   const PLANT_MOBILE_CARDS_TEXT_GAP_PX = 20;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;
@@ -350,9 +350,9 @@
   const MOBILE_TOPIC_COMPACT_RATIO = 24 / 36;
   const MOBILE_TEXT_SCALE_DURATION = 0.4;
   /** Riduzione extra pianta con pannello commenti visibile. */
-  const PLANT_CARDS_SCALE_MUL = 0.68;
+  const PLANT_CARDS_SCALE_MUL = 0.72;
   /** Scala base pianta su mobile (argomenti). */
-  const PLANT_TOPICS_SCALE_MUL = 0.78;
+  const PLANT_TOPICS_SCALE_MUL = 0.82;
   /** Riduzione extra pattini con pannello commenti visibile. */
   const SPORT_CARDS_SCALE_MUL = 0.74;
   /** Con commenti visibili: centro dello spazio bianco tra testo e card. */
@@ -559,10 +559,8 @@
   }
 
   function currentTopicsLayoutBlend(particleT: number): number {
-    // Su mobile testo e card sono position:absolute nel viewport sticky: il blend
-    // legato allo scroll spostava il modello 3D senza muovere il testo (overlap al reverse).
-    if (isMobile) return 1;
-    if (cardsIntroduced) return 1;
+    if (isMobile && (mobileCardsVisible || mobileTopicsScrollComplete)) return 1;
+    if (!isMobile && cardsIntroduced) return 1;
     return topicsLayoutBlendFromParticleT(particleT);
   }
 
@@ -587,17 +585,11 @@
   }
 
   function updateMobileTopicsScrollComplete(progress: number, particleT: number) {
-    if (!isMobile) return;
-    if (topicsMode || phase === 'topics') {
-      mobileTopicsScrollComplete = true;
+    if (!isMobile || !topicsMode) {
+      mobileTopicsScrollComplete = false;
       return;
     }
     mobileTopicsScrollComplete = progress >= MOBILE_TOPICS_READY_PROGRESS && particleT >= 1;
-  }
-
-  function onMobileTopicsScroll() {
-    if (!isMobile || phase !== 'topics') return;
-    updateTopicsModelFit({ skipScale: true });
   }
 
   // ── Model loaded signal ───────────────────────────────────────────────────
@@ -875,9 +867,6 @@
       }
       window.addEventListener('resize', updateTopicsModelFit);
       window.addEventListener('resize', updateFeedbackModelFit);
-      if (isMobile) {
-        window.addEventListener('scroll', onMobileTopicsScroll, { passive: true });
-      }
 
       const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
       const textEl  = titleEl.querySelector<SVGTextElement>('.hero-title__text');
@@ -938,7 +927,7 @@
 
             if (particleT >= 1 && !topicsMode) {
               enterTopicsMode();
-            } else if (particleT < 1 && topicsMode && !isMobile) {
+            } else if (particleT < 1 && topicsMode) {
               exitTopicsMode();
             }
 
@@ -1038,7 +1027,6 @@
         window.removeEventListener('resize', updateTopicsModelFit);
         window.removeEventListener('resize', updateFeedbackModelFit);
         if (isMobile) {
-          window.removeEventListener('scroll', onMobileTopicsScroll);
           document.removeEventListener('touchstart', mobileTouchStart);
           document.removeEventListener('touchmove', mobileTouchMove);
           document.removeEventListener('touchend', mobileTouchEnd);
@@ -1615,24 +1603,10 @@
 
     .scene__viewport {
       touch-action: pan-y;
-      height: 100dvh;
       --mobile-text-top: 108px;
       --mobile-phrase-top: 148px;
       --mobile-cards-bottom: 68px;
       --mobile-cards-scroll-height: calc(2 * 96px + 10px + 18px);
-    }
-
-    /* Sfondo halftone più tenue: il canvas frost copre già l'immagine */
-    .layer--bg {
-      opacity: 0.04;
-    }
-
-    .layer--frost :global(.sharp) {
-      opacity: 0.08;
-    }
-
-    .layer--frost :global(.frost-wrap.mobile canvas) {
-      filter: none;
     }
 
     .scene__viewport--feedback {

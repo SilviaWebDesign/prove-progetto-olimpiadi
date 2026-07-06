@@ -70,74 +70,15 @@
   let cursorY: number | undefined;
   let cursorInside    = false;
   let meltEnabled     = $state(true);
-  let isMobileViewport = $state(false);
 
   const MOBILE_BREAKPOINT = '(max-width: 768px)';
-
-  interface FrostParams {
-    brightness: number;
-    frostVeilOpacity: number;
-    finalVeilOpacity: number;
-    grainOpacity: number;
-    useDownscaleBlur: boolean;
-  }
-
-  function frostParams(): FrostParams {
-    if (isMobileViewport) {
-      return {
-        brightness: 1.32,
-        frostVeilOpacity: 0.52,
-        finalVeilOpacity: 0.34,
-        grainOpacity: 0.20,
-        useDownscaleBlur: true,
-      };
-    }
-    return {
-      brightness: 1.15,
-      frostVeilOpacity: FROST_VEIL_OPACITY,
-      finalVeilOpacity: 0.22,
-      grainOpacity: GRAIN_OPACITY,
-      useDownscaleBlur: false,
-    };
-  }
-
-  let blurScratch: HTMLCanvasElement | null = null;
-
-  function resizeCanvases(w: number, h: number) {
-    if (!canvas || !frostedCanvas || !revealCanvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, isMobileViewport ? 2 : 3);
-    cssW = w;
-    cssH = h;
-
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    ctx = canvas.getContext('2d')!;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-
-    frostedCanvas.width = Math.round(w * dpr);
-    frostedCanvas.height = Math.round(h * dpr);
-    frostedCtx = frostedCanvas.getContext('2d')!;
-    frostedCtx.setTransform(1, 0, 0, 1, 0, 0);
-    frostedCtx.scale(dpr, dpr);
-
-    revealCanvas.width = Math.round(w * dpr);
-    revealCanvas.height = Math.round(h * dpr);
-    revealCtx = revealCanvas.getContext('2d')!;
-    revealCtx.setTransform(1, 0, 0, 1, 0, 0);
-    revealCtx.scale(dpr, dpr);
-  }
 
   // ─── Setup su mount ──────────────────────────────────────────────────────
   $effect(() => {
     if (!canvas || !wrapper) return;
 
-    frostedCanvas = document.createElement('canvas');
-    revealCanvas = document.createElement('canvas');
-
     const mobileQuery = window.matchMedia(MOBILE_BREAKPOINT);
-    const syncMobileMode = () => {
-      isMobileViewport = mobileQuery.matches;
+    const syncMeltEnabled = () => {
       meltEnabled = !mobileQuery.matches;
       if (!meltEnabled) {
         revealPoints = [];
@@ -149,51 +90,45 @@
           cancelAnimationFrame(animRafId);
           animRafId = null;
         }
-      }
-      if (imgEl && cssW > 0 && cssH > 0) {
-        drawFrost();
         renderCurrentState();
       }
     };
-    syncMobileMode();
-    mobileQuery.addEventListener('change', syncMobileMode);
+    syncMeltEnabled();
+    mobileQuery.addEventListener('change', syncMeltEnabled);
 
-    const applySize = (w: number, h: number) => {
-      if (w < 1 || h < 1) return;
-      resizeCanvases(w, h);
-      if (imgEl) {
-        drawFrost();
-        renderCurrentState();
-      }
-    };
-
-    const ro = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect;
-      if (!rect) return;
-      applySize(rect.width, rect.height);
-    });
-    ro.observe(wrapper);
-
+    const dpr  = window.devicePixelRatio || 1;
     const rect = wrapper.getBoundingClientRect();
-    applySize(rect.width, rect.height);
+    cssW = rect.width;
+    cssH = rect.height;
 
-    const img = new Image();
+    canvas.width  = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+
+    ctx = canvas.getContext('2d')!;
+    ctx.scale(dpr, dpr);
+
+    frostedCanvas        = document.createElement('canvas');
+    frostedCanvas.width  = Math.round(cssW * dpr);
+    frostedCanvas.height = Math.round(cssH * dpr);
+    frostedCtx           = frostedCanvas.getContext('2d')!;
+    frostedCtx.scale(dpr, dpr);
+
+    revealCanvas        = document.createElement('canvas');
+    revealCanvas.width  = Math.round(cssW * dpr);
+    revealCanvas.height = Math.round(cssH * dpr);
+    revealCtx           = revealCanvas.getContext('2d')!;
+    revealCtx.scale(dpr, dpr);
+
+    const img       = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      imgEl = img;
-      const r = wrapper!.getBoundingClientRect();
-      applySize(r.width, r.height);
-      ready = true;
-    };
-    img.src = src;
+    img.onload      = () => { imgEl = img; drawFrost(); ready = true; };
+    img.src         = src;
 
     return () => {
-      mobileQuery.removeEventListener('change', syncMobileMode);
-      ro.disconnect();
+      mobileQuery.removeEventListener('change', syncMeltEnabled);
       if (animRafId !== null) { cancelAnimationFrame(animRafId); animRafId = null; }
       ctx = null; imgEl = null; frostedCanvas = null; frostedCtx = null;
       revealCanvas = null; revealCtx = null; revealPoints = [];
-      blurScratch = null;
     };
   });
 
@@ -234,44 +169,14 @@
 
   function drawBlurredImage(w: number, h: number) {
     const bleed = BLUR_AMOUNT * 2;
-    const params = frostParams();
-
-    if (params.useDownscaleBlur && imgEl) {
-      // Safari mobile: ctx.filter blur è inaffidabile e rende l'halftone troppo scuro.
-      const scale = 0.16;
-      const tw = Math.max(2, Math.round(w * scale));
-      const th = Math.max(2, Math.round(h * scale));
-      if (!blurScratch) blurScratch = document.createElement('canvas');
-      blurScratch.width = tw;
-      blurScratch.height = th;
-      const bctx = blurScratch.getContext('2d')!;
-      bctx.clearRect(0, 0, tw, th);
-      bctx.save();
-      bctx.filter = `brightness(${params.brightness}) saturate(0) contrast(1.05)`;
-      const prevCtx = ctx;
-      ctx = bctx;
-      drawImageCover(imgEl, tw, th);
-      ctx = prevCtx;
-      bctx.restore();
-
-      ctx!.save();
-      ctx!.imageSmoothingEnabled = true;
-      ctx!.imageSmoothingQuality = 'high';
-      const pad = bleed * 0.35;
-      ctx!.drawImage(blurScratch, 0, 0, tw, th, -pad, -pad, w + pad * 2, h + pad * 2);
-      ctx!.restore();
-      return;
-    }
-
     ctx!.save();
-    ctx!.filter = `blur(${BLUR_AMOUNT}px) brightness(${params.brightness}) saturate(0) contrast(1.08)`;
+    ctx!.filter = `blur(${BLUR_AMOUNT}px) brightness(1.15) saturate(0) contrast(1.08)`;
     drawImageCover(imgEl!, w, h, bleed);
     ctx!.filter = 'none';
     ctx!.restore();
   }
 
   function drawFrostColor(w: number, h: number) {
-    const { frostVeilOpacity } = frostParams();
     ctx!.save();
     ctx!.globalAlpha = FROST_OPACITY;
     const patches: [number,number,number,string,number,number][] = [
@@ -288,23 +193,21 @@
       ctx!.fillStyle = g;
       ctx!.fillRect(0, 0, w, h);
     }
-    ctx!.globalAlpha = frostVeilOpacity;
+    ctx!.globalAlpha = FROST_VEIL_OPACITY;
     ctx!.fillStyle   = 'rgba(215,235,255,1)';
     ctx!.fillRect(0, 0, w, h);
     ctx!.restore();
   }
 
   function drawFrostVeil(w: number, h: number) {
-    const { finalVeilOpacity } = frostParams();
     ctx!.save();
-    ctx!.globalAlpha = finalVeilOpacity;
+    ctx!.globalAlpha = 0.22;
     ctx!.fillStyle   = 'rgba(248, 252, 255, 1)';
     ctx!.fillRect(0, 0, w, h);
     ctx!.restore();
   }
 
   function drawGrain(w: number, h: number) {
-    const { grainOpacity } = frostParams();
     const S = 200;
     const off  = document.createElement('canvas');
     off.width  = S;
@@ -323,8 +226,8 @@
     }
     gctx.putImageData(data, 0, 0);
     ctx!.save();
-    ctx!.globalAlpha = grainOpacity;
-    ctx!.globalCompositeOperation = isMobileViewport ? 'soft-light' : 'overlay';
+    ctx!.globalAlpha = GRAIN_OPACITY;
+    ctx!.globalCompositeOperation = 'overlay';
     ctx!.fillStyle   = ctx!.createPattern(off, 'repeat')!;
     ctx!.fillRect(0, 0, w, h);
     ctx!.restore();
@@ -665,7 +568,7 @@
     1. .sharp  — foto nitida B/N, sempre visibile sotto
     2. canvas  — frost dipinto sopra; destination-out rivela la foto
 -->
-<div class="frost-wrap" class:ready class:no-melt={!meltEnabled} class:mobile={isMobileViewport} bind:this={wrapper} aria-hidden="true">
+<div class="frost-wrap" class:ready class:no-melt={!meltEnabled} bind:this={wrapper} aria-hidden="true">
   <img class="sharp" {src} alt="" draggable="false" style:object-position={objectPosition} />
   <canvas
     bind:this={canvas}
@@ -708,14 +611,6 @@
     cursor: crosshair;
     touch-action: pan-y;
     filter: saturate(0);
-  }
-
-  .frost-wrap.mobile canvas {
-    filter: none;
-  }
-
-  .frost-wrap.mobile .sharp {
-    opacity: 0.08;
   }
 
   .frost-wrap.no-melt canvas {

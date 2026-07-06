@@ -195,6 +195,24 @@
     isTransitioning = false;
   }
 
+  const FEEDBACK_MORPH_TIMEOUT_MS = 7000;
+
+  function completeFeedbackTransition() {
+    phase = 'feedback';
+    isTransitioning = false;
+    void tick().then(() => {
+      updateFeedbackModelFit();
+      requestAnimationFrame(() => {
+        updateFeedbackModelFit();
+        requestAnimationFrame(updateFeedbackModelFit);
+      });
+      setTimeout(updateFeedbackModelFit, 550);
+      gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+      gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
+      gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.25 });
+    });
+  }
+
   async function enterFeedbackPhase() {
     if (phase !== 'topics' || isTransitioning || !anyLiked) return;
     isTransitioning = true;
@@ -222,20 +240,21 @@
     visitedSections.markCompleted(config.sectionId, resultModelPath);
     gsap.to('.layer--bg', { filter: 'blur(12px)', duration: 0.8, ease: 'power2.inOut' });
 
-    scene3d?.morphToResult(resultModelPath, () => {
-      phase = 'feedback';
-      isTransitioning = false;
-      void tick().then(() => {
-        updateFeedbackModelFit();
-        requestAnimationFrame(() => {
-          updateFeedbackModelFit();
-          requestAnimationFrame(updateFeedbackModelFit);
-        });
-        setTimeout(updateFeedbackModelFit, 550);
-        gsap.fromTo('.feedback-top',        { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
-        gsap.fromTo('.feedback-subtitle',   { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.15 });
-        gsap.fromTo('.feedback-bottom-cta', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.25 });
+    let morphCompleted = false;
+    const morphTimeout = setTimeout(() => {
+      if (morphCompleted || phase !== 'topics') return;
+      scene3d?.forceCompleteMorph(() => {
+        if (morphCompleted) return;
+        morphCompleted = true;
+        completeFeedbackTransition();
       });
+    }, FEEDBACK_MORPH_TIMEOUT_MS);
+
+    scene3d?.morphToResult(resultModelPath, () => {
+      if (morphCompleted) return;
+      morphCompleted = true;
+      clearTimeout(morphTimeout);
+      completeFeedbackTransition();
     });
   }
 
@@ -528,6 +547,7 @@
     if (gapBottom - gapTop < 48) return;
 
     scene3d.setFeedbackFit(gapTop, gapBottom, {
+      centerBias: isSportModel() ? 0.6 : 0.5,
       viewportHeightPx: feedbackViewportHeightPx(),
     });
     scene3d.realignFeedback();

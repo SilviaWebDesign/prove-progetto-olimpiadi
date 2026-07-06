@@ -38,6 +38,7 @@
     unlockMobileFit:        () => void;
     clearMobileFit:         () => void;
     realignFeedback:        () => void;
+    forceCompleteMorph:     (onDone?: () => void) => void;
   }
 
   interface Props {
@@ -95,11 +96,11 @@
 
   /** Correzione visiva Y dopo il fit bbox (frazione dell'altezza camera). */
   const FEEDBACK_VISUAL_Y_OFFSET_VH: Record<string, number> = {
-    '/oggetti/sport-positivo.glb': -0.06,
-    '/oggetti/sport-negativo.glb': -0.06,
-    '/oggetti/sport-neutro.glb': -0.06,
-    '/oggetti/sport-piu-negativo.glb': -0.06,
-    '/oggetti/sport-piu-positivo.glb': -0.06,
+    '/oggetti/sport-positivo.glb': -0.18,
+    '/oggetti/sport-negativo.glb': -0.18,
+    '/oggetti/sport-neutro.glb': -0.18,
+    '/oggetti/sport-piu-negativo.glb': -0.18,
+    '/oggetti/sport-piu-positivo.glb': -0.18,
   };
 
   function applyModelPose(scene: THREE.Object3D, src: string) {
@@ -139,7 +140,7 @@
 
   /** Altezza max del modello in fase feedback (frazione del viewport). */
   const FEEDBACK_MAX_VH = 0.36;
-  const FEEDBACK_GAP_FILL = 0.88;
+  const FEEDBACK_GAP_FILL = 0.78;
   let feedbackLayoutScale: THREE.Vector3 | null = null;
   let feedbackFitOffsetY = 0;
   let feedbackFitGapPx = 0;
@@ -252,6 +253,79 @@
     feedbackLayoutScale = null;
   }
 
+  function abortMorphInProgress() {
+    morphState = 'none';
+    morphElapsed = 0;
+    morphStartedAtMs = 0;
+    morphDoneCallback = null;
+    if (spinner && activeResultGroup) {
+      spinner.remove(activeResultGroup);
+      activeResultGroup = null;
+      resultModelMaterials = [];
+    }
+    if (particleMesh && transitionState === 'done') {
+      particleMesh.visible = true;
+    }
+  }
+
+  function morphProgress(): number {
+    if (morphStartedAtMs <= 0) return 0;
+    return Math.min(1, (performance.now() - morphStartedAtMs) / (MORPH_DURATION * 1000));
+  }
+
+  function finishMorph(onDone?: () => void) {
+    if (particleMesh && iMatBuf) {
+      for (let i = 0; i < COUNT; i++) {
+        particleCurrent[i * 3]     = resultTargets[i * 3];
+        particleCurrent[i * 3 + 1] = resultTargets[i * 3 + 1];
+        particleCurrent[i * 3 + 2] = resultTargets[i * 3 + 2];
+        const b = i * 16 + 12;
+        iMatBuf[b]     = particleCurrent[i * 3];
+        iMatBuf[b + 1] = particleCurrent[i * 3 + 1];
+        iMatBuf[b + 2] = particleCurrent[i * 3 + 2];
+      }
+      particleMesh.instanceMatrix.needsUpdate = true;
+      particleMesh.visible = false;
+    }
+
+    morphState = 'none';
+    morphElapsed = 0;
+    morphStartedAtMs = 0;
+    resultModelMaterials.forEach((m) => {
+      m.opacity = 1;
+      m.transparent = false;
+      m.needsUpdate = true;
+    });
+    finalizeMorphView();
+
+    const cb = onDone ?? morphDoneCallback;
+    morphDoneCallback = null;
+    cb?.();
+  }
+
+  function morphFallbackToSourceModel(onDone: () => void) {
+    abortMorphInProgress();
+    const { scaleMul } = feedbackConfig();
+    showEnlargedSourceModel(scaleMul, onDone);
+  }
+
+  function forceCompleteMorph(onDone?: () => void) {
+    if (morphState === 'morphing') {
+      finishMorph(onDone);
+      return;
+    }
+    if (activeResultGroup) {
+      finishMorph(onDone);
+      return;
+    }
+    morphFallbackToSourceModel(onDone ?? morphDoneCallback ?? (() => {}));
+  }
+
+  function onVisibilityChange() {
+    if (document.visibilityState !== 'visible' || morphState !== 'morphing') return;
+    if (morphProgress() >= 1) finishMorph();
+  }
+
   let isFeedbackActive = false;
 
   let activeResultGroup: THREE.Group | null = null;
@@ -305,6 +379,8 @@
   let morphState: MorphState = 'none';
   let morphElapsed = 0;
   const MORPH_DURATION = 1.5;
+  const MORPH_FORCE_COMPLETE_MS = 5000;
+  let morphStartedAtMs = 0;
   let morphDoneCallback: (() => void) | null = null;
   let resultModelMaterials: THREE.MeshPhysicalMaterial[] = [];
   let useParticleCrossfade = false;
@@ -509,6 +585,7 @@
         prepareForFeedback();
       },
       realignFeedback: () => realignFeedbackModel(),
+      forceCompleteMorph,
     };
 
     initThree();
@@ -539,10 +616,12 @@
     window.addEventListener('resize', onResize);
     window.addEventListener('pointermove', onPointerMove, { passive: true });
     window.addEventListener('pointerleave', onPointerLeave);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerleave', onPointerLeave);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   });
 
@@ -911,10 +990,14 @@
   }
 
   function showEnlargedSourceModel(scaleMul: number, onDone: () => void) {
-    if (!modelGroup || !particleMesh) return;
+    abortMorphInProgress();
+    if (!modelGroup) {
+      onDone();
+      return;
+    }
 
     morphState = 'none';
-    particleMesh.visible = false;
+    if (particleMesh) particleMesh.visible = false;
     if (particleMat) {
       particleMat.uniforms.uPulse.value = 0;
       particleMat.uniforms.uBaseOpacity.value = 0;
@@ -922,6 +1005,7 @@
     }
 
     centerFeedbackView(scaleMul);
+    if (modelGroup) modelGroup.visible = true;
     materials.forEach((m) => {
       m.opacity = 1;
       m.transparent = false;
@@ -933,7 +1017,10 @@
   }
 
   function doMorph(source: THREE.Group, onDone: () => void) {
-    if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) { onDone(); return; }
+    if (!scene || !camera || !spinner || !modelGroup || !particleMesh || !iMatBuf) {
+      morphFallbackToSourceModel(onDone);
+      return;
+    }
 
     freezeSpinnerRotation();
     const resultGroup = source.clone();
@@ -1008,10 +1095,18 @@
       geos.push(deindexed);
     });
 
-    if (geos.length === 0) { spinner.remove(resultGroup); onDone(); return; }
+    if (geos.length === 0) {
+      spinner.remove(resultGroup);
+      morphFallbackToSourceModel(onDone);
+      return;
+    }
     const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
     geos.forEach(g => g.dispose());
-    if (!merged) { spinner.remove(resultGroup); onDone(); return; }
+    if (!merged) {
+      spinner.remove(resultGroup);
+      morphFallbackToSourceModel(onDone);
+      return;
+    }
 
     const samplerMesh = new THREE.Mesh(merged, new THREE.MeshBasicMaterial());
     const sampler = new MeshSurfaceSampler(samplerMesh).build();
@@ -1029,11 +1124,13 @@
 
     morphState        = 'morphing';
     morphElapsed      = 0;
+    morphStartedAtMs  = performance.now();
     morphFrameParity  = false;
     morphDoneCallback = onDone;
   }
 
   function morphToResult(path: string, onDone: () => void) {
+    abortMorphInProgress();
     prepareForFeedback();
     resetFeedbackLayout();
     activeResultSrc = path;
@@ -1058,7 +1155,7 @@
     }, undefined, (err) => {
       console.error('[Scene3D] on-demand load error:', path, err);
       draco.dispose();
-      onDone();
+      morphFallbackToSourceModel(onDone);
     });
   }
 
@@ -1311,8 +1408,8 @@
     }
 
     if (morphState === 'morphing' && particleMesh && particleMat && iMatBuf) {
-      morphElapsed += dt;
-      const t = Math.min(1, morphElapsed / MORPH_DURATION);
+      const t = morphProgress();
+      morphElapsed = t * MORPH_DURATION;
 
       for (let i = 0; i < COUNT; i++) {
         particleCurrent[i * 3]     += (resultTargets[i * 3]     - particleCurrent[i * 3])     * 0.06;
@@ -1335,14 +1432,8 @@
         resultModelMaterials.forEach(m => { m.opacity = fadeT; });
       }
 
-      if (t >= 1) {
-        morphState = 'none';
-        particleMesh.visible = false;
-        resultModelMaterials.forEach(m => { m.opacity = 1; m.transparent = false; m.needsUpdate = true; });
-        finalizeMorphView();
-        const cb = morphDoneCallback;
-        morphDoneCallback = null;
-        cb?.();
+      if (t >= 1 || performance.now() - morphStartedAtMs >= MORPH_FORCE_COMPLETE_MS) {
+        finishMorph();
       }
     }
 

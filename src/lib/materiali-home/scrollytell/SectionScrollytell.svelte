@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -1281,13 +1280,7 @@
         onclick={handleCtaClick}
         onkeydown={(e) => { if (ctaActive && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleCtaClick(); } }}
       >
-        {#key ctaLabel}
-          <span class="cta-label"
-            in:fade={{ duration: 150, delay: 150 }}
-            out:fade={{ duration: 150 }}>
-            {ctaLabel}
-          </span>
-        {/key}
+        <span class="cta-label">{ctaLabel}</span>
         <svg class="cta-chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
           <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
                 stroke-linecap="round" stroke-linejoin="round"/>
@@ -1607,6 +1600,7 @@
     z-index: 10;
     pointer-events: none;
     opacity: 0;
+    overflow: visible;
   }
 
   .stage__cta-content {
@@ -1619,6 +1613,7 @@
     pointer-events: none;
     cursor: default;
     transition: opacity 300ms ease;
+    overflow: visible;
   }
 
   .stage__cta-content.active {
@@ -1642,6 +1637,8 @@
     display: block;
     width: 21px;
     height: 9px;
+    flex-shrink: 0;
+    overflow: visible;
   }
 
   .stage__cta-content.active .cta-chevron {
@@ -1650,7 +1647,7 @@
 
   @keyframes chevron-bounce {
     0%, 100% { transform: translateY(0); }
-    50%       { transform: translateY(5px); }
+    50%       { transform: translateY(3px); }
   }
 
   /* ── Mobile scroll indicator (hidden on desktop) ─────────────────────── */
@@ -1960,15 +1957,17 @@
       align-items: flex-end;
       padding-top: 148px;
       padding-bottom: max(
-        var(--mobile-cta-bottom),
-        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 4px)
+        calc(var(--mobile-cta-bottom) + 10px),
+        calc(var(--mobile-browser-chrome-bottom, 0px) + env(safe-area-inset-bottom, 0px) + 10px)
       );
       box-sizing: border-box;
       background: transparent;
+      overflow: visible;
+      z-index: 15;
     }
 
     .stage__cta-content {
-      padding: 18px 24px 14px;
+      padding: 18px 24px 18px;
     }
 
     .feedback-bottom-cta {

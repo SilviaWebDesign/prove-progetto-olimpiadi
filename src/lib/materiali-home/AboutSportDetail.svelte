@@ -377,10 +377,6 @@
   @media (max-width: 900px) {
     .sport-detail {
       --panel-padding-x: 20px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      pointer-events: none;
     }
 
     .grad-side {
@@ -423,30 +419,24 @@
     }
 
     .sport-panel {
-      position: relative;
       top: auto;
       right: 0;
       left: 0;
-      bottom: auto;
+      bottom: 68px;
       transform: none;
       width: 100%;
-      flex: 1 1 auto;
-      min-height: 0;
-      max-height: min(62vh, calc(100dvh - 132px));
-      height: auto;
+      height: calc(50vh - 68px);
+      max-height: calc(50vh - 68px);
       display: block;
       overflow: hidden;
       padding: 0;
       background: transparent;
       border-radius: 0;
-      pointer-events: auto;
       animation-name: panelInMobile;
     }
 
     .sport-panel-scroll {
       height: 100%;
-      max-height: inherit;
-      min-height: 0;
       overflow-y: scroll;
       touch-action: pan-y;
       padding-right: calc(17px + var(--panel-padding-x));
@@ -504,15 +494,15 @@
     .sport-panel-content {
       position: relative;
       z-index: 1;
-      padding: 20px 0 32px var(--panel-padding-x);
+      padding: 20px 0 72px var(--panel-padding-x);
       transform-origin: top center;
     }
 
     .sport-continue-wrap {
-      position: relative;
-      left: auto;
-      right: auto;
-      bottom: auto;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
       transform: none;
       z-index: 51;
       flex-shrink: 0;
@@ -521,9 +511,9 @@
       align-items: center;
       width: 100%;
       margin: 0;
-      padding: 8px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
+      padding: 64px var(--panel-padding-x) max(18px, env(safe-area-inset-bottom));
       box-sizing: border-box;
-      pointer-events: auto;
+      pointer-events: none;
       background: transparent;
     }
   }

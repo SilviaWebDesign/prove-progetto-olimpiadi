@@ -97,7 +97,7 @@
 
   <footer class="sport-continue-wrap">
     <button type="button" class="continue-btn" onclick={onContinue}>
-      <span class="continue-label">Continua</span>
+      <span class="continue-label">CONTINUA</span>
       <span class="continue-chevron" aria-hidden="true"></span>
     </button>
   </footer>
@@ -217,6 +217,7 @@
     font-size: 16px;
     font-weight: 700;
     line-height: 1.1;
+    text-transform: uppercase;
     color: #161a1f;
   }
 

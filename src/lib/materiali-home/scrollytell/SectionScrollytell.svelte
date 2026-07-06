@@ -86,7 +86,7 @@
   const ctaLabel = $derived(
     currentTopic === lastTopic && anyLiked
       ? 'Scopri il tuo risultato'
-      : 'Continua'
+      : 'CONTINUA'
   );
 
   const ctaActive = $derived(
@@ -1504,6 +1504,7 @@
     font-size: 12px;
     line-height: 1;
     margin-top: -4px;
+    text-transform: uppercase;
     color: #161A1F;
     white-space: nowrap;
   }

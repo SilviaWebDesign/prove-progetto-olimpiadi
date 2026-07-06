@@ -199,7 +199,7 @@
           dismissIntro();
         }}
       >
-        <span class="scroll-hint__label">Continua</span>
+        <span class="scroll-hint__label">CONTINUA</span>
         <svg class="scroll-hint__chevron" viewBox="0 0 21 9" aria-hidden="true" fill="none">
           <path d="M1 1.35L10.5 7.65L20 1.35" stroke="#161A1F" stroke-width="1.5"
                 stroke-linecap="round" stroke-linejoin="round"/>
@@ -387,6 +387,7 @@
     line-height: 1;
     margin-top: -4px;
     text-align: center;
+    text-transform: uppercase;
     color: #161a1f;
   }
 

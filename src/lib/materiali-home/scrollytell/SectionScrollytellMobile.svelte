@@ -208,7 +208,7 @@
               onclick={goNext}
             >
               <span class="mobile-cta-btn__label">
-                {currentTopic === lastTopic ? 'Scopri il tuo risultato' : 'Continua'}
+                {currentTopic === lastTopic ? 'Scopri il tuo risultato' : 'CONTINUA'}
               </span>
               <svg class="mobile-cta-btn__chevron" viewBox="58 37 41 20" fill="none"
                    aria-hidden="true">

@@ -69,10 +69,32 @@
   let cursorX: number | undefined;
   let cursorY: number | undefined;
   let cursorInside    = false;
+  let meltEnabled     = $state(true);
+
+  const MOBILE_BREAKPOINT = '(max-width: 768px)';
 
   // ─── Setup su mount ──────────────────────────────────────────────────────
   $effect(() => {
     if (!canvas || !wrapper) return;
+
+    const mobileQuery = window.matchMedia(MOBILE_BREAKPOINT);
+    const syncMeltEnabled = () => {
+      meltEnabled = !mobileQuery.matches;
+      if (!meltEnabled) {
+        revealPoints = [];
+        stationaryAccum = 0;
+        cursorInside = false;
+        lastRevealX = undefined;
+        lastRevealY = undefined;
+        if (animRafId !== null) {
+          cancelAnimationFrame(animRafId);
+          animRafId = null;
+        }
+        renderCurrentState();
+      }
+    };
+    syncMeltEnabled();
+    mobileQuery.addEventListener('change', syncMeltEnabled);
 
     const dpr  = window.devicePixelRatio || 1;
     const rect = wrapper.getBoundingClientRect();
@@ -103,6 +125,7 @@
     img.src         = src;
 
     return () => {
+      mobileQuery.removeEventListener('change', syncMeltEnabled);
       if (animRafId !== null) { cancelAnimationFrame(animRafId); animRafId = null; }
       ctx = null; imgEl = null; frostedCanvas = null; frostedCtx = null;
       revealCanvas = null; revealCtx = null; revealPoints = [];
@@ -314,6 +337,7 @@
   }
 
   function onPointerMove(e: PointerEvent) {
+    if (!meltEnabled) return;
     const { x, y } = getCoords(e);
     cursorX      = x;
     cursorY      = y;
@@ -544,7 +568,7 @@
     1. .sharp  — foto nitida B/N, sempre visibile sotto
     2. canvas  — frost dipinto sopra; destination-out rivela la foto
 -->
-<div class="frost-wrap" class:ready bind:this={wrapper} aria-hidden="true">
+<div class="frost-wrap" class:ready class:no-melt={!meltEnabled} bind:this={wrapper} aria-hidden="true">
   <img class="sharp" {src} alt="" draggable="false" style:object-position={objectPosition} />
   <canvas
     bind:this={canvas}
@@ -587,5 +611,10 @@
     cursor: crosshair;
     touch-action: pan-y;
     filter: saturate(0);
+  }
+
+  .frost-wrap.no-melt canvas {
+    pointer-events: none;
+    cursor: default;
   }
 </style>

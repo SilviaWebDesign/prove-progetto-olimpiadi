@@ -322,7 +322,7 @@
   const TOPICS_CTA_RESERVE  = 100;
   const TOPICS_FIT_CENTER_BIAS = 0.5;
   /** Offset verticale pianta con testo del tema visibile (positivo = più in alto). */
-  const PLANT_THEME_TEXT_Y_OFFSET_VH = 0.01;
+  const PLANT_THEME_TEXT_Y_OFFSET_VH = -0.035;
   /** Offset verticale pianta con pannello commenti visibile (positivo = più in alto). */
   const PLANT_CARDS_Y_OFFSET_VH = 0.06;
   const MOBILE_TOPICS_READY_PROGRESS = 0.97;

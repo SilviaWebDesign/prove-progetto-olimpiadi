@@ -1963,10 +1963,16 @@
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      padding-top: 0;
+      padding-top: 132px;
       padding-bottom: 0;
       box-sizing: border-box;
-      background: transparent;
+      background: linear-gradient(
+        to top,
+        rgba(255, 255, 255, 0.98) 0%,
+        rgba(255, 255, 255, 0.98) 28%,
+        rgba(255, 255, 255, 0.82) 62%,
+        rgba(255, 255, 255, 0) 100%
+      );
       z-index: 15;
     }
 
@@ -1976,12 +1982,26 @@
 
     .feedback-bottom-cta {
       position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
+      left: 0;
+      right: 0;
+      width: 100%;
+      transform: none;
       bottom: calc(
-        8px +
         var(--mobile-browser-chrome-bottom, 0px) +
         env(safe-area-inset-bottom, 0px)
+      );
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 120px;
+      padding-bottom: 8px;
+      box-sizing: border-box;
+      background: linear-gradient(
+        to top,
+        rgba(255, 255, 255, 0.98) 0%,
+        rgba(255, 255, 255, 0.98) 28%,
+        rgba(255, 255, 255, 0.82) 62%,
+        rgba(255, 255, 255, 0) 100%
       );
       z-index: 15;
     }

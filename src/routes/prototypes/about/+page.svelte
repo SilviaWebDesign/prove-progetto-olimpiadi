@@ -160,11 +160,13 @@
       aria-live="polite"
       aria-hidden={!showHintOverlay}
     >
-      {#key hoveredHotspot?.id ?? 'none'}
-        <p class="mountain-hover-hint__title" aria-hidden={!hintVisible}>
-          {hintVisible ? hoveredHotspot?.title ?? hoveredHotspot?.label ?? lastHintTitle : ''}
-        </p>
-      {/key}
+      <p
+        class="mountain-hover-hint__title"
+        class:is-visible={hintVisible}
+        aria-hidden={!hintVisible}
+      >
+        {hoveredHotspot?.title ?? hoveredHotspot?.label ?? lastHintTitle}
+      </p>
       <p class="mountain-hover-hint__cta">clicca sulle sfere per sapere di più</p>
     </div>
   {/if}
@@ -295,7 +297,7 @@
 
   .mountain-hover-hint {
     position: fixed;
-    top: clamp(104px, 15vh, 148px);
+    top: 170px;
     left: 50%;
     z-index: 6;
     display: block;
@@ -308,7 +310,6 @@
     transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .mountain-hover-hint__title,
   .mountain-hover-hint__cta {
     margin: 0;
     opacity: 0;
@@ -316,10 +317,6 @@
     transition:
       opacity 480ms cubic-bezier(0.22, 1, 0.36, 1),
       transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .mountain-hover-hint.visible .mountain-hover-hint__title {
-    animation: mountain-hint-title-fade-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .mountain-hover-hint.visible .mountain-hover-hint__cta {
@@ -330,36 +327,6 @@
     opacity: 0;
     transform: translateY(6px);
     transition-delay: 0ms;
-  }
-
-  .mountain-hover-hint:not(.visible) .mountain-hover-hint__title {
-    opacity: 0;
-    transform: translate(-50%, 6px);
-    transition-delay: 100ms;
-  }
-
-  @keyframes mountain-hint-title-fade-in {
-    from {
-      opacity: 0;
-      transform: translate(-50%, 10px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translate(-50%, 0);
-    }
-  }
-
-  @keyframes mountain-hint-fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
   }
 
   @keyframes mountain-hint-fade-in-cta {
@@ -378,13 +345,27 @@
     position: absolute;
     left: 50%;
     bottom: calc(100% + 8px);
-    transform: translate(-50%, 10px);
+    margin: 0;
+    transform: translateX(-50%);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 1100ms ease,
+      visibility 0ms linear 1100ms;
     font-family: 'Supreme Variable', sans-serif;
     font-size: clamp(1.25rem, 3.2vw, 1.75rem);
     font-weight: 800;
     line-height: 1.1;
     letter-spacing: 0.01em;
     white-space: nowrap;
+  }
+
+  .mountain-hover-hint__title.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 1100ms ease,
+      visibility 0ms linear 0ms;
   }
 
   .mountain-hover-hint__cta {
@@ -493,7 +474,7 @@
 
   @media (max-width: 900px) {
     .mountain-hover-hint {
-      top: clamp(88px, 11vh, 112px);
+      top: 170px;
     }
 
     .mountain-hover-hint--mobile-explore .mountain-hover-hint__cta {

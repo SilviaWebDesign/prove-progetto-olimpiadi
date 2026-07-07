@@ -789,7 +789,9 @@ export function clampFocusCameraPosition(surfacePoint, desiredCamPos, mountainMo
 }
 
 /** Frazione viewport (0–1) dove inquadrare il marker in focus — lato sinistro. */
-export const FOCUS_VIEWPORT_X = 0.32;
+export const FOCUS_VIEWPORT_X = 0.3;
+/** Desktop: centro verticale dello schermo. */
+export const FOCUS_VIEWPORT_Y = 0.5;
 /** Mobile: sfera centrata nello schermo. */
 export const FOCUS_VIEWPORT_X_MOBILE = 0.5;
 export const FOCUS_VIEWPORT_Y_MOBILE = 0.3;

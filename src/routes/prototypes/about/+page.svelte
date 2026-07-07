@@ -24,7 +24,7 @@
   let hintVisible = $derived(!!hoveredHotspot && !isMobileExplore);
   let showDesktopFooter = $derived(introDismissed && !isMobileExplore && !selectedHotspot);
   let showMobileExploreHint = $derived(isMobileExplore && introDismissed && !selectedHotspot);
-  let showHintOverlay = $derived(showMobileExploreHint || hintVisible);
+  let showHintOverlay = $derived(introDismissed && !selectedHotspot);
 
   $effect(() => {
     if (!showDesktopFooter) footerVisible = false;
@@ -117,7 +117,9 @@
   });
 
   let introTextOpacity = $derived(introDismissed ? 0 : Math.max(0, 1 - introProgress * 2.4));
-  let introBgOpacity = $derived(introDismissed ? 0 : Math.max(0, 1 - introProgress * 1.35));
+  let introBgOpacity = $derived(
+    introDismissed ? 0 : Math.max(0, 1 - introProgress * 1.35) * 0.66
+  );
 
   function closeHotspot() {
     selectedHotspot = null;
@@ -143,6 +145,7 @@
 <div
   class="about-page"
   class:footer-open={footerVisible}
+  class:intro-active={!introDismissed}
   style="--mountain-lift: {footerVisible ? footerHeight : 0}px"
 >
   {#if browser}
@@ -157,13 +160,11 @@
       aria-live="polite"
       aria-hidden={!showHintOverlay}
     >
-      {#if hintVisible}
-        {#key hoveredHotspot?.id ?? 'none'}
-          <p class="mountain-hover-hint__title">
-            {hoveredHotspot?.title ?? hoveredHotspot?.label ?? lastHintTitle}
-          </p>
-        {/key}
-      {/if}
+      {#key hoveredHotspot?.id ?? 'none'}
+        <p class="mountain-hover-hint__title" aria-hidden={!hintVisible}>
+          {hintVisible ? hoveredHotspot?.title ?? hoveredHotspot?.label ?? lastHintTitle : ''}
+        </p>
+      {/key}
       <p class="mountain-hover-hint__cta">clicca sulle sfere per sapere di più</p>
     </div>
   {/if}
@@ -249,8 +250,13 @@
     width: 100%;
     height: 100%;
     z-index: 1;
+    filter: saturate(0.03);
     transform: translateY(calc(-1 * var(--mountain-lift, 0px)));
     transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .about-page.intro-active :global(.three-canvas) {
+    filter: saturate(0.03) blur(8px);
   }
 
   .about-footer-scrim {
@@ -292,10 +298,7 @@
     top: clamp(104px, 15vh, 148px);
     left: 50%;
     z-index: 6;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
+    display: block;
     margin: 0;
     padding: 0;
     transform: translateX(-50%);
@@ -316,7 +319,7 @@
   }
 
   .mountain-hover-hint.visible .mountain-hover-hint__title {
-    animation: mountain-hint-fade-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: mountain-hint-title-fade-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .mountain-hover-hint.visible .mountain-hover-hint__cta {
@@ -331,8 +334,20 @@
 
   .mountain-hover-hint:not(.visible) .mountain-hover-hint__title {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translate(-50%, 6px);
     transition-delay: 100ms;
+  }
+
+  @keyframes mountain-hint-title-fade-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
   }
 
   @keyframes mountain-hint-fade-in {
@@ -360,6 +375,10 @@
   }
 
   .mountain-hover-hint__title {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translate(-50%, 10px);
     font-family: 'Supreme Variable', sans-serif;
     font-size: clamp(1.25rem, 3.2vw, 1.75rem);
     font-weight: 800;
@@ -369,6 +388,7 @@
   }
 
   .mountain-hover-hint__cta {
+    position: relative;
     font-family: 'Supreme Variable', sans-serif;
     font-size: clamp(0.75rem, 1.6vw, 0.875rem);
     font-weight: 700;
@@ -396,7 +416,9 @@
   .intro-backdrop {
     position: absolute;
     inset: 0;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.68);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
     pointer-events: none;
   }
 
@@ -422,7 +444,7 @@
     margin: 0;
     font-family: 'Supreme Variable', sans-serif;
     font-size: clamp(1.65rem, 4.6vw, 2.75rem);
-    font-weight: 800;
+    font-weight: 500;
     line-height: 1.1;
     letter-spacing: 0;
     color: #161A1F;
@@ -478,6 +500,10 @@
       opacity: 0.82;
       transform: translateY(0);
       animation: none;
+    }
+
+    .mountain-hover-hint__title {
+      bottom: calc(100% + 6px);
     }
   }
 

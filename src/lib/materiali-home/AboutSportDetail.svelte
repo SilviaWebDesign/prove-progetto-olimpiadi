@@ -32,6 +32,14 @@
   let thumbRatio = $state(1);
   let sliderTop = $state(0);
   let sliderTrackHeight = $state(0);
+  let scrollAdvanceLockUntil = 0;
+  let scrollAdvanceAccum = 0;
+  let touchStartY = 0;
+  let touchLastY = 0;
+
+  const SCROLL_WHEEL_FACTOR = 0.42;
+  const SCROLL_ADVANCE_THRESHOLD = 260;
+  const TOUCH_ADVANCE_THRESHOLD = 12;
 
   function measureSliderFrame() {
     if (!scrollEl || !contentEl || !titleEl) return;
@@ -51,6 +59,7 @@
     thumbRatio =
       scrollHeight > 0 ? Math.max(0.14, Math.min(1, clientHeight / scrollHeight)) : 1;
     measureSliderFrame();
+    if (!isScrollAtBottom()) scrollAdvanceAccum = 0;
   }
 
   /** @param {number} value @param {number} min @param {number} max */
@@ -111,6 +120,7 @@
   $effect(() => {
     hotspot.id;
     paragraphs.length;
+    scrollAdvanceAccum = 0;
     fitPanelContent();
   });
 
@@ -143,6 +153,78 @@
     else onclose();
   }
 
+  function isScrollAtBottom() {
+    if (!scrollEl) return false;
+    return scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 6;
+  }
+
+  /** @param {number} deltaY */
+  function tryAdvanceFromScroll(deltaY) {
+    if (deltaY <= 0) return;
+    if (!isScrollAtBottom()) {
+      scrollAdvanceAccum = 0;
+      return;
+    }
+    const now = performance.now();
+    if (now < scrollAdvanceLockUntil) return;
+
+    scrollAdvanceAccum += deltaY;
+    if (scrollAdvanceAccum < SCROLL_ADVANCE_THRESHOLD) return;
+
+    scrollAdvanceAccum = 0;
+    scrollAdvanceLockUntil = now + 900;
+    onContinue();
+  }
+
+  /** @param {WheelEvent} event */
+  function onPanelWheel(event) {
+    if (!scrollEl) return;
+
+    const deltaY = event.deltaY;
+    const atBottom = isScrollAtBottom();
+
+    if (!atBottom || deltaY < 0) {
+      event.preventDefault();
+      scrollEl.scrollTop += deltaY * SCROLL_WHEEL_FACTOR;
+      syncSlider();
+      return;
+    }
+
+    event.preventDefault();
+    tryAdvanceFromScroll(deltaY);
+  }
+
+  /** @param {TouchEvent} event */
+  function onPanelTouchStart(event) {
+    stopTouchPropagation(event);
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStartY = touch.clientY;
+    touchLastY = touch.clientY;
+  }
+
+  /** @param {TouchEvent} event */
+  function onPanelTouchMove(event) {
+    stopTouchPropagation(event);
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchLastY = touch.clientY;
+  }
+
+  /** @param {TouchEvent} event */
+  function onPanelTouchEnd(event) {
+    stopTouchPropagation(event);
+    const totalSwipe = touchStartY - touchLastY;
+    if (totalSwipe <= 0) return;
+    if (!isScrollAtBottom()) return;
+    const now = performance.now();
+    if (now < scrollAdvanceLockUntil) return;
+
+    if (totalSwipe < TOUCH_ADVANCE_THRESHOLD) return;
+    scrollAdvanceLockUntil = now + 900;
+    onContinue();
+  }
+
   /** @param {TouchEvent} event */
   function stopTouchPropagation(event) {
     event.stopPropagation();
@@ -166,8 +248,10 @@
       class="sport-panel-scroll"
       bind:this={scrollEl}
       onscroll={syncSlider}
-      ontouchstart={stopTouchPropagation}
-      ontouchmove={stopTouchPropagation}
+      onwheel={onPanelWheel}
+      ontouchstart={onPanelTouchStart}
+      ontouchmove={onPanelTouchMove}
+      ontouchend={onPanelTouchEnd}
     >
       <div class="sport-panel-content" bind:this={contentEl}>
         {#key hotspot.id}
@@ -233,15 +317,16 @@
   .grad-side {
     position: absolute;
     top: 0;
-    left: 36%;
+    left: 20%;
     right: 0;
     height: 100%;
     background: linear-gradient(
       to right,
       rgba(249, 249, 250, 0) 0%,
-      rgba(249, 249, 250, 0.72) 22%,
-      rgba(249, 249, 250, 0.92) 38%,
-      #f9f9fa 50%
+      rgba(249, 249, 250, 0.22) 14%,
+      rgba(249, 249, 250, 0.52) 30%,
+      rgba(249, 249, 250, 0.82) 44%,
+      #f9f9fa 56%
     );
   }
 
@@ -252,10 +337,10 @@
   .sport-panel {
     position: absolute;
     top: calc(50% + 22px);
-    right: var(--panel-padding-x);
-    left: auto;
+    right: 0;
+    left: 50%;
     transform: translateY(-50%);
-    width: min(402px, calc(50vw - var(--panel-padding-x) - 12px));
+    width: 50vw;
     max-height: calc(100vh - clamp(108px, 14vh, 136px));
     overflow: hidden;
     padding: 0;
@@ -269,6 +354,7 @@
     height: 100%;
     overflow-x: hidden;
     overflow-y: auto;
+    scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     box-sizing: border-box;
@@ -276,7 +362,7 @@
 
   .sport-panel-content {
     position: relative;
-    padding: 0 0 28px;
+    padding: 0 calc(var(--panel-padding-x) + 44px) 28px var(--panel-padding-x);
     transform-origin: top right;
     --sport-title-size: clamp(1.75rem, 3.2vw, 36px);
   }
@@ -308,12 +394,11 @@
     font-weight: 400;
     line-height: normal;
     color: #161a1f;
-    text-indent: 0.45em;
   }
 
   .sport-continue-wrap {
     position: absolute;
-    left: calc(45.83% + 40.5px);
+    left: 75%;
     bottom: clamp(28px, 6vh, 48px);
     transform: translateX(-50%);
     z-index: 51;

@@ -25,7 +25,8 @@
     focusCameraDistance,
     getMarkerFocusPoint,
     panFocusToViewport,
-    panFocusToViewportX,
+    FOCUS_VIEWPORT_X,
+    FOCUS_VIEWPORT_Y,
     FOCUS_VIEWPORT_X_MOBILE,
     FOCUS_VIEWPORT_Y_MOBILE,
     FOCUS_CAMERA_Y_LIFT_MOBILE,
@@ -725,7 +726,13 @@
           FOCUS_VIEWPORT_Y_MOBILE
         );
       } else {
-        panFocusToViewportX(camera, _tmpTarget, focusPoint);
+        panFocusToViewport(
+          camera,
+          _tmpTarget,
+          focusPoint,
+          FOCUS_VIEWPORT_X,
+          FOCUS_VIEWPORT_Y
+        );
       }
       panCam.copy(camera.position).sub(toCam);
       panTarget.copy(_tmpTarget).sub(toTarget);

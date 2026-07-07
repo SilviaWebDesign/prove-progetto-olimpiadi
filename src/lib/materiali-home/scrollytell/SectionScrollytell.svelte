@@ -265,14 +265,16 @@
       });
     }, FEEDBACK_MORPH_TIMEOUT_MS);
 
+    await tick();
+    applyFeedbackModelFit(true);
+
     scene3d?.morphToResult(resultModelPath, () => {
       if (morphCompleted) return;
       morphCompleted = true;
       clearTimeout(morphTimeout);
       completeFeedbackTransition();
     });
-    applyFeedbackModelFit(false);
-    void tick().then(() => applyFeedbackModelFit(false));
+    void tick().then(() => applyFeedbackModelFit(true));
   }
 
   async function goNext() {
@@ -516,7 +518,7 @@
 
   function feedbackCenterBias(): number {
     if (isSportModel()) return isMobile ? 0.62 : 0.6;
-    if (isInfrastructureModel()) return isMobile ? 0.72 : 0.54;
+    if (isInfrastructureModel()) return 0.5;
     if (isPlantModel()) return isMobile ? 0.58 : 0.5;
     return isMobile ? 0.56 : 0.5;
   }
@@ -548,6 +550,13 @@
         centerBias: cardsActive
           ? MOBILE_CARDS_FIT_CENTER_BIAS
           : SPORT_MOBILE_THEME_CENTER_BIAS,
+      };
+    }
+    if (isMobile && isInfrastructureModel()) {
+      return {
+        centerBias: cardsActive
+          ? MOBILE_CARDS_FIT_CENTER_BIAS
+          : TOPICS_FIT_CENTER_BIAS,
       };
     }
     if (!isMobile || !cardsActive || !isSportModel()) {
@@ -605,9 +614,14 @@
     const topRect = topEl.getBoundingClientRect();
     const titleRect = titleEl?.getBoundingClientRect();
     const subtitleRect = subtitleEl.getBoundingClientRect();
+    const ctaEl = sceneEl?.querySelector<HTMLElement>('.feedback-bottom-cta') ?? null;
+    const ctaRect = ctaEl?.getBoundingClientRect();
     const margin = feedbackModelMargin();
     const gapTop = (titleRect?.bottom ?? topRect.bottom) + margin;
     let gapBottom = subtitleRect.top - margin;
+    if (isMobile && ctaRect) {
+      gapBottom = Math.min(gapBottom, ctaRect.top - margin);
+    }
     if (gapBottom - gapTop < 48) {
       gapBottom = gapTop + 48;
     }

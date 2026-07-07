@@ -102,11 +102,11 @@
     '/oggetti/sport-neutro.glb': -0.18,
     '/oggetti/sport-piu-negativo.glb': -0.18,
     '/oggetti/sport-piu-positivo.glb': -0.18,
-    '/oggetti/infrastrutture-positivo.glb': -0.24,
-    '/oggetti/infrastrutture-negativo.glb': -0.24,
-    '/oggetti/infrastrutture-neutro.glb': -0.24,
-    '/oggetti/infrastrutture-piu-negativo.glb': -0.24,
-    '/oggetti/infrastrutture-piu-positivo.glb': -0.24,
+    '/oggetti/infrastrutture-positivo.glb': 0,
+    '/oggetti/infrastrutture-negativo.glb': 0,
+    '/oggetti/infrastrutture-neutro.glb': 0,
+    '/oggetti/infrastrutture-piu-negativo.glb': 0,
+    '/oggetti/infrastrutture-piu-positivo.glb': 0,
   };
 
   function applyModelPose(scene: THREE.Object3D, src: string) {
@@ -147,7 +147,7 @@
   /** Altezza max del modello in fase feedback (frazione del viewport). */
   const FEEDBACK_MAX_VH = 0.36;
   const FEEDBACK_GAP_FILL = 0.78;
-  const FEEDBACK_GAP_FILL_INFRASTRUCTURE = 0.62;
+  const FEEDBACK_GAP_FILL_INFRASTRUCTURE = 0.52;
   let feedbackLayoutScale: THREE.Vector3 | null = null;
   let feedbackFitOffsetY = 0;
   let feedbackFitGapPx = 0;
@@ -169,14 +169,7 @@
 
   function getFeedbackVisualYOffset(): number {
     const vh = FEEDBACK_VISUAL_Y_OFFSET_VH[activeResultSrc];
-    if (!vh) return 0;
-    const mobileBoost =
-      typeof window !== 'undefined' &&
-      window.innerWidth < 768 &&
-      activeResultSrc.includes('infrastrutture-')
-        ? 1.4
-        : 1;
-    return vh * mobileBoost * getCameraVisibleH();
+    return vh ? vh * getCameraVisibleH() : 0;
   }
 
   function feedbackGapFill(): number {
@@ -245,21 +238,28 @@
     }
   }
 
-  function prepareForFeedback() {
+  function applyFeedbackSpinnerOffset(force = false) {
+    if (!spinner || !feedbackFitReady) return;
+    const targetY = feedbackFitOffsetY + getFeedbackVisualYOffset();
+    if (force) {
+      spinner.position.y = targetY;
+      return;
+    }
+    spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;
+  }
+
+  function beginResultMorph(path: string) {
     mobileFitActive = false;
     mobileLayoutBlend = 0;
     modelBaseYOffsetVh = 0;
-    feedbackFitOffsetY = 0;
-    feedbackFitGapPx = 0;
-    feedbackFitViewportH = 0;
-    feedbackFitReady = false;
-    activeResultSrc = '';
-    if (spinner) {
-      spinner.position.set(0, 0, 0);
-      spinner.rotation.set(0, 0, 0);
-    }
+    mobileFitLocked = false;
     resetFeedbackLayout();
+    activeResultSrc = path;
     resetFeedbackViewCamera();
+    if (spinner) {
+      spinner.rotation.set(0, 0, 0);
+      applyFeedbackSpinnerOffset(true);
+    }
   }
 
   function realignFeedbackModel() {
@@ -604,7 +604,20 @@
       },
       clearMobileFit: () => {
         mobileFitLocked = false;
-        prepareForFeedback();
+        mobileFitActive = false;
+        mobileLayoutBlend = 0;
+        modelBaseYOffsetVh = 0;
+        feedbackFitOffsetY = 0;
+        feedbackFitGapPx = 0;
+        feedbackFitViewportH = 0;
+        feedbackFitReady = false;
+        activeResultSrc = '';
+        if (spinner) {
+          spinner.position.set(0, 0, 0);
+          spinner.rotation.set(0, 0, 0);
+        }
+        resetFeedbackLayout();
+        resetFeedbackViewCamera();
       },
       realignFeedback: () => realignFeedbackModel(),
       forceCompleteMorph,
@@ -1153,9 +1166,7 @@
 
   function morphToResult(path: string, onDone: () => void) {
     abortMorphInProgress();
-    prepareForFeedback();
-    resetFeedbackLayout();
-    activeResultSrc = path;
+    beginResultMorph(path);
     const { scaleMul } = feedbackConfig();
     if (MODEL_FEEDBACK[modelSrc] && path === modelSrc) {
       showEnlargedSourceModel(scaleMul, onDone);
@@ -1382,6 +1393,8 @@
       const fitY = mobileFitActive ? mobileFitFinalOffsetY * mobileLayoutBlend : 0;
       const targetY = fitY + getModelBaseYOffset();
       spinner.position.y += (targetY - spinner.position.y) * MOBILE_FIT_LERP;
+    } else if (spinner && morphState === 'morphing' && feedbackFitReady) {
+      applyFeedbackSpinnerOffset();
     }
 
     decayParticleHover(dt);

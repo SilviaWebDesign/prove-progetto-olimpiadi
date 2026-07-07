@@ -58,9 +58,14 @@
   const ABOUT_HERO_ZOOM = HOME_HERO_ZOOM * 0.82;
   /**
    * Angolo polare hero about (radianti): più basso = vista più dall'alto.
-   * La home è ~1.55–1.65; qui ~0.95 per inclinare senza zoom né avvicinamento.
+   * ~0.2 ≈ vista zenitale; ~0.55 ≈ obliqua; ~1.12 ≈ laterale.
    */
-  const ABOUT_HERO_POLAR = 1.12;
+  const ABOUT_HERO_POLAR = 0.22;
+  const ABOUT_HERO_POLAR_MOBILE = 0.2;
+  const ABOUT_HERO_POLAR_MAX = 0.32;
+  const ABOUT_HERO_YAW_MOBILE = 0.12;
+  /** Zoom più largo per la vista zenitale. */
+  const ABOUT_HERO_ZOOM_MOBILE = ABOUT_HERO_ZOOM * 0.72;
 
   const HOVER_MARKER_SCALE = 1.14;
   const HOVER_SCALE_LERP = 0.28;
@@ -169,6 +174,7 @@
   const MOUNTAIN_MAX_POLAR = Math.PI / 2 - 0.1;
   const _refCam = new THREE.Vector3();
   const _refTarget = new THREE.Vector3();
+  const _heroProj = new THREE.Vector3();
   let focusParticleHover = false;
   /** Quota minima camera (linea neve / base render). */
   /** @type {number | null} */
@@ -192,6 +198,11 @@
    * } | null} */
   let cameraTransition = null;
   let mobileLayout = false;
+  let panelMobileLayout = false;
+
+  function isAboutMobileHeroView() {
+    return isAboutPanelMobileLayout();
+  }
 
   /** @param {THREE.Object3D} object */
   function hotspotFromObject(object) {
@@ -403,7 +414,7 @@
    * @param {ReturnType<typeof buildHomeOrbitConfig>} orbitConfig
    * @param {THREE.Vector3} targetOut
    */
-  function applyAboutHeroCamera(cam, orbitConfig, targetOut) {
+  function applyAboutHeroCamera(cam, orbitConfig, targetOut, mobile = isAboutMobileHeroView()) {
     const angle = orbitConfig.startAngle;
     const lookAt = targetOut.copy(orbitConfig.center);
 
@@ -416,17 +427,93 @@
     const distance = _refCam.distanceTo(_refTarget);
 
     _camSpherical.radius = distance;
-    _camSpherical.phi = ABOUT_HERO_POLAR;
-    _camSpherical.theta = angle;
+    _camSpherical.phi = mobile ? ABOUT_HERO_POLAR_MOBILE : ABOUT_HERO_POLAR;
+    _camSpherical.theta = angle + (mobile ? ABOUT_HERO_YAW_MOBILE : 0);
     _camOffset.setFromSpherical(_camSpherical);
     cam.position.copy(lookAt).add(_camOffset);
 
-    cam.zoom = ABOUT_HERO_ZOOM;
+    cam.zoom = mobile ? ABOUT_HERO_ZOOM_MOBILE : ABOUT_HERO_ZOOM * 0.76;
     cam.updateProjectionMatrix();
     cam.up.set(0, 1, 0);
     cam.lookAt(lookAt);
 
     return lookAt;
+  }
+
+  function fitHeroCameraToMarkers(markerPoints, padding = 0.1) {
+    if (!camera || !controls || markerPoints.length === 0) return;
+
+    const ndcPad = padding * 2;
+    const boundsMin = -1 + ndcPad;
+    const boundsMax = 1 - ndcPad;
+    const baseZoom = isAboutMobileHeroView() ? ABOUT_HERO_ZOOM_MOBILE : ABOUT_HERO_ZOOM;
+    const minZoom = baseZoom * 0.5;
+
+    for (let iter = 0; iter < 14; iter++) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      for (const point of markerPoints) {
+        _heroProj.copy(point).project(camera);
+        minX = Math.min(minX, _heroProj.x);
+        maxX = Math.max(maxX, _heroProj.x);
+        minY = Math.min(minY, _heroProj.y);
+        maxY = Math.max(maxY, _heroProj.y);
+      }
+
+      const inside =
+        minX >= boundsMin &&
+        maxX <= boundsMax &&
+        minY >= boundsMin &&
+        maxY <= boundsMax;
+      if (inside) break;
+
+      const centerX = (minX + maxX) * 0.5;
+      const centerY = (minY + maxY) * 0.5;
+      const spanX = Math.max(maxX - minX, 0.001);
+      const spanY = Math.max(maxY - minY, 0.001);
+      const availX = boundsMax - boundsMin;
+      const availY = boundsMax - boundsMin;
+      const zoomScale = Math.min(availX / spanX, availY / spanY, 1);
+
+      if (zoomScale < 0.98) {
+        camera.zoom = Math.max(minZoom, camera.zoom * zoomScale * 0.96);
+        camera.updateProjectionMatrix();
+      }
+
+      _camOffset.subVectors(camera.position, controls.target);
+      _camSpherical.setFromVector3(_camOffset);
+      _camSpherical.theta -= centerX * 0.22;
+      _camSpherical.phi = THREE.MathUtils.clamp(
+        _camSpherical.phi - centerY * 0.05,
+        MOUNTAIN_MIN_POLAR,
+        ABOUT_HERO_POLAR_MAX
+      );
+      _camOffset.setFromSpherical(_camSpherical);
+      camera.position.copy(controls.target).add(_camOffset);
+      camera.lookAt(controls.target);
+    }
+  }
+
+  function refreshAboutHeroCameraPose() {
+    if (!camera || !controls || !homeOrbitConfig) return;
+
+    const mobileHero = isAboutMobileHeroView();
+    applyAboutHeroCamera(camera, homeOrbitConfig, _heroLookAt, mobileHero);
+    controls.target.copy(_heroLookAt);
+
+    const markerPoints = markers.map((entry) => getMarkerFocusPoint(entry.object));
+    if (markerPoints.length > 0) {
+      fitHeroCameraToMarkers(markerPoints, mobileHero ? 0.12 : 0.1);
+    }
+
+    _storedHeroCam.copy(camera.position);
+    _storedHeroTarget.copy(controls.target);
+    heroPoseStored = true;
+    resetOrbitControlDeltas(controls);
+    controls.update();
   }
 
   /** @param {OrbitControls} ctrl */
@@ -516,12 +603,7 @@
       storedFocusPan.target.copy(cameraTransition.panTarget);
       applyFocusOrbitLimits();
     } else if (heroPoseStored) {
-      camera.position.copy(_storedHeroCam);
-      controls.target.copy(_storedHeroTarget);
-      camera.zoom = ABOUT_HERO_ZOOM;
-      camera.updateProjectionMatrix();
-      camera.up.set(0, 1, 0);
-      camera.lookAt(_storedHeroTarget);
+      refreshAboutHeroCameraPose();
       applyMountainOrbitLimits();
       setupOrbitPolarLimits();
       storedFocusPan.cam.set(0, 0, 0);
@@ -535,7 +617,9 @@
       storedFocusPan.target.set(0, 0, 0);
     }
 
-    syncControlsToCameraPose();
+    if (toFocus || !heroPoseStored) {
+      syncControlsToCameraPose();
+    }
     clampCameraAboveSnow(toFocus ? undefined : { pivot: _storedHeroTarget, clampCenter: true });
 
     cameraTransition = null;
@@ -636,6 +720,7 @@
       };
     }
 
+    const mobileHero = isAboutMobileHeroView();
     const angle = homeOrbitConfig.startAngle;
     const lookAt = _heroLookAt.clone().copy(homeOrbitConfig.center);
     _refTarget.copy(homeOrbitConfig.center).add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
@@ -646,8 +731,8 @@
     );
     const distance = _refCam.distanceTo(_refTarget);
     _camSpherical.radius = distance;
-    _camSpherical.phi = ABOUT_HERO_POLAR;
-    _camSpherical.theta = angle;
+    _camSpherical.phi = mobileHero ? ABOUT_HERO_POLAR_MOBILE : ABOUT_HERO_POLAR;
+    _camSpherical.theta = angle + (mobileHero ? ABOUT_HERO_YAW_MOBILE : 0);
     _camOffset.setFromSpherical(_camSpherical);
     return {
       cam: lookAt.clone().add(_camOffset),
@@ -1004,19 +1089,21 @@
     initMountainBlur(w, h);
 
     const nextMobileLayout = isAboutMobileLayout();
-    if (nextMobileLayout !== mobileLayout && snowMountainModel) {
+    const nextPanelMobile = isAboutPanelMobileLayout();
+    const mobileLayoutChanged = nextMobileLayout !== mobileLayout;
+    const panelMobileChanged = nextPanelMobile !== panelMobileLayout;
+
+    if (mobileLayoutChanged && snowMountainModel) {
       mobileLayout = nextMobileLayout;
-      if (heroPoseStored && !selectedHotspot && controls) {
-        camera.position.copy(_storedHeroCam);
-        controls.target.copy(_storedHeroTarget);
-        camera.zoom = ABOUT_HERO_ZOOM;
-        camera.updateProjectionMatrix();
-        camera.lookAt(_storedHeroTarget);
-        syncControlsToCameraPose();
-      }
       buildMarkers(_worldBox);
     } else {
       mobileLayout = nextMobileLayout;
+    }
+
+    panelMobileLayout = nextPanelMobile;
+
+    if (!selectedHotspot && controls && snowMountainModel && (mobileLayoutChanged || panelMobileChanged || isAboutMobileHeroView())) {
+      refreshAboutHeroCameraPose();
     }
 
     if (isAboutPanelMobileLayout()) {
@@ -1235,9 +1322,7 @@
         homeOrbitConfig.startAngle += ABOUT_HERO_ANGLE_OFFSET;
         cameraFloorY = snowField.y - 0.2;
         mobileLayout = isAboutMobileLayout();
-
-        applyAboutHeroCamera(camera, homeOrbitConfig, _heroLookAt);
-        controls.target.copy(_heroLookAt);
+        panelMobileLayout = isAboutPanelMobileLayout();
 
         try {
           await buildMarkers(_worldBox);
@@ -1247,10 +1332,7 @@
 
         applyMountainOrbitLimits();
         setupOrbitPolarLimits();
-        syncControlsToCameraPose();
-        _storedHeroCam.copy(camera.position);
-        _storedHeroTarget.copy(_heroLookAt);
-        heroPoseStored = true;
+        refreshAboutHeroCameraPose();
         cameraReady = true;
         controls.enabled = true;
         lastSelectedHotspotId = selectedHotspot?.id ?? null;

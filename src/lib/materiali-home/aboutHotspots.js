@@ -828,11 +828,11 @@ export function clampFocusCameraPosition(surfacePoint, desiredCamPos, mountainMo
 export const FOCUS_VIEWPORT_X = 0.3;
 /** Desktop: centro verticale dello schermo. */
 export const FOCUS_VIEWPORT_Y = 0.5;
-/** Mobile: sfera centrata nello schermo. */
+/** Mobile: sfera al centro della metà superiore dello schermo. */
 export const FOCUS_VIEWPORT_X_MOBILE = 0.5;
-export const FOCUS_VIEWPORT_Y_MOBILE = 0.3;
+export const FOCUS_VIEWPORT_Y_MOBILE = 0.4;
 /** Sollevamento camera in focus mobile (frazione altezza montagna). */
-export const FOCUS_CAMERA_Y_LIFT_MOBILE = 0.18;
+export const FOCUS_CAMERA_Y_LIFT_MOBILE = 0;
 
 const _focusProj = new THREE.Vector3();
 const _focusFwd = new THREE.Vector3();

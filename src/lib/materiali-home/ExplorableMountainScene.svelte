@@ -10,6 +10,7 @@
     buildHomeOrbitConfig,
     homeOrbitDistanceLimits,
     setupMountainRenderMaterials,
+    applyHomeHeroCamera,
     HOME_CAM_Y_LOW,
     HOME_CAMERA_Z_START,
     HOME_HERO_ZOOM,
@@ -57,14 +58,13 @@
   /** Zoom hero about (invariato). */
   const ABOUT_HERO_ZOOM = HOME_HERO_ZOOM * 0.82;
   /**
-   * Angolo polare hero about (radianti): più basso = vista più dall'alto.
+   * Angolo polare hero about mobile (radianti): più basso = vista più dall'alto.
    * ~0.2 ≈ vista zenitale; ~0.55 ≈ obliqua; ~1.12 ≈ laterale.
    */
-  const ABOUT_HERO_POLAR = 0.22;
   const ABOUT_HERO_POLAR_MOBILE = 0.2;
   const ABOUT_HERO_POLAR_MAX = 0.32;
   const ABOUT_HERO_YAW_MOBILE = 0.12;
-  /** Zoom più largo per la vista zenitale. */
+  /** Zoom più largo per la vista zenitale mobile. */
   const ABOUT_HERO_ZOOM_MOBILE = ABOUT_HERO_ZOOM * 0.72;
 
   const HOVER_MARKER_SCALE = 1.14;
@@ -409,35 +409,39 @@
   }
 
   /**
-   * Pose hero about: stessa distanza/zoom, vista più dall'alto.
+   * Pose hero about: mobile zenitale; desktop come hero home (lato opposto).
    * @param {THREE.PerspectiveCamera} cam
    * @param {ReturnType<typeof buildHomeOrbitConfig>} orbitConfig
    * @param {THREE.Vector3} targetOut
    */
   function applyAboutHeroCamera(cam, orbitConfig, targetOut, mobile = isAboutMobileHeroView()) {
     const angle = orbitConfig.startAngle;
-    const lookAt = targetOut.copy(orbitConfig.center);
 
-    _refTarget.copy(orbitConfig.center).add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
-    _refCam.set(
-      orbitConfig.center.x + Math.sin(angle) * orbitConfig.radius,
-      orbitConfig.orbitY,
-      orbitConfig.center.z + Math.cos(angle) * orbitConfig.radius
-    );
-    const distance = _refCam.distanceTo(_refTarget);
+    if (mobile) {
+      const lookAt = targetOut.copy(orbitConfig.center);
 
-    _camSpherical.radius = distance;
-    _camSpherical.phi = mobile ? ABOUT_HERO_POLAR_MOBILE : ABOUT_HERO_POLAR;
-    _camSpherical.theta = angle + (mobile ? ABOUT_HERO_YAW_MOBILE : 0);
-    _camOffset.setFromSpherical(_camSpherical);
-    cam.position.copy(lookAt).add(_camOffset);
+      _refTarget.copy(orbitConfig.center).add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
+      _refCam.set(
+        orbitConfig.center.x + Math.sin(angle) * orbitConfig.radius,
+        orbitConfig.orbitY,
+        orbitConfig.center.z + Math.cos(angle) * orbitConfig.radius
+      );
+      const distance = _refCam.distanceTo(_refTarget);
 
-    cam.zoom = mobile ? ABOUT_HERO_ZOOM_MOBILE : ABOUT_HERO_ZOOM * 0.76;
-    cam.updateProjectionMatrix();
-    cam.up.set(0, 1, 0);
-    cam.lookAt(lookAt);
+      _camSpherical.radius = distance;
+      _camSpherical.phi = ABOUT_HERO_POLAR_MOBILE;
+      _camSpherical.theta = angle + ABOUT_HERO_YAW_MOBILE;
+      _camOffset.setFromSpherical(_camSpherical);
+      cam.position.copy(lookAt).add(_camOffset);
 
-    return lookAt;
+      cam.zoom = ABOUT_HERO_ZOOM_MOBILE;
+      cam.updateProjectionMatrix();
+      cam.up.set(0, 1, 0);
+      cam.lookAt(lookAt);
+      return lookAt;
+    }
+
+    return applyHomeHeroCamera(cam, orbitConfig, targetOut);
   }
 
   function fitHeroCameraToMarkers(markerPoints, padding = 0.1) {
@@ -446,7 +450,7 @@
     const ndcPad = padding * 2;
     const boundsMin = -1 + ndcPad;
     const boundsMax = 1 - ndcPad;
-    const baseZoom = isAboutMobileHeroView() ? ABOUT_HERO_ZOOM_MOBILE : ABOUT_HERO_ZOOM;
+    const baseZoom = ABOUT_HERO_ZOOM_MOBILE;
     const minZoom = baseZoom * 0.5;
 
     for (let iter = 0; iter < 14; iter++) {
@@ -505,8 +509,8 @@
     controls.target.copy(_heroLookAt);
 
     const markerPoints = markers.map((entry) => getMarkerFocusPoint(entry.object));
-    if (markerPoints.length > 0) {
-      fitHeroCameraToMarkers(markerPoints, mobileHero ? 0.12 : 0.1);
+    if (mobileHero && markerPoints.length > 0) {
+      fitHeroCameraToMarkers(markerPoints, 0.12);
     }
 
     _storedHeroCam.copy(camera.position);
@@ -722,22 +726,36 @@
 
     const mobileHero = isAboutMobileHeroView();
     const angle = homeOrbitConfig.startAngle;
-    const lookAt = _heroLookAt.clone().copy(homeOrbitConfig.center);
-    _refTarget.copy(homeOrbitConfig.center).add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
-    _refCam.set(
+
+    if (mobileHero) {
+      const lookAt = _heroLookAt.clone().copy(homeOrbitConfig.center);
+      _refTarget.copy(homeOrbitConfig.center).add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
+      _refCam.set(
+        homeOrbitConfig.center.x + Math.sin(angle) * homeOrbitConfig.radius,
+        homeOrbitConfig.orbitY,
+        homeOrbitConfig.center.z + Math.cos(angle) * homeOrbitConfig.radius
+      );
+      const distance = _refCam.distanceTo(_refTarget);
+      _camSpherical.radius = distance;
+      _camSpherical.phi = ABOUT_HERO_POLAR_MOBILE;
+      _camSpherical.theta = angle + ABOUT_HERO_YAW_MOBILE;
+      _camOffset.setFromSpherical(_camSpherical);
+      return {
+        cam: lookAt.clone().add(_camOffset),
+        target: lookAt
+      };
+    }
+
+    const cam = new THREE.Vector3(
       homeOrbitConfig.center.x + Math.sin(angle) * homeOrbitConfig.radius,
       homeOrbitConfig.orbitY,
       homeOrbitConfig.center.z + Math.cos(angle) * homeOrbitConfig.radius
     );
-    const distance = _refCam.distanceTo(_refTarget);
-    _camSpherical.radius = distance;
-    _camSpherical.phi = mobileHero ? ABOUT_HERO_POLAR_MOBILE : ABOUT_HERO_POLAR;
-    _camSpherical.theta = angle + (mobileHero ? ABOUT_HERO_YAW_MOBILE : 0);
-    _camOffset.setFromSpherical(_camSpherical);
-    return {
-      cam: lookAt.clone().add(_camOffset),
-      target: lookAt
-    };
+    const target = _heroLookAt
+      .clone()
+      .copy(homeOrbitConfig.center)
+      .add(new THREE.Vector3(0, HOME_LOOK_AT_Y_OFFSET, 0));
+    return { cam, target };
   }
 
   /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot */
@@ -785,7 +803,7 @@
     let toTarget;
     const panCam = new THREE.Vector3();
     const panTarget = new THREE.Vector3();
-    let toZoom = ABOUT_HERO_ZOOM;
+    let toZoom = isAboutMobileHeroView() ? ABOUT_HERO_ZOOM_MOBILE : HOME_HERO_ZOOM;
     const toFocus = hotspot != null;
     const betweenFocuses = toFocus && hasStoredFocusPan();
 

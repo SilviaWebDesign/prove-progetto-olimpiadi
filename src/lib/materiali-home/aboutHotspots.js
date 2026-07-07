@@ -15,22 +15,29 @@ import * as THREE from 'three';
  */
 
 /** Distanza minima tra marker consecutivi sul percorso (unità mondo). */
-export const MIN_HOTSPOT_SPACING = 7;
+export const MIN_HOTSPOT_SPACING = 4.5;
 
-/** Posizioni desktop: distribuite attorno al perimetro della montagna. */
+/**
+ * Posizioni desktop — 2 sfere a sinistra, 2 a destra (faccia visibile).
+ *   alto sx ······ alto dx
+ *   basso sx ···· basso dx
+ */
+/**
+ * Posizioni desktop — 2 sx, 2 dx; su ogni lato una avanti e una indietro.
+ */
 const DESKTOP_HOTSPOT_PLACEMENTS = [
-  { azimuth: 0.06, elevation: 0.18 },
-  { azimuth: 0.3, elevation: 0.34 },
-  { azimuth: 0.54, elevation: 0.48 },
-  { azimuth: 0.78, elevation: 0.56 }
+  { azimuth: 0.18, elevation: 0.18 }, // start — Il progetto, anteriore destra
+  { azimuth: 0.6, elevation: 0.66 }, // west-ridge — Ricerca quantitativa
+  { azimuth: 0.02, elevation: 0.68 }, // peak — Ricerca qualitativa
+  { azimuth: 0.42, elevation: 0.1 } // lower-slope — Chi siamo, anteriore sinistra
 ];
 
-/** Posizioni mobile: stesso giro attorno alla montagna, quote più alte. */
+/** Posizioni mobile: stessa distribuzione, quote leggermente più alte. */
 const MOBILE_HOTSPOT_PLACEMENTS = [
-  { azimuth: 0.08, elevation: 0.26 },
-  { azimuth: 0.32, elevation: 0.38 },
-  { azimuth: 0.56, elevation: 0.48 },
-  { azimuth: 0.78, elevation: 0.56 }
+  { azimuth: 0.18, elevation: 0.24 },
+  { azimuth: 0.6, elevation: 0.7 },
+  { azimuth: 0.02, elevation: 0.72 },
+  { azimuth: 0.42, elevation: 0.16 }
 ];
 /** Breakpoint allineato al layout about mobile (pannello in basso). */
 export const ABOUT_MOBILE_BREAKPOINT = 768;
@@ -73,7 +80,7 @@ export function getMobileHotspotPlacement(hotspot) {
 export const ABOUT_HOTSPOT_PATH = [
   {
     id: 'start',
-    azimuth: 0.06,
+    azimuth: 0.18,
     elevation: 0.18,
     label: 'Partenza',
     title: 'Il progetto',
@@ -87,29 +94,9 @@ L’intento non è quello di chiudere il dibattito sugli “eroi” e i “catti
     modelSrc: '/oggetti/snowboardlady.glb'
   },
   {
-    id: 'lower-slope',
-    azimuth: 0.3,
-    elevation: 0.34,
-    label: 'Divergenza',
-    title: 'Chi siamo – Divergenza',
-    template: 'sport',
-    body: `“Divergenza” è un gruppo di sei studenti del Politecnico di Milano, al secondo anno del Corso di Laurea in Design della Comunicazione.
-
-Crediamo nella duplice essenza del Design: sia emotivo che funzionale. Per noi i progetti di comunicazione visiva, analogici o digitali che siano, hanno il compito di provocare nel fruitore una riflessione, sia interiore che rispetto al mondo che lo circonda.
-
-Silvia La Mastra: implementazione e coding;
-Chiara Moretti: implementazione e coding;
-Letizia Neri: design system, prototipazione, copywriting;
-Giovanni Palladino: supporto a identità visiva;
-Siyu Yang: supporto a prototipazione;
-Jieni Ye: modellazione 3D.`,
-    sources: 'fonte placeholder',
-    modelSrc: '/oggetti/scii.glb'
-  },
-  {
     id: 'west-ridge',
-    azimuth: 0.54,
-    elevation: 0.48,
+    azimuth: 0.6,
+    elevation: 0.66,
     label: 'Ricerca quantitativa',
     title: 'Ricerca quantitativa',
     template: 'sport',
@@ -125,8 +112,8 @@ Dal sondaggio sono emersi diversi “eroi” e “cattivi”, individuati tra mo
   },
   {
     id: 'peak',
-    azimuth: 0.78,
-    elevation: 0.56,
+    azimuth: 0.02,
+    elevation: 0.68,
     label: 'Ricerca qualitativa',
     title: 'Ricerca qualitativa',
     template: 'sport',
@@ -139,6 +126,26 @@ In particolare Chiara, attivista e scrittrice laureata in Economia e Scienze Pol
 Attraverso le loro risposte abbiamo individuato pensieri e opinioni per ogni evento presentato nel sito in modo tale che l’utente possa confrontare e scegliere tra le diverse posizioni presentate.`,
     sources: 'fonte placeholder',
     modelSrc: '/oggetti/ice_hockey_player.glb'
+  },
+  {
+    id: 'lower-slope',
+    azimuth: 0.42,
+    elevation: 0.1,
+    label: 'Divergenza',
+    title: 'Chi siamo – Divergenza',
+    template: 'sport',
+    body: `“Divergenza” è un gruppo di sei studenti del Politecnico di Milano, al secondo anno del Corso di Laurea in Design della Comunicazione.
+
+Crediamo nella duplice essenza del Design: sia emotivo che funzionale. Per noi i progetti di comunicazione visiva, analogici o digitali che siano, hanno il compito di provocare nel fruitore una riflessione, sia interiore che rispetto al mondo che lo circonda.
+
+Silvia La Mastra: implementazione e coding;
+Chiara Moretti: implementazione e coding;
+Letizia Neri: design system, prototipazione, copywriting;
+Giovanni Palladino: supporto a identità visiva;
+Siyu Yang: supporto a prototipazione;
+Jieni Ye: modellazione 3D.`,
+    sources: 'fonte placeholder',
+    modelSrc: '/oggetti/scii.glb'
   }
 ];
 
@@ -181,6 +188,35 @@ export const HOTSPOT_MARKER_LIFT = 0.12;
 
 /** Margine minimo tra camera e superficie della montagna. */
 export const CAMERA_SURFACE_MARGIN = 1.2;
+
+const _smoothFromRel = new THREE.Vector3();
+const _smoothToRel = new THREE.Vector3();
+const _smoothDir = new THREE.Vector3();
+const _transitionCam = new THREE.Vector3();
+const _transitionTarget = new THREE.Vector3();
+const _unfocusFromOffset = new THREE.Vector3();
+const _unfocusToOffset = new THREE.Vector3();
+const _unfocusDir = new THREE.Vector3();
+const _unfocusRel = new THREE.Vector3();
+const _unfocusSph = new THREE.Spherical();
+const _slerpOut = new THREE.Vector3();
+
+/**
+ * @param {THREE.Vector3} out
+ * @param {THREE.Vector3} a
+ * @param {THREE.Vector3} b
+ * @param {number} t
+ */
+function slerpUnitVectorsInto(out, a, b, t) {
+  const dot = THREE.MathUtils.clamp(a.dot(b), -1, 1);
+  const omega = Math.acos(dot);
+  if (omega < 1e-5) {
+    return out.copy(a);
+  }
+  const s0 = Math.sin((1 - t) * omega) / Math.sin(omega);
+  const s1 = Math.sin(t * omega) / Math.sin(omega);
+  return out.set(0, 0, 0).addScaledVector(a, s0).addScaledVector(b, s1);
+}
 
 /**
  * Angolo orizzontale in radianti attorno alla montagna (senso orario, vista dall'alto).
@@ -285,15 +321,20 @@ export function hotspotSnowPosition(worldBox, mountainModel, hotspot, raycaster)
   ];
 
   for (const shellRadius of shellRadii) {
-    const x = center.x + horizontal.x * shellRadius;
-    const z = center.z + horizontal.z * shellRadius;
+    const inset = /** @type {number} */ (hotspot.shellInset ?? 0);
+    const radius = shellRadius * (1 - inset);
+    const x = center.x + horizontal.x * radius;
+    const z = center.z + horizontal.z * radius;
     raycaster.set(new THREE.Vector3(x, castFromY, z), new THREE.Vector3(0, -1, 0));
     const hits = raycaster.intersectObject(mountainModel, true);
 
+    /** @type {THREE.Intersection | null} */
+    let bestHit = null;
     for (const hit of hits) {
       if (!isSnowSurfaceHit(hit, snowY)) continue;
-      return positionOnSnowSurface(hit);
+      if (!bestHit || hit.point.y > bestHit.point.y) bestHit = hit;
     }
+    if (bestHit) return positionOnSnowSurface(bestHit);
   }
 
   return hotspotSurfacePosition(worldBox, mountainModel, hotspot, raycaster);
@@ -573,14 +614,7 @@ export function computeFocusCameraPosition(markerPos, focusPoint, mountainCenter
  * @param {number} t
  */
 export function slerpUnitVectors(a, b, t) {
-  const dot = THREE.MathUtils.clamp(a.dot(b), -1, 1);
-  const omega = Math.acos(dot);
-  if (omega < 1e-5) {
-    return a.clone();
-  }
-  const s0 = Math.sin((1 - t) * omega) / Math.sin(omega);
-  const s1 = Math.sin(t * omega) / Math.sin(omega);
-  return new THREE.Vector3().addScaledVector(a, s0).addScaledVector(b, s1);
+  return slerpUnitVectorsInto(_slerpOut, a, b, t).clone();
 }
 
 /**
@@ -644,29 +678,23 @@ export function sampleOrbitFocusTransition(
  * @returns {{ cam: THREE.Vector3, target: THREE.Vector3 }}
  */
 export function sampleSmoothCameraTransition(fromCam, toCam, fromTarget, toTarget, t) {
-  const target = new THREE.Vector3().lerpVectors(fromTarget, toTarget, t);
+  _transitionTarget.lerpVectors(fromTarget, toTarget, t);
 
-  const fromRel = new THREE.Vector3().subVectors(fromCam, fromTarget);
-  const toRel = new THREE.Vector3().subVectors(toCam, toTarget);
-  const fromDist = fromRel.length();
-  const toDist = toRel.length();
+  _smoothFromRel.subVectors(fromCam, fromTarget);
+  _smoothToRel.subVectors(toCam, toTarget);
+  const fromDist = _smoothFromRel.length();
+  const toDist = _smoothToRel.length();
 
   if (fromDist < 1e-5 || toDist < 1e-5) {
-    return {
-      cam: new THREE.Vector3().lerpVectors(fromCam, toCam, t),
-      target
-    };
+    _transitionCam.lerpVectors(fromCam, toCam, t);
+    return { cam: _transitionCam, target: _transitionTarget };
   }
 
-  const fromDir = fromRel.normalize();
-  const toDir = toRel.normalize();
-  const dir = slerpUnitVectors(fromDir, toDir, t);
+  slerpUnitVectorsInto(_smoothDir, _smoothFromRel.multiplyScalar(1 / fromDist), _smoothToRel.multiplyScalar(1 / toDist), t);
   const dist = THREE.MathUtils.lerp(fromDist, toDist, t);
 
-  return {
-    cam: target.clone().addScaledVector(dir, dist),
-    target
-  };
+  _transitionCam.copy(_transitionTarget).addScaledVector(_smoothDir, dist);
+  return { cam: _transitionCam, target: _transitionTarget };
 }
 
 /**
@@ -694,30 +722,33 @@ export function sampleUnfocusTransition(
   const minPhi = options.minPhi ?? 0.2;
   const maxPhi = options.maxPhi ?? Math.PI / 2 - 0.1;
 
-  const fromOffset = new THREE.Vector3().subVectors(fromCam, mountainCenter);
-  const toOffset = new THREE.Vector3().subVectors(toCam, mountainCenter);
-  const fromR = Math.max(fromOffset.length(), 1e-4);
-  const toR = Math.max(toOffset.length(), 1e-4);
+  _unfocusFromOffset.subVectors(fromCam, mountainCenter);
+  _unfocusToOffset.subVectors(toCam, mountainCenter);
+  const fromR = Math.max(_unfocusFromOffset.length(), 1e-4);
+  const toR = Math.max(_unfocusToOffset.length(), 1e-4);
 
-  const fromDir = fromOffset.normalize();
-  const toDir = toOffset.normalize();
-  const dir = slerpUnitVectors(fromDir, toDir, t);
+  slerpUnitVectorsInto(
+    _unfocusDir,
+    _unfocusFromOffset.multiplyScalar(1 / fromR),
+    _unfocusToOffset.multiplyScalar(1 / toR),
+    t
+  );
   const radius = THREE.MathUtils.lerp(fromR, toR, t);
 
-  const cam = mountainCenter.clone().addScaledVector(dir, radius);
+  _transitionCam.copy(mountainCenter).addScaledVector(_unfocusDir, radius);
 
-  const rel = new THREE.Vector3().subVectors(cam, mountainCenter);
-  const sph = new THREE.Spherical().setFromVector3(rel);
-  const clampedPhi = THREE.MathUtils.clamp(sph.phi, minPhi, maxPhi);
-  if (clampedPhi !== sph.phi) {
-    sph.phi = clampedPhi;
-    rel.setFromSpherical(sph);
-    cam.copy(mountainCenter).add(rel);
+  _unfocusRel.subVectors(_transitionCam, mountainCenter);
+  _unfocusSph.setFromVector3(_unfocusRel);
+  const clampedPhi = THREE.MathUtils.clamp(_unfocusSph.phi, minPhi, maxPhi);
+  if (clampedPhi !== _unfocusSph.phi) {
+    _unfocusSph.phi = clampedPhi;
+    _unfocusRel.setFromSpherical(_unfocusSph);
+    _transitionCam.copy(mountainCenter).add(_unfocusRel);
   }
 
-  const target = new THREE.Vector3().lerpVectors(fromTarget, toTarget, t);
+  _transitionTarget.lerpVectors(fromTarget, toTarget, t);
 
-  return { cam, target };
+  return { cam: _transitionCam, target: _transitionTarget };
 }
 
 /**

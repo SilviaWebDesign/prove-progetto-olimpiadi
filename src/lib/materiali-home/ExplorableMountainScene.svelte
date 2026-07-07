@@ -34,8 +34,7 @@
     sampleUnfocusTransition,
     getHotspotPlacement,
     isAboutMobileLayout,
-    isAboutPanelMobileLayout,
-    MIN_HOTSPOT_SPACING
+    isAboutPanelMobileLayout
   } from './aboutHotspots.js';
   import {
     createMarkerParticleSphere,
@@ -50,6 +49,8 @@
   /** Su mobile: quasi nessuno zoom aggiuntivo al focus. */
   const FOCUS_CAMERA_ZOOM_MOBILE = 0.99;
   const FOCUS_TRANSITION_MS = 1800;
+  /** Transizione tra sfere già in focus: più breve e reattiva. */
+  const FOCUS_HOP_TRANSITION_MS = 1700;
   const HERO_TRANSITION_MS = 1400;
   /** Vista iniziale about: lato opposto rispetto alla home. */
   const ABOUT_HERO_ANGLE_OFFSET = Math.PI;
@@ -82,6 +83,12 @@
   function smoothstep(t) {
     const x = THREE.MathUtils.clamp(t, 0, 1);
     return x * x * (3 - 2 * x);
+  }
+
+  /** Easing più rapido per i passaggi tra sfere. */
+  function easeOutCubic(t) {
+    const x = THREE.MathUtils.clamp(t, 0, 1);
+    return 1 - (1 - x) ** 3;
   }
 
   const _tmpTarget = new THREE.Vector3();
@@ -343,6 +350,7 @@
     updateMountainBlur();
 
     const useBlur =
+      !transitionActive &&
       mountainBlurCurrent > 0.05 &&
       mountainBlurRT &&
       mountainBlurScene &&
@@ -454,7 +462,7 @@
   function applyCameraTransitionPose(t) {
     if (!cameraTransition || !camera || !controls) return;
 
-    const eased = smoothstep(t);
+    const eased = cameraTransition.betweenFocuses ? easeOutCubic(t) : smoothstep(t);
     const {
       fromCam,
       fromTarget,
@@ -467,8 +475,9 @@
     } = cameraTransition;
 
     const unfocusing = !cameraTransition.toFocus;
+    const betweenFocuses = cameraTransition.betweenFocuses === true;
     const { cam, target } =
-      unfocusing && homeOrbitConfig
+      homeOrbitConfig && (unfocusing || betweenFocuses)
         ? sampleUnfocusTransition(
             fromCam,
             toCam,
@@ -674,6 +683,10 @@
     return entry ? getMarkerFocusPoint(entry.object) : null;
   }
 
+  function hasStoredFocusPan() {
+    return storedFocusPan.cam.lengthSq() > 1e-6 || storedFocusPan.target.lengthSq() > 1e-6;
+  }
+
   function startCameraTransition(hotspot) {
     if (!camera || !controls || !homeOrbitConfig) return;
 
@@ -689,11 +702,17 @@
     const panTarget = new THREE.Vector3();
     let toZoom = ABOUT_HERO_ZOOM;
     const toFocus = hotspot != null;
+    const betweenFocuses = toFocus && hasStoredFocusPan();
 
     if (hotspot) {
       const markerPos = getHotspotMarkerPosition(hotspot);
       const focusPoint = getHotspotFocusPoint(hotspot);
       if (!markerPos || !focusPoint) return;
+
+      if (betweenFocuses) {
+        fromCam.sub(storedFocusPan.cam);
+        fromTarget.sub(storedFocusPan.target);
+      }
 
       const mobileFocus = isAboutPanelMobileLayout();
       toTarget = focusPoint.clone();
@@ -765,8 +784,13 @@
       panTarget,
       toZoom,
       startTime: performance.now(),
-      duration: toFocus ? FOCUS_TRANSITION_MS : HERO_TRANSITION_MS,
-      toFocus
+      duration: toFocus
+        ? betweenFocuses
+          ? FOCUS_HOP_TRANSITION_MS
+          : FOCUS_TRANSITION_MS
+        : HERO_TRANSITION_MS,
+      toFocus,
+      betweenFocuses
     };
   }
 
@@ -843,11 +867,6 @@
       );
       positions.push(worldPos);
     });
-
-    enforceHotspotSeparation(
-      positions,
-      useMobileLayout ? MIN_HOTSPOT_SPACING * 0.85 : MIN_HOTSPOT_SPACING
-    );
 
     for (let i = 0; i < positions.length; i++) {
       positions[i] = snapPositionToSnowSurface(
@@ -987,6 +1006,14 @@
     const nextMobileLayout = isAboutMobileLayout();
     if (nextMobileLayout !== mobileLayout && snowMountainModel) {
       mobileLayout = nextMobileLayout;
+      if (heroPoseStored && !selectedHotspot && controls) {
+        camera.position.copy(_storedHeroCam);
+        controls.target.copy(_storedHeroTarget);
+        camera.zoom = ABOUT_HERO_ZOOM;
+        camera.updateProjectionMatrix();
+        camera.lookAt(_storedHeroTarget);
+        syncControlsToCameraPose();
+      }
       buildMarkers(_worldBox);
     } else {
       mobileLayout = nextMobileLayout;
@@ -1209,14 +1236,15 @@
         cameraFloorY = snowField.y - 0.2;
         mobileLayout = isAboutMobileLayout();
 
+        applyAboutHeroCamera(camera, homeOrbitConfig, _heroLookAt);
+        controls.target.copy(_heroLookAt);
+
         try {
           await buildMarkers(_worldBox);
         } catch (markerErr) {
           console.error('[ExplorableMountainScene] creazione marker fallita:', markerErr);
         }
 
-        applyAboutHeroCamera(camera, homeOrbitConfig, _heroLookAt);
-        controls.target.copy(_heroLookAt);
         applyMountainOrbitLimits();
         setupOrbitPolarLimits();
         syncControlsToCameraPose();

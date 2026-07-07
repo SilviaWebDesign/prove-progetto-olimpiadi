@@ -6,5 +6,5 @@
   const config = getScrollytellConfig('sustainability');
 </script>
 
-<Navbar alwaysVisible />
+<Navbar alwaysVisible hideTitle />
 <SectionScrollytell {config} />

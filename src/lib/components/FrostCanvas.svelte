@@ -23,9 +23,11 @@
 	// ─── Config — identico al prototipo frost-reveal ─────────────────────────
 	const FROST_OPACITY = 1.0;
 	const FROST_VEIL_OPACITY = 0.42;
+	const FROST_VEIL_OPACITY_MOBILE = 0.58;
 	const GRAIN_OPACITY = 0.3;
 	const SCRATCH_OPACITY = 0.16;
 	const BLUR_AMOUNT = 23;
+	const BLUR_AMOUNT_MOBILE = 30;
 	const INITIAL_SNOWFLAKE_DENSITY = 40;
 	const INITIAL_SPECKLE_DENSITY = 600;
 	const INITIAL_CRYSTAL_OPACITY = 0.55;
@@ -83,15 +85,27 @@
 	const MOBILE_BREAKPOINT = '(max-width: 768px)';
 
 	function frostBlurAmount() {
-		return mobileFrost ? 34 : BLUR_AMOUNT;
+		return mobileFrost ? BLUR_AMOUNT_MOBILE : BLUR_AMOUNT;
 	}
 
 	function frostVeilOpacity() {
-		return mobileFrost ? 0.34 : FROST_VEIL_OPACITY;
+		return mobileFrost ? FROST_VEIL_OPACITY_MOBILE : FROST_VEIL_OPACITY;
 	}
 
 	function finalVeilOpacity() {
-		return mobileFrost ? 0.16 : 0.22;
+		return 0.22;
+	}
+
+	function shouldUseManualBlur() {
+		// Mobile Safari often exposes ctx.filter but doesn't paint blur — use box blur.
+		return mobileFrost || !canvasFilterSupported();
+	}
+
+	function frostTone() {
+		return {
+			brightness: 1.15,
+			contrast: 1.08
+		};
 	}
 
 	function resetCanvasSize(
@@ -161,7 +175,10 @@
 		window.visualViewport?.addEventListener('resize', syncCanvasSize);
 
 		const img = new Image();
-		img.crossOrigin = 'anonymous';
+		// crossOrigin on same-origin static assets breaks getImageData on some Safari builds.
+		if (src.startsWith('http') && !src.startsWith(window.location.origin)) {
+			img.crossOrigin = 'anonymous';
+		}
 		img.onload = () => {
 			imgEl = img;
 			drawFrost();
@@ -225,44 +242,190 @@
 	function drawBlurredImage(w: number, h: number) {
 		const blur = frostBlurAmount();
 		const bleed = blur * 2;
+		const { brightness, contrast } = frostTone();
+		const pw = w + bleed * 2;
+		const ph = h + bleed * 2;
+
+		if (!shouldUseManualBlur()) {
+			const dpr = window.devicePixelRatio || 1;
+			const padded = document.createElement('canvas');
+			padded.width = Math.round(pw * dpr);
+			padded.height = Math.round(ph * dpr);
+			const paddedCtx = padded.getContext('2d')!;
+			paddedCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			paddedCtx.translate(bleed, bleed);
+
+			const mainCtx = ctx;
+			ctx = paddedCtx;
+			drawImageCover(imgEl!, w, h, 0);
+			ctx = mainCtx;
+
+			ctx!.save();
+			ctx!.filter = `blur(${blur}px) brightness(${brightness}) saturate(0) contrast(${contrast})`;
+			ctx!.drawImage(padded, -bleed, -bleed, pw, ph);
+			ctx!.filter = 'none';
+			ctx!.restore();
+			return;
+		}
+
+		// Safari: ctx.filter blur is exposed but often not painted — manual box blur.
+		const work = document.createElement('canvas');
+		work.width = Math.round(pw);
+		work.height = Math.round(ph);
+		const wctx = work.getContext('2d')!;
+		coverRect(wctx, imgEl!, 0, 0, pw, ph, focusX, focusY);
+		coverRect(wctx, imgEl!, bleed, bleed, w, h, focusX, focusY);
+
+		blurCanvasInPlace(work, blur);
+		applyBrightnessContrast(work, brightness, contrast);
+
 		ctx!.save();
-		ctx!.filter = mobileFrost
-			? `blur(${blur}px) brightness(1.18) saturate(0) contrast(0.96)`
-			: `blur(${blur}px) brightness(1.15) saturate(0) contrast(1.08)`;
-		drawImageCover(imgEl!, w, h, bleed);
-		ctx!.filter = 'none';
+		ctx!.imageSmoothingEnabled = true;
+		ctx!.imageSmoothingQuality = 'high';
+		ctx!.drawImage(work, -bleed, -bleed, pw, ph);
 		ctx!.restore();
+	}
+
+	// Whether CanvasRenderingContext2D.filter actually RENDERS a blur. Safari exposes
+	// the property but often doesn't paint it — test pixels, don't trust the API.
+	let _canvasFilterOk: boolean | null = null;
+	function canvasFilterSupported(): boolean {
+		if (_canvasFilterOk !== null) return _canvasFilterOk;
+		try {
+			const a = document.createElement('canvas');
+			a.width = 20;
+			a.height = 1;
+			const actx = a.getContext('2d')!;
+			actx.fillStyle = '#000';
+			actx.fillRect(0, 0, 10, 1);
+			actx.fillStyle = '#fff';
+			actx.fillRect(10, 0, 10, 1);
+
+			const b = document.createElement('canvas');
+			b.width = 20;
+			b.height = 1;
+			const bctx = b.getContext('2d')!;
+			bctx.filter = 'blur(3px)';
+			bctx.drawImage(a, 0, 0);
+			bctx.filter = 'none';
+
+			const v = bctx.getImageData(9, 0, 1, 1).data[0];
+			_canvasFilterOk = v > 10;
+		} catch {
+			_canvasFilterOk = false;
+		}
+		return _canvasFilterOk;
+	}
+
+	function coverRect(
+		c: CanvasRenderingContext2D,
+		img: HTMLImageElement,
+		tx: number,
+		ty: number,
+		tw: number,
+		th: number,
+		fx = 0.5,
+		fy = 0.5
+	) {
+		const iw = img.naturalWidth;
+		const ih = img.naturalHeight;
+		if (!iw || !ih) return;
+		const s = Math.max(tw / iw, th / ih);
+		const dw = iw * s;
+		const dh = ih * s;
+		c.drawImage(img, tx + (tw - dw) * fx, ty + (th - dh) * fy, dw, dh);
+	}
+
+	const SAFARI_BLUR_PASSES = 3;
+
+	function blurCanvasInPlace(cv: HTMLCanvasElement, radius: number) {
+		const cx = cv.getContext('2d')!;
+		const w = cv.width;
+		const h = cv.height;
+		if (w < 3 || h < 3) return;
+		let img: ImageData;
+		try {
+			img = cx.getImageData(0, 0, w, h);
+		} catch {
+			return;
+		}
+		const a = img.data;
+		const b = new Uint8ClampedArray(a.length);
+		const r = Math.max(1, Math.round(radius));
+		for (let p = 0; p < SAFARI_BLUR_PASSES; p++) {
+			boxBlurH(a, b, w, h, r);
+			boxBlurV(b, a, w, h, r);
+		}
+		cx.putImageData(img, 0, 0);
+	}
+
+	function boxBlurH(src: Uint8ClampedArray, dst: Uint8ClampedArray, w: number, h: number, r: number) {
+		const n = r + r + 1;
+		for (let y = 0; y < h; y++) {
+			const row = y * w * 4;
+			for (let c = 0; c < 4; c++) {
+				let sum = 0;
+				for (let i = -r; i <= r; i++) {
+					const x = i < 0 ? 0 : i >= w ? w - 1 : i;
+					sum += src[row + x * 4 + c];
+				}
+				for (let x = 0; x < w; x++) {
+					dst[row + x * 4 + c] = sum / n;
+					const xa = x + r + 1 >= w ? w - 1 : x + r + 1;
+					const xs = x - r < 0 ? 0 : x - r;
+					sum += src[row + xa * 4 + c] - src[row + xs * 4 + c];
+				}
+			}
+		}
+	}
+
+	function boxBlurV(src: Uint8ClampedArray, dst: Uint8ClampedArray, w: number, h: number, r: number) {
+		const n = r + r + 1;
+		for (let x = 0; x < w; x++) {
+			const col = x * 4;
+			for (let c = 0; c < 4; c++) {
+				let sum = 0;
+				for (let i = -r; i <= r; i++) {
+					const y = i < 0 ? 0 : i >= h ? h - 1 : i;
+					sum += src[y * w * 4 + col + c];
+				}
+				for (let y = 0; y < h; y++) {
+					dst[y * w * 4 + col + c] = sum / n;
+					const ya = y + r + 1 >= h ? h - 1 : y + r + 1;
+					const ys = y - r < 0 ? 0 : y - r;
+					sum += src[ya * w * 4 + col + c] - src[ys * w * 4 + col + c];
+				}
+			}
+		}
+	}
+
+	function applyBrightnessContrast(cv: HTMLCanvasElement, brightness: number, contrast: number) {
+		const cx = cv.getContext('2d')!;
+		let img: ImageData;
+		try {
+			img = cx.getImageData(0, 0, cv.width, cv.height);
+		} catch {
+			return;
+		}
+		const d = img.data;
+		for (let i = 0; i < d.length; i += 4) {
+			for (let k = 0; k < 3; k++) {
+				let v = d[i + k] * brightness;
+				v = (v - 128) * contrast + 128;
+				d[i + k] = v < 0 ? 0 : v > 255 ? 255 : v;
+			}
+		}
+		cx.putImageData(img, 0, 0);
 	}
 
 	function drawFrostColor(w: number, h: number) {
 		ctx!.save();
 		ctx!.globalAlpha = FROST_OPACITY;
 		const patches: [number, number, number, string, number, number][] = [
-			[
-				0.12,
-				0.18,
-				0.7,
-				mobileFrost ? '238,242,244' : '218,238,255',
-				mobileFrost ? 0.56 : 0.78,
-				mobileFrost ? 0.32 : 0.48
-			],
-			[
-				0.88,
-				0.82,
-				0.6,
-				mobileFrost ? '232,236,238' : '205,230,255',
-				mobileFrost ? 0.5 : 0.72,
-				mobileFrost ? 0.28 : 0.42
-			],
-			[
-				0.65,
-				0.44,
-				0.42,
-				mobileFrost ? '246,248,249' : '230,245,255',
-				mobileFrost ? 0.44 : 0.58,
-				0.0
-			],
-			[0.5, 0.88, 0.6, mobileFrost ? '230,233,236' : '200,225,252', mobileFrost ? 0.36 : 0.48, 0.0]
+			[0.12, 0.18, 0.7, '218,238,255', 0.78, 0.48],
+			[0.88, 0.82, 0.6, '205,230,255', 0.72, 0.42],
+			[0.65, 0.44, 0.42, '230,245,255', 0.58, 0.0],
+			[0.5, 0.88, 0.6, '200,225,252', 0.48, 0.0]
 		];
 		for (const [cx, cy, r, rgb, a0, a1] of patches) {
 			const g = ctx!.createRadialGradient(w * cx, h * cy, 0, w * cx, h * cy, w * r);
@@ -273,7 +436,7 @@
 			ctx!.fillRect(0, 0, w, h);
 		}
 		ctx!.globalAlpha = frostVeilOpacity();
-		ctx!.fillStyle = mobileFrost ? 'rgba(238, 240, 241, 1)' : 'rgba(215,235,255,1)';
+		ctx!.fillStyle = 'rgba(215,235,255,1)';
 		ctx!.fillRect(0, 0, w, h);
 		ctx!.restore();
 	}
@@ -695,7 +858,6 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		object-position: center;
 		pointer-events: none;
 		user-select: none;
 		filter: grayscale(1);
@@ -708,12 +870,18 @@
 		width: 100%;
 		height: 100%;
 		cursor: crosshair;
-		touch-action: pan-y;
+		touch-action: none;
 		filter: saturate(0);
 	}
 
 	.frost-wrap.no-melt canvas {
 		pointer-events: none;
 		cursor: default;
+	}
+
+	@media (max-width: 768px) {
+		.frost-wrap.no-melt canvas {
+			touch-action: auto;
+		}
 	}
 </style>

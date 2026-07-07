@@ -4,8 +4,8 @@
   import { homeScrollProgress } from './homeScrollProgress.js';
   import { HOME_CARDS_START } from './scrollStages.js';
 
-  /** @type {{ alwaysVisible?: boolean, revealAtCards?: boolean }} */
-  let { alwaysVisible = false, revealAtCards = false } = $props();
+  /** @type {{ alwaysVisible?: boolean, revealAtCards?: boolean, hideTitle?: boolean }} */
+  let { alwaysVisible = false, revealAtCards = false, hideTitle = false } = $props();
 
   let menuOpen = $state(false);
   let scrolled = $state(false);
@@ -107,10 +107,13 @@
   class:always-visible={alwaysVisible}
   class:reveal-at-cards={revealAtCards}
   class:menu-open={menuOpen}
+  class:hide-title={hideTitle}
 >
   <div class="navbar-inner" style="--navbar-icon-size: {iconSize}px">
     <div class="navbar-row">
-      <a bind:this={titleEl} href="/prototypes/home#sezioni" class="navbar-title">Quante facce ha una medaglia?</a>
+      {#if !hideTitle}
+        <a bind:this={titleEl} href="/prototypes/home#sezioni" class="navbar-title">Quante facce ha una medaglia?</a>
+      {/if}
       <button
         type="button"
         class="menu-button"
@@ -226,6 +229,10 @@
     justify-content: space-between;
     gap: 12px;
     width: 100%;
+  }
+
+  .navbar.hide-title .navbar-row {
+    justify-content: flex-end;
   }
 
   .navbar-title {

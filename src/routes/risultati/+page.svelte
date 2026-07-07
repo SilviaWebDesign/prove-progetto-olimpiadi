@@ -77,7 +77,7 @@
           <ModelViewer src={modelPaths[1]} fitFactor={0.86} />
         </div>
         <div class="models-scene__item models-scene__item--infrastructure">
-          <ModelViewer src={modelPaths[2]} fitFactor={0.82} />
+          <ModelViewer src={modelPaths[2]} fitFactor={0.92} />
         </div>
       </div>
     </div>
@@ -230,35 +230,26 @@
     position: relative;
     flex: 1;
     width: 100%;
-    min-height: 62vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(6px, 1.5vh, 14px);
+    min-height: 0;
     pointer-events: none;
   }
 
   .models-scene__item {
-    position: absolute;
+    position: relative;
+    width: min(54vw, 220px);
+    height: min(17vh, 125px);
+    flex-shrink: 0;
     pointer-events: auto;
   }
 
-  .models-scene__item--sustainability {
-    top: 2%;
-    left: 30%;
-    width: min(52vw, 225px);
-    height: min(28vh, 195px);
-    transform: translateX(-50%);
-  }
-
-  .models-scene__item--sport {
-    top: 34%;
-    right: 2%;
-    width: min(46vw, 205px);
-    height: min(24vh, 165px);
-  }
-
   .models-scene__item--infrastructure {
-    bottom: 4%;
-    left: 4%;
-    width: min(44vw, 195px);
-    height: min(22vh, 152px);
+    width: min(62vw, 255px);
+    height: min(20vh, 148px);
   }
 
   .models-row {
@@ -346,8 +337,14 @@
       margin-bottom: 16px;
     }
 
-    .models-scene {
-      min-height: 56vh;
+    .models-scene__item {
+      width: min(52vw, 210px);
+      height: min(16vh, 118px);
+    }
+
+    .models-scene__item--infrastructure {
+      width: min(58vw, 240px);
+      height: min(19vh, 140px);
     }
   }
 </style>

@@ -17,6 +17,7 @@
       .split(/\n\n+/)
       .map((p) => p.trim())
       .filter(Boolean)
+      .map((p) => p.split(/\n/).map((line) => line.trim()))
   );
 
   /** @type {HTMLElement | null} */
@@ -117,11 +118,17 @@
     syncSlider();
   }
 
+  async function resetPanelForHotspot() {
+    await tick();
+    if (scrollEl) scrollEl.scrollTop = 0;
+    await fitPanelContent();
+  }
+
   $effect(() => {
     hotspot.id;
     paragraphs.length;
     scrollAdvanceAccum = 0;
-    fitPanelContent();
+    resetPanelForHotspot();
   });
 
   $effect(() => {
@@ -257,8 +264,12 @@
         {#key hotspot.id}
           <h1 id="sport-detail-title" class="sport-title" bind:this={titleEl}>{title}</h1>
           <div class="sport-body">
-            {#each paragraphs as paragraph}
-              <p>{paragraph}</p>
+            {#each paragraphs as lines}
+              <p>
+                {#each lines as line, i}
+                  {#if i > 0}<br />{/if}{line}
+                {/each}
+              </p>
             {/each}
           </div>
         {/key}
@@ -317,16 +328,16 @@
   .grad-side {
     position: absolute;
     top: 0;
-    left: 20%;
+    left: 14%;
     right: 0;
     height: 100%;
     background: linear-gradient(
       to right,
       rgba(249, 249, 250, 0) 0%,
-      rgba(249, 249, 250, 0.22) 14%,
-      rgba(249, 249, 250, 0.52) 30%,
-      rgba(249, 249, 250, 0.82) 44%,
-      #f9f9fa 56%
+      rgba(249, 249, 250, 0.22) 10%,
+      rgba(249, 249, 250, 0.52) 24%,
+      rgba(249, 249, 250, 0.82) 38%,
+      #f9f9fa 50%
     );
   }
 

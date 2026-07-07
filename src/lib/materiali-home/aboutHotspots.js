@@ -97,7 +97,12 @@ L’intento non è quello di chiudere il dibattito sugli “eroi” e i “catti
 
 Crediamo nella duplice essenza del Design: sia emotivo che funzionale. Per noi i progetti di comunicazione visiva, analogici o digitali che siano, hanno il compito di provocare nel fruitore una riflessione, sia interiore che rispetto al mondo che lo circonda.
 
-Silvia La Mastra, implementazione e coding; Chiara Moretti, implementazione e coding; Letizia Neri, design system, prototipazione, copywriting; Giovanni Palladino, supporto a identità visiva; Siyu Yang, supporto a prototipazione; Jieni Ye, modellazione 3D.`,
+Silvia La Mastra: implementazione e coding;
+Chiara Moretti: implementazione e coding;
+Letizia Neri: design system, prototipazione, copywriting;
+Giovanni Palladino: supporto a identità visiva;
+Siyu Yang: supporto a prototipazione;
+Jieni Ye: modellazione 3D.`,
     sources: 'fonte placeholder',
     modelSrc: '/oggetti/scii.glb'
   },

@@ -474,7 +474,7 @@
 
   @media (max-width: 900px) {
     .mountain-hover-hint {
-      top: 170px;
+      top: 130px;
     }
 
     .mountain-hover-hint--mobile-explore .mountain-hover-hint__cta {

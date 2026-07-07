@@ -5,12 +5,7 @@
   import { visitedSections } from '$lib/stores/visitedSections';
   import { overlayVisible } from '$lib/stores/pageTransition';
 
-  const sectionLabels = ['Sostenibilità', 'Sport', 'Infrastrutture'] as const;
-
   let isMobile = $state(false);
-  let currentIndex = $state(0);
-
-  let touchStartX = 0;
 
   onMount(() => {
     isMobile = window.innerWidth < 768;
@@ -20,40 +15,21 @@
 
   async function tornareAllaHome() {
     overlayVisible.set(true);
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 400));
     visitedSections.reset();
     window.location.href = '/prototypes/home';
   }
 
   async function scopriDiPiu() {
     overlayVisible.set(true);
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 400));
     window.location.href = '/prototypes/about';
-  }
-
-  function prevSection() {
-    currentIndex = (currentIndex - 1 + 3) % 3;
-  }
-
-  function nextSection() {
-    currentIndex = (currentIndex + 1) % 3;
-  }
-
-  function onTouchStart(e: TouchEvent) {
-    touchStartX = e.touches[0].clientX;
-  }
-
-  function onTouchEnd(e: TouchEvent) {
-    const delta = touchStartX - e.changedTouches[0].clientX;
-    if (Math.abs(delta) < 40) return;
-    if (delta > 0) nextSection();
-    else prevSection();
   }
 
   const modelPaths = $derived([
     $visitedSections.sustainability.resultModelPath,
     $visitedSections.sport.resultModelPath,
-    $visitedSections.infrastructure.resultModelPath,
+    $visitedSections.infrastructure.resultModelPath
   ]);
 </script>
 
@@ -63,10 +39,9 @@
 
 <Navbar alwaysVisible />
 
-<div class="risultati">
+<div class="risultati" class:risultati--mobile={isMobile}>
   <div class="bg" aria-hidden="true"></div>
 
-  <!-- Desktop: 3 models side by side -->
   {#if !isMobile}
     <div class="models-row">
       <div class="model-wrap">
@@ -79,63 +54,34 @@
         <ModelViewer src={$visitedSections.infrastructure.resultModelPath} fitFactor={0.88} />
       </div>
     </div>
+
+    <p class="quote quote--desktop">
+      La realtà non è mai unica<br />
+      e uguale per tutti.<br />
+      Lo stesso evento può generare visioni differenti e soggettive, in base alle opinioni di ognuno
+    </p>
   {:else}
-    <!-- Mobile: one model at a time with swipe carousel -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="carousel"
-      ontouchstart={onTouchStart}
-      ontouchend={onTouchEnd}
-    >
-      <!-- Quote above model on mobile (3 lines) -->
-      <p class="carousel__quote">
-        La realtà non è mai unica<br>
-        e uguale per tutti.<br>
-        Lo stesso evento può generare visioni<br>
-        differenti e soggettive.
+    <div class="mobile-layout">
+      <p class="quote quote--mobile">
+        La realtà non è mai unica<br />
+        e uguale per tutti.<br />
+        Lo stesso evento può generare<br />
+        visioni differenti e soggettive.
       </p>
 
-      {#key currentIndex}
-        <div class="carousel__model">
-          <ModelViewer src={modelPaths[currentIndex]} fitFactor={0.82} />
+      <div class="models-scene" aria-label="Risultati delle tre sezioni">
+        <div class="models-scene__item models-scene__item--sustainability">
+          <ModelViewer src={modelPaths[0]} fitFactor={0.9} />
         </div>
-      {/key}
-
-      <!-- Section name below model at 50px display font -->
-      <p class="carousel__label">{sectionLabels[currentIndex]}</p>
-
-      <!-- Dots indicator -->
-      <div class="carousel__dots" aria-hidden="true">
-        {#each sectionLabels as _, i}
-          <button
-            type="button"
-            class="carousel__dot"
-            class:active={i === currentIndex}
-            onclick={() => { currentIndex = i; }}
-            aria-label="Sezione {i + 1}"
-          ></button>
-        {/each}
+        <div class="models-scene__item models-scene__item--sport">
+          <ModelViewer src={modelPaths[1]} fitFactor={0.86} />
+        </div>
+        <div class="models-scene__item models-scene__item--infrastructure">
+          <ModelViewer src={modelPaths[2]} fitFactor={0.82} />
+        </div>
       </div>
-
-      <!-- Arrow buttons -->
-      <button type="button" class="carousel__arrow carousel__arrow--left" onclick={prevSection} aria-label="Precedente">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-      <button type="button" class="carousel__arrow carousel__arrow--right" onclick={nextSection} aria-label="Successivo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      </button>
     </div>
   {/if}
-
-  <p class="quote">
-    La realtà non è mai unica<br>
-    e uguale per tutti.<br>
-    Lo stesso evento può generare visioni differenti e soggettive, in base alle opinioni di ognuno
-  </p>
 
   <div class="bottom-nav">
     <div
@@ -143,12 +89,22 @@
       role="button"
       tabindex="0"
       onclick={tornareAllaHome}
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tornareAllaHome(); } }}
+      onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          tornareAllaHome();
+        }
+      }}
     >
       <span class="cta-label">Torna alla home</span>
-      <svg class="cta-chevron cta-chevron--up" viewBox="58 37 41 20" aria-hidden="true" fill="none">
-        <path d="M60 54L78.5 40L95 54" stroke="#161A1F" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round"/>
+      <svg class="cta-chevron cta-chevron--down" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+        <path
+          d="M60 40L78.5 54L95 40"
+          stroke="#161A1F"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </svg>
     </div>
 
@@ -157,12 +113,22 @@
       role="button"
       tabindex="0"
       onclick={scopriDiPiu}
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scopriDiPiu(); } }}
+      onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          scopriDiPiu();
+        }
+      }}
     >
       <span class="cta-label">Scopri di più</span>
       <svg class="cta-chevron cta-chevron--down" viewBox="58 37 41 20" aria-hidden="true" fill="none">
-        <path d="M60 40L78.5 54L95 40" stroke="#161A1F" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round"/>
+        <path
+          d="M60 40L78.5 54L95 40"
+          stroke="#161A1F"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </svg>
     </div>
   </div>
@@ -201,6 +167,12 @@
     background: #ffffff;
   }
 
+  .risultati--mobile {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
   .bg {
     position: absolute;
     inset: 0;
@@ -213,23 +185,82 @@
     z-index: 0;
   }
 
+  .risultati--mobile .bg {
+    opacity: 0.14;
+    filter: blur(18px);
+  }
+
   .quote {
+    font-family: 'Supreme Variable', sans-serif;
+    font-weight: 500;
+    text-align: center;
+    color: #161a1f;
+  }
+
+  .quote--desktop {
     position: fixed;
     left: 50%;
     bottom: 108px;
     transform: translateX(-50%);
     z-index: 1;
-    font-family: 'Supreme Variable', sans-serif;
-    font-weight: 500;
     font-size: 30px;
     line-height: 1.35;
-    text-align: center;
-    color: #161A1F;
     max-width: min(860px, 92vw);
     padding: 0 16px;
   }
 
-  /* ── Desktop: 3 models row ── */
+  .mobile-layout {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    padding: 88px 20px 108px;
+  }
+
+  .quote--mobile {
+    font-size: 18px;
+    line-height: 1.4;
+    max-width: 280px;
+    margin: 0 auto 20px;
+  }
+
+  .models-scene {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    min-height: 62vh;
+    pointer-events: none;
+  }
+
+  .models-scene__item {
+    position: absolute;
+    pointer-events: auto;
+  }
+
+  .models-scene__item--sustainability {
+    top: 2%;
+    left: 30%;
+    width: min(52vw, 225px);
+    height: min(28vh, 195px);
+    transform: translateX(-50%);
+  }
+
+  .models-scene__item--sport {
+    top: 34%;
+    right: 2%;
+    width: min(46vw, 205px);
+    height: min(24vh, 165px);
+  }
+
+  .models-scene__item--infrastructure {
+    bottom: 4%;
+    left: 4%;
+    width: min(44vw, 195px);
+    height: min(22vh, 152px);
+  }
+
   .models-row {
     position: fixed;
     left: 50%;
@@ -252,108 +283,17 @@
     pointer-events: auto;
   }
 
-  /* ── Mobile: carousel ── */
-  .carousel {
-    position: fixed;
-    inset: 0;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-  }
-
-  .carousel__model {
-    width: 100%;
-    height: min(50vh, 400px);
-    pointer-events: auto;
-  }
-
-  .carousel__label {
-    font-family: 'PP Formula Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 50px;
-    color: #161A1F;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    text-align: center;
-    line-height: 1;
-  }
-
-  .carousel__quote {
-    font-family: 'Supreme Variable', sans-serif;
-    font-weight: 500;
-    font-size: 18px;
-    line-height: 1.4;
-    text-align: center;
-    color: #161A1F;
-    padding: 0 24px;
-  }
-
-  .carousel__dots {
-    display: flex;
-    gap: 8px;
-    margin-top: 4px;
-  }
-
-  .carousel__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(22, 26, 31, 0.25);
-    cursor: pointer;
-    padding: 0;
-    transition: background 0.25s;
-  }
-
-  .carousel__dot.active {
-    background: #161A1F;
-  }
-
-  .carousel__arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 40px;
-    height: 40px;
-    border: none;
-    background: transparent;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: #161A1F;
-    z-index: 2;
-  }
-
-  .carousel__arrow svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .carousel__arrow--left {
-    left: 16px;
-  }
-
-  .carousel__arrow--right {
-    right: 16px;
-  }
-
   .bottom-nav {
     position: fixed;
-    left: 50%;
+    left: 0;
+    right: 0;
     bottom: 28px;
-    transform: translateX(-50%);
-    z-index: 1;
+    z-index: 2;
     display: flex;
     align-items: flex-end;
-    justify-content: center;
-    gap: clamp(32px, 12vw, 80px);
-    width: min(100%, 520px);
-    padding: 0 20px;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 clamp(20px, 6vw, 32px);
     box-sizing: border-box;
   }
 
@@ -364,8 +304,6 @@
     gap: 6px;
     cursor: pointer;
     white-space: nowrap;
-    flex: 1;
-    min-width: 0;
   }
 
   .cta-label {
@@ -374,45 +312,42 @@
     font-size: 13px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #161A1F;
+    color: #161a1f;
   }
 
   .cta-chevron {
     display: block;
-    width: 38px;
-    height: 19px;
+    width: 24px;
+    height: 12px;
   }
 
   .cta-chevron--down {
-    animation: chevron-bounce-down 1.4s ease-in-out infinite;
-  }
-
-  .cta-chevron--up {
-    animation: chevron-bounce-up 1.4s ease-in-out infinite;
+    animation: chevron-bounce-down 2.4s ease-in-out infinite;
   }
 
   @keyframes chevron-bounce-down {
-    0%, 100% { transform: translateY(0); }
-    50%       { transform: translateY(5px); }
-  }
-
-  @keyframes chevron-bounce-up {
-    0%, 100% { transform: translateY(0); }
-    50%       { transform: translateY(-5px); }
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(5px);
+    }
   }
 
   @media (max-width: 768px) {
-    .quote {
-      display: none;
+    .mobile-layout {
+      padding-top: 82px;
+      padding-bottom: 96px;
     }
 
-    .carousel__model {
-      height: min(38vh, 300px);
+    .quote--mobile {
+      font-size: 17px;
+      margin-bottom: 16px;
     }
 
-    .carousel {
-      gap: 8px;
-      justify-content: center;
+    .models-scene {
+      min-height: 56vh;
     }
   }
 </style>

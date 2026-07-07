@@ -445,6 +445,9 @@
   const SPORT_MOBILE_THEME_CENTER_BIAS = 0.52;
   /** Centro verticale ruspa con solo testo tema su mobile (più alto = più in basso). */
   const INFRASTRUCTURE_MOBILE_THEME_CENTER_BIAS = 0.62;
+  /** Ruspa mobile: centro fisso nel viewport (indipendente da testo, card e topic). */
+  const INFRASTRUCTURE_MOBILE_MODEL_CENTER_VH = 0.64;
+  const INFRASTRUCTURE_MOBILE_MODEL_FIT_HALF_GAP_VH = 0.18;
   const MOBILE_CARDS_TOP_MARGIN = 8;
   const topicsScaleTween = { value: TOPICS_SCALE_MOBILE };
 
@@ -457,7 +460,7 @@
     if (isInfrastructureModel()) {
       scale *= INFRASTRUCTURE_TOPICS_SCALE_MUL;
     }
-    if (cardsMode) {
+    if (cardsMode && !isInfrastructureModel()) {
       scale *= MOBILE_TOPIC_COMPACT_RATIO;
       if (
         config.modelSrc === '/oggetti/sport.glb' ||
@@ -539,6 +542,16 @@
     return plantTopicsYOffset(cardsActive) + sportTopicsYOffset(cardsActive);
   }
 
+  function mobileInfrastructureFixedFitBounds(): { topPx: number; bottomPx: number } {
+    const vh = mobileTopicsViewportHeightPx();
+    const centerPx = vh * INFRASTRUCTURE_MOBILE_MODEL_CENTER_VH;
+    const halfGap = vh * INFRASTRUCTURE_MOBILE_MODEL_FIT_HALF_GAP_VH;
+    return {
+      topPx: centerPx - halfGap,
+      bottomPx: centerPx + halfGap,
+    };
+  }
+
   function topicsFitOptions(cardsActive: boolean): MobileFitOptions {
     if (isMobile && isPlantModel()) {
       return {
@@ -555,11 +568,7 @@
       };
     }
     if (isMobile && isInfrastructureModel()) {
-      return {
-        centerBias: cardsActive
-          ? MOBILE_CARDS_FIT_CENTER_BIAS
-          : INFRASTRUCTURE_MOBILE_THEME_CENTER_BIAS,
-      };
+      return { centerBias: INFRASTRUCTURE_MOBILE_THEME_CENTER_BIAS };
     }
     if (!isMobile || !cardsActive || !isSportModel()) {
       return { centerBias: TOPICS_FIT_CENTER_BIAS };
@@ -694,9 +703,15 @@
     let bottomPx: number;
 
     if (isMobile) {
-      const bottomBoundPx = mobileFixedTopicsBottomBoundPx(cardsActive);
-      topPx = mobileTopicsTopPx(textRect, cardsActive);
-      bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
+      if (isInfrastructureModel()) {
+        const fixed = mobileInfrastructureFixedFitBounds();
+        topPx = fixed.topPx;
+        bottomPx = fixed.bottomPx;
+      } else {
+        const bottomBoundPx = mobileFixedTopicsBottomBoundPx(cardsActive);
+        topPx = mobileTopicsTopPx(textRect, cardsActive);
+        bottomPx = bottomBoundPx - TOPICS_MODEL_MARGIN;
+      }
     } else if (cardsActive && cardsRect && cardsRect.height > 0) {
       const overlapTop = Math.max(textRect.top, cardsRect.top);
       const overlapBottom = Math.min(textRect.bottom, cardsRect.bottom);

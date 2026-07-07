@@ -444,7 +444,7 @@
     margin: 0;
     font-family: 'Supreme Variable', sans-serif;
     font-size: clamp(1.65rem, 4.6vw, 2.75rem);
-    font-weight: 500;
+    font-weight: 700;
     line-height: 1.1;
     letter-spacing: 0;
     color: #161A1F;

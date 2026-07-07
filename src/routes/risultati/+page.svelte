@@ -248,7 +248,9 @@
   }
 
   .quote--mobile {
-    font-size: 20px;
+    font-size: 20pt;
+    font-weight: 500;
+    font-variation-settings: 'wght' 500;
     line-height: normal;
     max-width: 305px;
     margin: 0 auto 20px;
@@ -333,14 +335,7 @@
 
   .bottom-nav--mobile .bottom-cta {
     gap: 9px;
-  }
-
-  .bottom-nav--mobile .bottom-cta--home {
-    align-items: flex-start;
-  }
-
-  .bottom-nav--mobile .bottom-cta--about {
-    align-items: flex-end;
+    align-items: center;
   }
 
   .cta-label {
@@ -356,7 +351,7 @@
 
   .bottom-nav--mobile .cta-label {
     font-size: 13px;
-    text-align: left;
+    text-align: center;
   }
 
   .cta-chevron {
@@ -405,7 +400,7 @@
     }
 
     .quote--mobile {
-      font-size: 20px;
+      font-size: 20pt;
       margin-bottom: 16px;
     }
 

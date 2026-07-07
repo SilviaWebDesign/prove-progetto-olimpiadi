@@ -81,6 +81,7 @@
   }
 
   const anyLiked = $derived(topicLikes[currentTopic].some(l => l));
+  const topicCounter = $derived(`${currentTopic + 1} / ${topics.length}`);
 
   const ctaLabel = $derived(
     currentTopic === lastTopic && anyLiked
@@ -1375,6 +1376,7 @@
         onkeydown={(e) => { if (isMobile && phase === 'topics' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileCardsPanel(); } }}
       >
         <TextBlock
+          counter={topicCounter}
           title={topics[currentTopic].title}
           body={topics[currentTopic].body}
           source={topics[currentTopic].source ?? ''}
@@ -1923,7 +1925,11 @@
     /* Topic title font size transition */
     .stage__text :global(.section-fact-block) {
       width: 100%;
-      gap: 16px;
+      gap: 30px;
+    }
+
+    .stage__text :global(.section-fact-block__counter) {
+      font-size: 14px;
     }
 
     .stage__text :global(.section-fact-block__title) {
@@ -1945,7 +1951,7 @@
     }
 
     .stage__text :global(.section-fact-block__source) {
-      font-size: 12px;
+      font-size: 18px;
     }
 
     /* ── Cards column: posizione fissa (lvh), indipendente da CTA e barra browser ── */

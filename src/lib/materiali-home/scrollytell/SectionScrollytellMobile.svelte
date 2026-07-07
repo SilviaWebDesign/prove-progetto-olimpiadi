@@ -170,6 +170,7 @@
           <!-- Testo del topic -->
           <div class="mobile-topic__text">
             <SectionFactBlock
+              counter={`${currentTopic + 1} / ${topics.length}`}
               title={topics[currentTopic].title}
               body={topics[currentTopic].body}
               source={topics[currentTopic].source ?? ''}

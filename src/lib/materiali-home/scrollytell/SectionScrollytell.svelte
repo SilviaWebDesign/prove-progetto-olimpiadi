@@ -443,6 +443,8 @@
   const SPORT_CARDS_Y_OFFSET_VH = 0.038;
   /** Centro verticale pattini con solo testo tema su mobile. */
   const SPORT_MOBILE_THEME_CENTER_BIAS = 0.52;
+  /** Centro verticale ruspa con solo testo tema su mobile (più alto = più in basso). */
+  const INFRASTRUCTURE_MOBILE_THEME_CENTER_BIAS = 0.62;
   const MOBILE_CARDS_TOP_MARGIN = 8;
   const topicsScaleTween = { value: TOPICS_SCALE_MOBILE };
 
@@ -556,7 +558,7 @@
       return {
         centerBias: cardsActive
           ? MOBILE_CARDS_FIT_CENTER_BIAS
-          : TOPICS_FIT_CENTER_BIAS,
+          : INFRASTRUCTURE_MOBILE_THEME_CENTER_BIAS,
       };
     }
     if (!isMobile || !cardsActive || !isSportModel()) {

@@ -77,7 +77,9 @@
         </div>
 
         <div class="about-footer__col about-footer__col--brand">
-          <p class="about-footer__lab">Laboratorio di Web e Digital Design 2025-2026</p>
+          <p class="about-footer__lab">
+            <span class="about-footer__lab-medium">Laboratorio di</span> Web e Digital Design 2025-2026
+          </p>
           <div class="about-footer__logos">
             <img
               class="about-footer__ddc"
@@ -200,6 +202,11 @@
     color: #000000;
     text-align: right;
     text-wrap: balance;
+  }
+
+  .about-footer__lab-medium {
+    font-weight: 500;
+    font-variation-settings: 'wght' 500;
   }
 
   .about-footer__logos {

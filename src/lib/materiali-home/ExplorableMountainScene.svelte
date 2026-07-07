@@ -179,7 +179,7 @@
   /** Quota minima camera (linea neve / base render). */
   /** @type {number | null} */
   let cameraFloorY = null;
-  let cameraReady = false;
+  let cameraReady = $state(false);
   /** @type {string | null} */
   let lastSelectedHotspotId = null;
   let transitionActive = false;
@@ -588,11 +588,9 @@
     camera.updateProjectionMatrix();
     camera.up.set(0, 1, 0);
     camera.lookAt(controls.target);
-    clampCameraAboveSnow(
-      unfocusing
-        ? { pivot: _storedHeroTarget, clampCenter: true }
-        : undefined
-    );
+    if (!unfocusing) {
+      clampCameraAboveSnow();
+    }
   }
 
   function finishCameraTransition() {
@@ -621,9 +619,7 @@
       storedFocusPan.target.set(0, 0, 0);
     }
 
-    if (toFocus || !heroPoseStored) {
-      syncControlsToCameraPose();
-    }
+    syncControlsToCameraPose();
     clampCameraAboveSnow(toFocus ? undefined : { pivot: _storedHeroTarget, clampCenter: true });
 
     cameraTransition = null;
@@ -790,8 +786,23 @@
     return storedFocusPan.cam.lengthSq() > 1e-6 || storedFocusPan.target.lengthSq() > 1e-6;
   }
 
+  /** @param {import('./aboutHotspots.js').AboutHotspot | null} hotspot @returns {boolean} */
   function startCameraTransition(hotspot) {
-    if (!camera || !controls || !homeOrbitConfig) return;
+    if (!camera || !controls || !homeOrbitConfig) return false;
+
+    if (!hotspot && heroPoseStored) {
+      cameraTransition = null;
+      transitionActive = false;
+      storedFocusPan.cam.set(0, 0, 0);
+      storedFocusPan.target.set(0, 0, 0);
+      refreshAboutHeroCameraPose();
+      applyMountainOrbitLimits();
+      setupOrbitPolarLimits();
+      syncControlsToCameraPose();
+      clampCameraAboveSnow({ pivot: _storedHeroTarget, clampCenter: true });
+      controls.enabled = true;
+      return true;
+    }
 
     const fromCam = camera.position.clone();
     const fromTarget = controls.target.clone();
@@ -810,7 +821,7 @@
     if (hotspot) {
       const markerPos = getHotspotMarkerPosition(hotspot);
       const focusPoint = getHotspotFocusPoint(hotspot);
-      if (!markerPos || !focusPoint) return;
+      if (!markerPos || !focusPoint) return false;
 
       if (betweenFocuses) {
         fromCam.sub(storedFocusPan.cam);
@@ -895,6 +906,7 @@
       toFocus,
       betweenFocuses
     };
+    return true;
   }
 
   function updateCameraTransition() {
@@ -1133,11 +1145,31 @@
     paused = document.hidden;
   }
 
+  function syncCameraToSelectedHotspot() {
+    if (!cameraReady) return;
+
+    const id = selectedHotspot?.id ?? null;
+    if (id === lastSelectedHotspotId) return;
+
+    if (startCameraTransition(selectedHotspot)) {
+      lastSelectedHotspotId = id;
+    }
+  }
+
   function animate() {
     if (!renderer || !scene || !camera) return;
 
     animationFrameId = requestAnimationFrame(animate);
-    if (paused) return;
+
+    if (transitionActive && !cameraTransition && controls) {
+      transitionActive = false;
+      controls.enabled = true;
+    }
+
+    if (paused) {
+      if (cameraTransition) updateCameraTransition();
+      return;
+    }
 
     const now = performance.now();
 
@@ -1157,15 +1189,15 @@
       updateMarkerBob(entry.object, phase, active);
     }
 
-    if (controls && cameraReady) {
-      controls.enabled = !transitionActive;
-    }
-
     if (cameraTransition) {
       updateCameraTransition();
     } else {
       clampCameraAboveSnow();
       updateMarkerScales();
+    }
+
+    if (controls && cameraReady) {
+      controls.enabled = !transitionActive;
     }
 
     renderScene();
@@ -1241,11 +1273,7 @@
     updateMarkerSelection();
     if (!cameraReady) return;
 
-    const id = hotspot?.id ?? null;
-    if (id === lastSelectedHotspotId) return;
-
-    lastSelectedHotspotId = id;
-    startCameraTransition(hotspot);
+    syncCameraToSelectedHotspot();
   });
 
   onMount(() => {
@@ -1351,9 +1379,9 @@
         applyMountainOrbitLimits();
         setupOrbitPolarLimits();
         refreshAboutHeroCameraPose();
-        cameraReady = true;
         controls.enabled = true;
-        lastSelectedHotspotId = selectedHotspot?.id ?? null;
+        cameraReady = true;
+        syncCameraToSelectedHotspot();
 
         resizeRenderer();
       } catch (err) {

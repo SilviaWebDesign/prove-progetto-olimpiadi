@@ -105,11 +105,11 @@
       }}
     >
       <span class="cta-label">Torna alla home</span>
-      <svg class="cta-chevron cta-chevron--up" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+      <svg class="cta-chevron cta-chevron--up" viewBox="0 0 17 7" aria-hidden="true" fill="none">
         <path
-          d="M60 54L78.5 40L95 54"
+          d="M1 6L8.5 1L16 6"
           stroke="#161A1F"
-          stroke-width="2"
+          stroke-width="1.5"
           stroke-linecap="round"
           stroke-linejoin="round"
         />
@@ -129,11 +129,11 @@
       }}
     >
       <span class="cta-label">Scopri di più</span>
-      <svg class="cta-chevron cta-chevron--down" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+      <svg class="cta-chevron cta-chevron--down" viewBox="0 0 17 7" aria-hidden="true" fill="none">
         <path
-          d="M60 40L78.5 54L95 40"
+          d="M1 1L8.5 6L16 1"
           stroke="#161A1F"
-          stroke-width="2"
+          stroke-width="1.5"
           stroke-linecap="round"
           stroke-linejoin="round"
         />
@@ -315,12 +315,12 @@
     align-items: flex-end;
     justify-content: space-between;
     width: 100%;
-    padding: 0 clamp(20px, 6vw, 32px);
+    padding: 0 32px;
     box-sizing: border-box;
   }
 
   .bottom-nav--mobile {
-    bottom: 24px;
+    bottom: 32px;
     padding: 0 20px;
   }
 
@@ -329,19 +329,22 @@
     flex-direction: column;
     align-items: center;
     gap: 16px;
+    min-height: 50px;
     padding: 0 14px;
     cursor: pointer;
     white-space: nowrap;
+    user-select: none;
   }
 
   .bottom-nav--mobile .bottom-cta {
     gap: 9px;
-    align-items: center;
+    min-height: 30px;
   }
 
   .cta-label {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
+    font-variation-settings: 'wght' 700;
     font-size: 16px;
     line-height: 1.1;
     letter-spacing: 0;
@@ -352,46 +355,18 @@
 
   .bottom-nav--mobile .cta-label {
     font-size: 13px;
-    text-align: center;
   }
 
   .cta-chevron {
     display: block;
     width: 25px;
     height: 10px;
+    flex-shrink: 0;
   }
 
   .bottom-nav--mobile .cta-chevron {
     width: 17px;
     height: 7px;
-  }
-
-  .cta-chevron--down {
-    animation: chevron-bounce-down 2.4s ease-in-out infinite;
-  }
-
-  .cta-chevron--up {
-    animation: chevron-bounce-up 2.4s ease-in-out infinite;
-  }
-
-  @keyframes chevron-bounce-down {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(5px);
-    }
-  }
-
-  @keyframes chevron-bounce-up {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-5px);
-    }
   }
 
   @media (max-width: 768px) {

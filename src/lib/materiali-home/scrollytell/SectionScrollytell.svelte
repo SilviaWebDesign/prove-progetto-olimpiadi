@@ -430,6 +430,8 @@
   const PLANT_CARDS_SCALE_MUL = 0.76;
   /** Scala base pianta su mobile (argomenti). */
   const PLANT_TOPICS_SCALE_MUL = 0.87;
+  /** Scala base ruspa su mobile (argomenti). */
+  const INFRASTRUCTURE_TOPICS_SCALE_MUL = 0.68;
   /** Riduzione extra pattini con pannello commenti visibile. */
   const SPORT_CARDS_SCALE_MUL = 0.74;
   /** Con commenti visibili: centro dello spazio bianco tra testo e card. */
@@ -447,6 +449,9 @@
     let scale = TOPICS_SCALE_MOBILE;
     if (config.modelSrc === '/oggetti/pianta.glb') {
       scale *= PLANT_TOPICS_SCALE_MUL;
+    }
+    if (isInfrastructureModel()) {
+      scale *= INFRASTRUCTURE_TOPICS_SCALE_MUL;
     }
     if (cardsMode) {
       scale *= MOBILE_TOPIC_COMPACT_RATIO;
@@ -1376,7 +1381,7 @@
         onkeydown={(e) => { if (isMobile && phase === 'topics' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMobileCardsPanel(); } }}
       >
         <TextBlock
-          counter={topicCounter}
+          counter={isMobile && mobileCardsVisible ? undefined : topicCounter}
           title={topics[currentTopic].title}
           body={topics[currentTopic].body}
           source={topics[currentTopic].source ?? ''}
@@ -1886,6 +1891,7 @@
       height: 100vh;
       height: 100lvh;
       --mobile-text-top: 108px;
+      --mobile-text-top-compact: 72px;
       --mobile-phrase-top: 148px;
       --mobile-cards-bottom: 90px;
       --mobile-cta-bottom: 16px;
@@ -1920,6 +1926,11 @@
       right: 20px;
       width: auto;
       z-index: 5;
+      transition: top 0.4s ease;
+    }
+
+    .stage__text.m-compact {
+      top: var(--mobile-text-top-compact);
     }
 
     /* Topic title font size transition */
@@ -1935,6 +1946,10 @@
     .stage__text :global(.section-fact-block__title) {
       font-size: 36px;
       transition: font-size 0.4s ease;
+    }
+
+    .stage__text.m-compact :global(.section-fact-block) {
+      gap: 16px;
     }
 
     .stage__text.m-compact :global(.section-fact-block__title) {

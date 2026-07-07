@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import Navbar from '$lib/materiali-home/Navbar.svelte';
   import ModelViewer from '$lib/components/ModelViewer.svelte';
+  import SectionMountainScene from '$lib/materiali-home/SectionMountainScene.svelte';
+  import { preloadMountainGltf } from '$lib/materiali-home/mountainGltf.js';
   import { visitedSections } from '$lib/stores/visitedSections';
   import { overlayVisible } from '$lib/stores/pageTransition';
 
@@ -9,6 +11,7 @@
 
   onMount(() => {
     isMobile = window.innerWidth < 768;
+    preloadMountainGltf();
     const t = setTimeout(() => overlayVisible.set(false), 60);
     return () => clearTimeout(t);
   });
@@ -40,7 +43,13 @@
 <Navbar alwaysVisible />
 
 <div class="risultati" class:risultati--mobile={isMobile}>
-  <div class="bg" aria-hidden="true"></div>
+  {#if isMobile}
+    <div class="bg bg--mountain" aria-hidden="true">
+      <SectionMountainScene topDown={true} fixedZoom={1.05} visible={true} />
+    </div>
+  {:else}
+    <div class="bg" aria-hidden="true"></div>
+  {/if}
 
   {#if !isMobile}
     <div class="models-row">
@@ -58,15 +67,14 @@
     <p class="quote quote--desktop">
       La realtà non è mai unica<br />
       e uguale per tutti.<br />
-      Lo stesso evento può generare visioni differenti e soggettive, in base alle opinioni di ognuno
+      Lo stesso evento può generare visioni differenti e soggettive.
     </p>
   {:else}
     <div class="mobile-layout">
       <p class="quote quote--mobile">
         La realtà non è mai unica<br />
         e uguale per tutti.<br />
-        Lo stesso evento può generare<br />
-        visioni differenti e soggettive.
+        Lo stesso evento può generare visioni differenti e soggettive.
       </p>
 
       <div class="models-scene" aria-label="Risultati delle tre sezioni">
@@ -83,9 +91,9 @@
     </div>
   {/if}
 
-  <div class="bottom-nav">
+  <div class="bottom-nav" class:bottom-nav--mobile={isMobile}>
     <div
-      class="bottom-cta"
+      class="bottom-cta bottom-cta--home"
       role="button"
       tabindex="0"
       onclick={tornareAllaHome}
@@ -97,9 +105,9 @@
       }}
     >
       <span class="cta-label">Torna alla home</span>
-      <svg class="cta-chevron cta-chevron--down" viewBox="58 37 41 20" aria-hidden="true" fill="none">
+      <svg class="cta-chevron cta-chevron--up" viewBox="58 37 41 20" aria-hidden="true" fill="none">
         <path
-          d="M60 40L78.5 54L95 40"
+          d="M60 54L78.5 40L95 54"
           stroke="#161A1F"
           stroke-width="2"
           stroke-linecap="round"
@@ -109,7 +117,7 @@
     </div>
 
     <div
-      class="bottom-cta"
+      class="bottom-cta bottom-cta--about"
       role="button"
       tabindex="0"
       onclick={scopriDiPiu}
@@ -183,11 +191,31 @@
     filter: blur(12px);
     pointer-events: none;
     z-index: 0;
+    overflow: hidden;
   }
 
-  .risultati--mobile .bg {
-    opacity: 0.14;
-    filter: blur(18px);
+  .bg--mountain {
+    inset: -10%;
+    background-image: none;
+    opacity: 1;
+    filter: blur(18px) saturate(0.95) contrast(1.08);
+  }
+
+  .bg--mountain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.22);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .bg--mountain :global(.three-canvas) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
   }
 
   .quote {
@@ -220,9 +248,9 @@
   }
 
   .quote--mobile {
-    font-size: 18px;
-    line-height: 1.4;
-    max-width: 280px;
+    font-size: 20px;
+    line-height: normal;
+    max-width: 305px;
     margin: 0 auto 20px;
   }
 
@@ -288,32 +316,66 @@
     box-sizing: border-box;
   }
 
+  .bottom-nav--mobile {
+    bottom: 24px;
+    padding: 0 20px;
+  }
+
   .bottom-cta {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 16px;
+    padding: 0 14px;
     cursor: pointer;
     white-space: nowrap;
+  }
+
+  .bottom-nav--mobile .bottom-cta {
+    gap: 9px;
+  }
+
+  .bottom-nav--mobile .bottom-cta--home {
+    align-items: flex-start;
+  }
+
+  .bottom-nav--mobile .bottom-cta--about {
+    align-items: flex-end;
   }
 
   .cta-label {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.08em;
+    font-size: 16px;
+    line-height: 1.1;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: #161a1f;
+    text-align: center;
+  }
+
+  .bottom-nav--mobile .cta-label {
+    font-size: 13px;
+    text-align: left;
   }
 
   .cta-chevron {
     display: block;
-    width: 24px;
-    height: 12px;
+    width: 25px;
+    height: 10px;
+  }
+
+  .bottom-nav--mobile .cta-chevron {
+    width: 17px;
+    height: 7px;
   }
 
   .cta-chevron--down {
     animation: chevron-bounce-down 2.4s ease-in-out infinite;
+  }
+
+  .cta-chevron--up {
+    animation: chevron-bounce-up 2.4s ease-in-out infinite;
   }
 
   @keyframes chevron-bounce-down {
@@ -326,6 +388,16 @@
     }
   }
 
+  @keyframes chevron-bounce-up {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
   @media (max-width: 768px) {
     .mobile-layout {
       padding-top: 82px;
@@ -333,7 +405,7 @@
     }
 
     .quote--mobile {
-      font-size: 17px;
+      font-size: 20px;
       margin-bottom: 16px;
     }
 

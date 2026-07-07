@@ -15,8 +15,8 @@
   const CAMERA_ZOOM_END = 1.4;
   const smogColor = '#ffffff';
 
-  /** @type {{ progress?: number, visible?: boolean }} */
-  let { progress = 0, visible = true } = $props();
+  /** @type {{ progress?: number, visible?: boolean, fixedZoom?: number, fixedCameraZ?: number, topDown?: boolean }} */
+  let { progress = 0, visible = true, fixedZoom, fixedCameraZ, topDown = false } = $props();
 
   /** @type {HTMLDivElement | undefined} */
   let container = $state(undefined);
@@ -31,6 +31,12 @@
   let animationFrameId = 0;
   /** @type {THREE.Object3D | undefined} */
   let snowMountainModel;
+  /** @type {THREE.Vector3 | undefined} */
+  let mountainLookAt;
+  /** @type {number | undefined} */
+  let mountainTopDownHeight;
+  const _topDownOffset = new THREE.Vector3();
+  const _topDownSpherical = new THREE.Spherical();
   let initGeneration = 0;
 
   /** @param {number} value @param {number} min @param {number} max */
@@ -64,12 +70,25 @@
     animationFrameId = requestAnimationFrame(animate);
 
     const tZoom = easeInOutCubic(clamp(progress, 0, 1));
-    camera.position.set(0, CAMERA_Y_START, lerp(CAMERA_Z_START, CAMERA_Z_END, tZoom));
-    camera.rotation.set(0, 0, 0);
-    camera.zoom = lerp(CAMERA_ZOOM_START, CAMERA_ZOOM_END, tZoom);
+    if (topDown && mountainLookAt && mountainTopDownHeight != null) {
+      _topDownSpherical.radius = mountainTopDownHeight * 0.78;
+      _topDownSpherical.phi = 0.24;
+      _topDownSpherical.theta = Math.PI * 0.18;
+      _topDownOffset.setFromSpherical(_topDownSpherical);
+      camera.position.copy(mountainLookAt).add(_topDownOffset);
+      camera.up.set(0, 1, 0);
+      camera.lookAt(mountainLookAt);
+      if (sceneFog) sceneFog.density = 0.01;
+    } else {
+      const cameraZ = fixedCameraZ ?? lerp(CAMERA_Z_START, CAMERA_Z_END, tZoom);
+      camera.position.set(0, CAMERA_Y_START, cameraZ);
+      camera.rotation.set(0, 0, 0);
+      camera.up.set(0, 1, 0);
+      if (sceneFog) sceneFog.density = 0.045;
+    }
+    camera.zoom = fixedZoom ?? lerp(CAMERA_ZOOM_START, CAMERA_ZOOM_END, tZoom);
     camera.updateProjectionMatrix();
 
-    if (sceneFog) sceneFog.density = 0.045;
     if (snowMountainModel) snowMountainModel.visible = visible;
 
     renderer.render(scene, camera);
@@ -91,6 +110,9 @@
       });
       snowMountainModel = undefined;
     }
+
+    mountainLookAt = undefined;
+    mountainTopDownHeight = undefined;
 
     if (renderer) {
       renderer.dispose();
@@ -142,7 +164,9 @@
         if (gen !== initGeneration || !scene) return;
 
         snowMountainModel = gltf.scene.clone(true);
-        fitMountainModel(snowMountainModel);
+        const { mountainCenter, topDownHeight } = fitMountainModel(snowMountainModel);
+        mountainLookAt = mountainCenter;
+        mountainTopDownHeight = topDownHeight;
         scene.add(snowMountainModel);
         resizeRenderer();
       } catch (err) {

@@ -322,12 +322,7 @@ export function getScrollytellConfig(key) {
 
   return {
     pageTitle: `${section.title} — Quante facce ha una medaglia?`,
-    heroTitle:
-      key === 'infrastructure'
-        ? ''
-        : sectionHeroTitles.has(key)
-          ? section.heroTitle
-          : section.title,
+    heroTitle: sectionHeroTitles.has(key) ? section.heroTitle : section.title,
     heroTitleStyle: /** @type {'svg' | 'section'} */ (
       sectionHeroTitles.has(key) ? 'section' : 'svg'
     ),

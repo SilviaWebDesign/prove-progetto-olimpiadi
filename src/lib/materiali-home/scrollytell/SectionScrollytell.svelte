@@ -6,6 +6,7 @@
   import Lenis from 'lenis';
 
   import FrostCanvas from '$lib/components/FrostCanvas.svelte';
+  import SectionHeroTitle from '$lib/materiali-home/SectionHeroTitle.svelte';
   import TextBlock from './TextBlock.svelte';
   import CardStack from './CardStack.svelte';
   import type { CardStackApi } from './CardStack.svelte';
@@ -344,21 +345,6 @@
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
   let sceneEl = $state<HTMLElement | null>(null);
-
-  function purgeHeroTitles(root: ParentNode | null) {
-    if (!root) return;
-    root.querySelectorAll('.hero-title, .section-hero-title').forEach((el) => el.remove());
-    gsap.killTweensOf('.hero-title');
-    gsap.killTweensOf('.section-hero-title');
-  }
-
-  $effect(() => {
-    if (!browser || !sceneEl) return;
-    purgeHeroTitles(sceneEl);
-    const observer = new MutationObserver(() => purgeHeroTitles(sceneEl));
-    observer.observe(sceneEl, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  });
   let scene3d = $state<Scene3DApi | undefined>(undefined);
   let cardStack = $state<CardStackApi | undefined>(undefined);
   let cardsIntroduced = false;
@@ -1107,8 +1093,6 @@
 
       if (!sceneEl) return;
 
-      purgeHeroTitles(sceneEl);
-
       gsap.registerPlugin(ScrollTrigger);
 
       // Lenis only on desktop (mobile has native touch scroll for GSAP)
@@ -1135,12 +1119,10 @@
       }
       window.addEventListener('resize', onWindowResize);
 
-      const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title');
-      const textEl = titleEl?.querySelector<SVGTextElement>('.hero-title__text') ?? null;
+      const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
+      const textEl = titleEl.querySelector<SVGTextElement>('.hero-title__text');
 
-      if (titleEl) {
-        gsap.set(titleEl, { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
-      }
+      gsap.set(titleEl, { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
       gsap.set('.phrase, .phrase--multiline', { y: 30, autoAlpha: 0 });
       gsap.set('.stage__text',  { x: -30 });
       // On mobile, CSS class controls .stage__right opacity (no GSAP inline style so CSS class can win)
@@ -1158,14 +1140,12 @@
         },
       });
 
-      if (titleEl) {
-        heroTl.fromTo(
-          titleEl,
-          { scaleY: 1, yPercent: 0, opacity: 1, immediateRender: false },
-          { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
-          0
-        );
-      }
+      heroTl.fromTo(
+        titleEl,
+        { scaleY: 1, yPercent: 0, opacity: 1, immediateRender: false },
+        { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
+        0
+      );
       heroTl.fromTo('.layer--frost',
         { autoAlpha: 1 },
         { autoAlpha: 0, ease: 'power2.inOut', duration: 0.30 },
@@ -1263,7 +1243,7 @@
           titleEl.style.top = `${Math.max(0, (window.innerHeight - svgH) / 2)}px`;
         }
       }
-      if (titleEl && window.scrollY < window.innerHeight * 0.15) {
+      if (window.scrollY < window.innerHeight * 0.15) {
         gsap.to(titleEl, { opacity: 1, duration: 0.12, ease: 'none' });
       }
     });
@@ -1336,6 +1316,29 @@
       style="background-image: url('{config.bgSrc}'); background-position: {config.bgPosition ?? 'center'}"
       aria-hidden="true"
     ></div>
+
+    <!-- Titolone -->
+    {#if config.heroTitleStyle === 'section'}
+      <div
+        class="hero-title hero-title--section"
+        class:hero-title--spread={config.heroTitleLayout === 'spread'}
+        role="img"
+        aria-label={config.heroAriaLabel}
+      >
+        <SectionHeroTitle title={config.heroTitle} layout={config.heroTitleLayout ?? 'center'} />
+      </div>
+    {:else}
+      <svg
+        class="hero-title"
+        width="100%"
+        preserveAspectRatio="xMidYMax meet"
+        role="img"
+        aria-label={config.heroAriaLabel}
+        focusable="false"
+      >
+        <text class="hero-title__text" x="0" y="0">{config.heroTitle}</text>
+      </svg>
+    {/if}
 
     <!-- Frase -->
     <div class="phrase-container">
@@ -1538,16 +1541,50 @@
     opacity: 0.10;
   }
 
-  /* Titolone disabilitato — nessuna scritta di sezione in hero */
-  .scene :global(.hero-title),
-  .scene :global(.section-hero-title),
-  .scene :global(.hero-title__text) {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
+  /* ── Titolone SVG ──────────────────────────────────────────────────────── */
+  .hero-title {
+    display: block;
+    position: absolute;
+    z-index: 3;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    line-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    transform-origin: bottom center;
+    pointer-events: none;
+    user-select: none;
+    will-change: transform, opacity;
+    opacity: 0;
+  }
+
+  .hero-title__text {
+    font-family: 'PP Formula Condensed', sans-serif;
+    font-weight: 700;
+    font-variation-settings: 'wght' 700;
+    fill: var(--color-text-primary, #000000);
+  }
+
+  /* ── Titolone section-style ───────────────────────────────────────────── */
+  .hero-title--section {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    inset: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .hero-title--section.hero-title--spread {
+    align-items: stretch;
+    padding: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
   }
 
   /* ── Frase ───────────────────────────────────────────────────────────── */
@@ -1860,6 +1897,11 @@
 
     .scene {
       height: 600vh;
+    }
+
+    /* Titolone: centrato verticalmente sullo schermo (entrambe le varianti: center e spread) */
+    .hero-title--section {
+      justify-content: center;
     }
 
     /* Stage: single column, children absolutely positioned */

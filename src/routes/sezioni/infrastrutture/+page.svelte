@@ -6,5 +6,5 @@
   const config = getScrollytellConfig('infrastructure');
 </script>
 
-<Navbar alwaysVisible hideTitle />
+<Navbar alwaysVisible />
 <SectionScrollytell {config} />

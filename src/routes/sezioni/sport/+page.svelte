@@ -6,5 +6,5 @@
   const config = getScrollytellConfig('sport');
 </script>
 
-<Navbar alwaysVisible hideTitle />
+<Navbar alwaysVisible />
 <SectionScrollytell {config} />

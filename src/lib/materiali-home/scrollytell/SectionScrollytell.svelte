@@ -1128,7 +1128,7 @@
       const titleEl = sceneEl.querySelector<HTMLElement>('.hero-title')!;
       const textEl = titleEl.querySelector<SVGTextElement>('.hero-title__text');
 
-      gsap.set(titleEl, { scaleY: 1, yPercent: 0, transformOrigin: 'bottom center' });
+      gsap.set(titleEl, { yPercent: 0, transformOrigin: 'bottom center' });
       gsap.set('.phrase, .phrase--multiline', { y: 30, autoAlpha: 0 });
       gsap.set('.stage__text',  { x: -30 });
       // On mobile, CSS class controls .stage__right opacity (no GSAP inline style so CSS class can win)
@@ -1148,8 +1148,8 @@
 
       heroTl.fromTo(
         titleEl,
-        { scaleY: 1, yPercent: 0, opacity: 1, immediateRender: false },
-        { scaleY: 2.2, yPercent: -120, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
+        { yPercent: 0, opacity: 1, immediateRender: false },
+        { yPercent: -60, opacity: 0, ease: 'power3.inOut', duration: 0.25 },
         0
       );
       heroTl.fromTo('.layer--frost',

@@ -92,53 +92,37 @@
   {/if}
 
   <div class="bottom-nav" class:bottom-nav--mobile={isMobile}>
-    <div
+    <button
+      type="button"
       class="bottom-cta bottom-cta--home"
-      role="button"
-      tabindex="0"
       onclick={tornareAllaHome}
-      onkeydown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          tornareAllaHome();
-        }
-      }}
     >
       <span class="cta-label">Torna alla home</span>
-      <svg class="cta-chevron cta-chevron--up" viewBox="0 0 17 7" aria-hidden="true" fill="none">
-        <path
-          d="M1 6L8.5 1L16 6"
-          stroke="#161A1F"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-    </div>
+      <img
+        class="cta-chevron"
+        src={isMobile ? '/images/risultati/chevron-down.svg' : '/images/risultati/chevron-down-desktop.svg'}
+        alt=""
+        aria-hidden="true"
+        width={isMobile ? 17 : 25}
+        height={isMobile ? 7 : 10}
+      />
+    </button>
 
-    <div
+    <button
+      type="button"
       class="bottom-cta bottom-cta--about"
-      role="button"
-      tabindex="0"
       onclick={scopriDiPiu}
-      onkeydown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          scopriDiPiu();
-        }
-      }}
     >
       <span class="cta-label">Scopri di più</span>
-      <svg class="cta-chevron cta-chevron--down" viewBox="0 0 17 7" aria-hidden="true" fill="none">
-        <path
-          d="M1 1L8.5 6L16 1"
-          stroke="#161A1F"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-    </div>
+      <img
+        class="cta-chevron"
+        src={isMobile ? '/images/risultati/chevron-down.svg' : '/images/risultati/chevron-down-desktop.svg'}
+        alt=""
+        aria-hidden="true"
+        width={isMobile ? 17 : 25}
+        height={isMobile ? 7 : 10}
+      />
+    </button>
   </div>
 </div>
 
@@ -320,8 +304,10 @@
   }
 
   .bottom-nav--mobile {
-    bottom: 32px;
-    padding: 0 20px;
+    bottom: max(24px, env(safe-area-inset-bottom, 0px));
+    display: block;
+    height: 30px;
+    padding: 0;
   }
 
   .bottom-cta {
@@ -331,14 +317,32 @@
     gap: 16px;
     min-height: 50px;
     padding: 0 14px;
+    border: 0;
+    background: transparent;
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
+    color: inherit;
+    font: inherit;
   }
 
   .bottom-nav--mobile .bottom-cta {
+    position: absolute;
+    bottom: 0;
     gap: 9px;
     min-height: 30px;
+    height: 30px;
+    justify-content: flex-start;
+  }
+
+  .bottom-nav--mobile .bottom-cta--home {
+    left: 33.85%;
+    transform: translateX(-50%);
+  }
+
+  .bottom-nav--mobile .bottom-cta--about {
+    left: 68.08%;
+    transform: translateX(-50%);
   }
 
   .cta-label {
@@ -355,6 +359,11 @@
 
   .bottom-nav--mobile .cta-label {
     font-size: 13px;
+    line-height: 1.1;
+  }
+
+  .bottom-nav--mobile .bottom-cta--home .cta-label {
+    text-align: left;
   }
 
   .cta-chevron {
@@ -362,11 +371,22 @@
     width: 25px;
     height: 10px;
     flex-shrink: 0;
+    object-fit: contain;
+    object-position: center;
   }
 
   .bottom-nav--mobile .cta-chevron {
     width: 17px;
     height: 7px;
+  }
+
+  .bottom-cta--home .cta-chevron {
+    transform: rotate(180deg);
+  }
+
+  .bottom-cta:focus-visible {
+    outline: 2px solid #161a1f;
+    outline-offset: 4px;
   }
 
   @media (max-width: 768px) {

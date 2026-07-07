@@ -221,6 +221,7 @@
   .quote {
     font-family: 'Supreme Variable', sans-serif;
     font-weight: 500;
+    font-variation-settings: 'wght' 500;
     text-align: center;
     color: #161a1f;
   }
@@ -248,7 +249,7 @@
   }
 
   .quote--mobile {
-    font-size: 20pt;
+    font-size: 20px;
     font-weight: 500;
     font-variation-settings: 'wght' 500;
     line-height: normal;
@@ -400,7 +401,9 @@
     }
 
     .quote--mobile {
-      font-size: 20pt;
+      font-size: 20px;
+      font-weight: 500;
+      font-variation-settings: 'wght' 500;
       margin-bottom: 16px;
     }
 

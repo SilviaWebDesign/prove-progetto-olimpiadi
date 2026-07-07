@@ -171,7 +171,7 @@
     background-image: url('/images/sfondo-infrastrutture.jpg');
     background-size: cover;
     background-position: center;
-    opacity: 0.28;
+    opacity: 0.2;
     filter: blur(12px);
     pointer-events: none;
     z-index: 0;
@@ -182,14 +182,14 @@
     inset: -10%;
     background-image: none;
     opacity: 1;
-    filter: blur(18px) saturate(0.95) contrast(1.08);
+    filter: blur(18px) brightness(1.22) saturate(0) contrast(1.05);
   }
 
   .bg--mountain::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.34);
     pointer-events: none;
     z-index: 1;
   }
